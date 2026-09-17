@@ -7,6 +7,7 @@ import { DotText } from '../src/components/DotText';
 import { PatForm } from '../src/components/PatForm';
 import { useContributions } from '../src/hooks/useContributions';
 import { tokenStore } from '../src/lib/token';
+import { clearWidget, syncWidget } from '../src/lib/widgetBridge';
 import { colors } from '../src/theme';
 
 /** undefined = restoring from Keychain, null = signed out. */
@@ -20,12 +21,19 @@ export default function Home() {
     tokenStore.get().then(setToken);
   }, []);
 
+  useEffect(() => {
+    if (contributions.status === 'ready') {
+      syncWidget(contributions.model).catch(() => {});
+    }
+  }, [contributions]);
+
   const connect = async (verifiedToken: string) => {
     await tokenStore.set(verifiedToken);
     setToken(verifiedToken);
   };
 
   const disconnect = async () => {
+    await clearWidget().catch(() => {});
     await tokenStore.clear();
     setToken(null);
   };

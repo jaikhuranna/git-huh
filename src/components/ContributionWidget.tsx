@@ -10,6 +10,10 @@ const SCREEN_MARGIN = 16;
 const WIDGET_PADDING = 20;
 const DOT_GAP = 4;
 
+/** Stats column share of the widget width; the dot matrix takes the rest. */
+const STATS_FLEX = 3;
+const GRID_FLEX = 7;
+
 const numberFormat = new Intl.NumberFormat('en-US');
 
 interface ContributionWidgetProps {
@@ -17,50 +21,53 @@ interface ContributionWidgetProps {
 }
 
 /**
- * The Nothing-style contribution widget: a monochrome dot matrix on black,
- * with today's cell punched out in Nothing red — the single allowed accent.
+ * The Nothing-style contribution widget: stats on the left third, a
+ * monochrome dot matrix on the right two-thirds, with today's cell punched
+ * out in Nothing red — the single allowed accent.
  */
 export function ContributionWidget({ model }: ContributionWidgetProps) {
   const { width: screenWidth } = useWindowDimensions();
-  const innerWidth =
-    screenWidth - SCREEN_MARGIN * 2 - WIDGET_PADDING * 2;
+  const gridWidth =
+    ((screenWidth - SCREEN_MARGIN * 2 - WIDGET_PADDING * 2) * GRID_FLEX) /
+    (STATS_FLEX + GRID_FLEX);
   const dotSize = Math.floor(
-    (innerWidth - DOT_GAP * (GRID_WEEKS - 1)) / GRID_WEEKS,
+    (gridWidth - DOT_GAP * (GRID_WEEKS - 1)) / GRID_WEEKS,
   );
 
   return (
     <View style={styles.widget}>
-      <View style={styles.header}>
-        <Wordmark />
-        <View
-          style={[
-            styles.statusDot,
-            model.todayCount === 0 && styles.statusDotIdle,
-          ]}
-        />
-      </View>
+      <View style={styles.split}>
+        <View style={styles.stats}>
+          <Wordmark />
+          <DotText style={styles.total}>
+            {numberFormat.format(model.total)}
+          </DotText>
+          <DotText style={styles.caption}>contributions</DotText>
+          <DotText style={styles.caption}>@{model.login.toLowerCase()}</DotText>
+          <DotText
+            style={[styles.today, model.todayCount === 0 && styles.todayIdle]}
+          >
+            today · {model.todayCount}
+          </DotText>
+        </View>
 
-      <DotText style={styles.total}>{numberFormat.format(model.total)}</DotText>
-      <DotText style={styles.caption}>
-        contributions · @{model.login.toLowerCase()}
-      </DotText>
-
-      <View style={[styles.grid, { gap: DOT_GAP }]}>
-        {model.columns.map((column) => (
-          <View key={column[0]?.date} style={{ gap: DOT_GAP }}>
-            {column.map((day) => (
-              <View
-                key={day.date}
-                style={[
-                  styles.dot,
-                  { width: dotSize, height: dotSize },
-                  { backgroundColor: colors.ramp[day.level] },
-                  day.isToday && styles.today,
-                ]}
-              />
-            ))}
-          </View>
-        ))}
+        <View style={[styles.grid, { gap: DOT_GAP }]}>
+          {model.columns.map((column) => (
+            <View key={column[0]?.date} style={{ gap: DOT_GAP }}>
+              {column.map((day) => (
+                <View
+                  key={day.date}
+                  style={[
+                    styles.dot,
+                    { width: dotSize, height: dotSize },
+                    { backgroundColor: colors.ramp[day.level] },
+                    day.isToday && styles.todayDot,
+                  ]}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
       </View>
 
       <View style={styles.footer}>
@@ -72,10 +79,6 @@ export function ContributionWidget({ model }: ContributionWidgetProps) {
           />
         ))}
         <DotText style={styles.legendLabel}>more</DotText>
-        <View style={styles.footerSpacer} />
-        <DotText style={styles.todayLabel}>
-          today · {model.todayCount}
-        </DotText>
       </View>
     </View>
   );
@@ -87,46 +90,47 @@ const styles = StyleSheet.create({
     borderColor: colors.outline,
     borderRadius: radii.widget,
     borderWidth: 1,
-    gap: 14,
+    gap: 18,
     margin: SCREEN_MARGIN,
     padding: WIDGET_PADDING,
   },
-  header: {
+  split: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
   },
-  statusDot: {
-    backgroundColor: colors.accent,
-    borderRadius: 4,
-    height: 8,
-    width: 8,
-  },
-  statusDotIdle: {
-    backgroundColor: 'transparent',
-    borderColor: colors.text.faint,
-    borderWidth: 1,
+  stats: {
+    flex: STATS_FLEX,
+    gap: 4,
   },
   total: {
-    fontSize: 44,
-    letterSpacing: 2,
-    lineHeight: 48,
+    fontSize: 30,
+    letterSpacing: 1,
+    lineHeight: 34,
+    marginTop: 10,
   },
   caption: {
     color: colors.text.secondary,
-    fontSize: 12,
+    fontSize: 10,
     letterSpacing: 1,
-    marginTop: -10,
+  },
+  today: {
+    color: colors.accent,
+    fontSize: 10,
+    letterSpacing: 1,
+    marginTop: 10,
+  },
+  todayIdle: {
+    color: colors.text.faint,
   },
   grid: {
+    flex: GRID_FLEX,
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 4,
+    justifyContent: 'flex-end',
   },
   dot: {
     borderRadius: 999,
   },
-  today: {
+  todayDot: {
     backgroundColor: colors.accent,
   },
   footer: {
@@ -141,14 +145,6 @@ const styles = StyleSheet.create({
   },
   legendLabel: {
     color: colors.text.faint,
-    fontSize: 10,
-    letterSpacing: 1,
-  },
-  footerSpacer: {
-    flex: 1,
-  },
-  todayLabel: {
-    color: colors.text.secondary,
     fontSize: 10,
     letterSpacing: 1,
   },
