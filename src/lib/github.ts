@@ -177,7 +177,7 @@ export function fetchStats(
       (year) =>
         `y${year}: viewer { contributionsCollection(from: "${year}-01-01T00:00:00Z", to: "${year}-12-31T23:59:59Z") { totalCommitContributions } }`,
     ),
-    `prs: search(type: ISSUE, query: "is:pr is:open author:${login}") { issueCount }`,
+    `prs: search(type: ISSUE, query: "is:pr is:open author:${login}", first: 1) { issueCount }`,
   ];
 
   return executeQuery(

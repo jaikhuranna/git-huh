@@ -21,10 +21,12 @@ export const colors = {
 
   /**
    * Contribution intensity ramp. Material-style tonal steps mapped onto a
-   * monochrome scale: near-black (no activity) → near-white (peak day).
+   * monochrome scale: dim gray (no activity) → near-white (peak day).
    * No hue, only lightness — that restraint is what makes it read as Nothing.
+   * The bottom step stays clearly visible against `surface`; sparse days
+   * must read as dots, not gaps.
    */
-  ramp: ['#161616', '#3D3D3D', '#6E6E6E', '#A8A8A8', '#E8E8E8'],
+  ramp: ['#242424', '#4A4A4A', '#7A7A7A', '#B0B0B0', '#EDEDED'],
 } as const;
 
 export const fonts = {

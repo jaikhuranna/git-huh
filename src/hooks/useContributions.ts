@@ -36,12 +36,22 @@ export function useContributions(token: string | null): ContributionsState {
 
     fetchContributions(token, controller.signal)
       .then(async (contributions) => {
-        const stats = await fetchStats(
-          token,
-          contributions.login,
-          contributions.years,
-          controller.signal,
-        );
+        let stats: Awaited<ReturnType<typeof fetchStats>>;
+        try {
+          stats = await fetchStats(
+            token,
+            contributions.login,
+            contributions.years,
+            controller.signal,
+          );
+        } catch (error) {
+          // A revoked token must fail loudly; anything else (rate limits,
+          // search hiccups) degrades to zeroed stats so the grid survives.
+          if (error instanceof GitHubError && error.kind === 'invalid-token') {
+            throw error;
+          }
+          stats = { todayCommits: 0, totalCommits: 0, openPrs: 0 };
+        }
         return toWidgetModel(contributions, stats);
       })
       .then((model) =>
