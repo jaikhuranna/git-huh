@@ -11,8 +11,8 @@ const WIDGET_PADDING = 20;
 const DOT_GAP = 4;
 
 /** Stats column share of the widget width; the dot matrix takes the rest. */
-const STATS_FLEX = 3;
-const GRID_FLEX = 7;
+const STATS_FLEX = 4;
+const GRID_FLEX = 6;
 
 const numberFormat = new Intl.NumberFormat('en-US');
 
@@ -39,16 +39,25 @@ export function ContributionWidget({ model }: ContributionWidgetProps) {
       <View style={styles.split}>
         <View style={styles.stats}>
           <Wordmark />
-          <DotText style={styles.total}>
-            {numberFormat.format(model.total)}
-          </DotText>
-          <DotText style={styles.caption}>contributions</DotText>
-          <DotText style={styles.caption}>@{model.login.toLowerCase()}</DotText>
           <DotText
-            style={[styles.today, model.todayCount === 0 && styles.todayIdle]}
+            style={[
+              styles.statValue,
+              model.todayCommits > 0 && styles.statValueAccent,
+            ]}
           >
-            today · {model.todayCount}
+            {numberFormat.format(model.todayCommits)}
           </DotText>
+          <DotText style={styles.statLabel}>today</DotText>
+          <View style={styles.divider} />
+          <DotText style={styles.statValue}>
+            {numberFormat.format(model.totalCommits)}
+          </DotText>
+          <DotText style={styles.statLabel}>commits</DotText>
+          <View style={styles.divider} />
+          <DotText style={styles.statValue}>
+            {numberFormat.format(model.openPrs)}
+          </DotText>
+          <DotText style={styles.statLabel}>open prs</DotText>
         </View>
 
         <View style={[styles.grid, { gap: DOT_GAP }]}>
@@ -100,27 +109,28 @@ const styles = StyleSheet.create({
   },
   stats: {
     flex: STATS_FLEX,
-    gap: 4,
+    gap: 3,
   },
-  total: {
-    fontSize: 30,
+  statValue: {
+    color: colors.text.primary,
+    fontSize: 22,
     letterSpacing: 1,
-    lineHeight: 34,
-    marginTop: 10,
+    lineHeight: 26,
+    marginTop: 8,
   },
-  caption: {
+  statValueAccent: {
+    color: colors.accent,
+  },
+  statLabel: {
     color: colors.text.secondary,
     fontSize: 10,
     letterSpacing: 1,
   },
-  today: {
-    color: colors.accent,
-    fontSize: 10,
-    letterSpacing: 1,
-    marginTop: 10,
-  },
-  todayIdle: {
-    color: colors.text.faint,
+  divider: {
+    backgroundColor: colors.outline,
+    height: 1,
+    marginVertical: 6,
+    width: 36,
   },
   grid: {
     flex: GRID_FLEX,

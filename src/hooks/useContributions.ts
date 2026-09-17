@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import { fetchContributions, GitHubError } from '../lib/github';
+import {
+  fetchContributions,
+  fetchStats,
+  GitHubError,
+} from '../lib/github';
 import { toWidgetModel, type WidgetModel } from '../lib/contributions';
 
 export type ContributionsState =
@@ -31,11 +35,17 @@ export function useContributions(token: string | null): ContributionsState {
     const controller = new AbortController();
 
     fetchContributions(token, controller.signal)
-      .then((data) =>
-        setResult({
+      .then(async (contributions) => {
+        const stats = await fetchStats(
           token,
-          outcome: { status: 'ready', model: toWidgetModel(data) },
-        }),
+          contributions.login,
+          contributions.years,
+          controller.signal,
+        );
+        return toWidgetModel(contributions, stats);
+      })
+      .then((model) =>
+        setResult({ token, outcome: { status: 'ready', model } }),
       )
       .catch((error: unknown) => {
         if (error instanceof Error && error.name === 'AbortError') return;

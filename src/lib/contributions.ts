@@ -1,4 +1,8 @@
-import type { Contributions, ContributionWeek } from './github';
+import type {
+  Contributions,
+  ContributionStats,
+  ContributionWeek,
+} from './github';
 
 /** Weeks of history rendered in the widget's dot matrix. */
 export const GRID_WEEKS = 18;
@@ -18,6 +22,9 @@ export interface WidgetModel {
   login: string;
   total: number;
   todayCount: number;
+  todayCommits: number;
+  totalCommits: number;
+  openPrs: number;
   columns: GridColumn[];
 }
 
@@ -42,6 +49,7 @@ function lastWeeks(weeks: ContributionWeek[], count: number): ContributionWeek[]
 /** Shape raw calendar data into the widget's view model. Pure and testable. */
 export function toWidgetModel(
   contributions: Contributions,
+  stats: ContributionStats,
   now: Date = new Date(),
 ): WidgetModel {
   const today = toISODate(now);
@@ -61,10 +69,21 @@ export function toWidgetModel(
     day.level = levelFor(day.count, max);
   }
 
+  // GitHub's calendar day boundaries can drift one day off the local clock;
+  // if no cell matched, mark the most recent past day as "today" so the
+  // accent dot always renders.
+  if (!allDays.some((day) => day.isToday)) {
+    const lastPast = allDays.findLast((day) => day.date <= today);
+    if (lastPast) lastPast.isToday = true;
+  }
+
   return {
     login: contributions.login,
     total: contributions.totalContributions,
     todayCount: allDays.find((day) => day.isToday)?.count ?? 0,
+    todayCommits: stats.todayCommits,
+    totalCommits: stats.totalCommits,
+    openPrs: stats.openPrs,
     columns,
   };
 }

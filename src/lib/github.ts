@@ -7,6 +7,7 @@ const CONTRIBUTIONS_QUERY = /* GraphQL */ `
     viewer {
       login
       contributionsCollection {
+        contributionYears
         contributionCalendar {
           totalContributions
           weeks {
@@ -38,6 +39,7 @@ const contributionsSchema = z.object({
   viewer: z.object({
     login: z.string(),
     contributionsCollection: z.object({
+      contributionYears: z.array(z.number().int()),
       contributionCalendar: z.object({
         totalContributions: z.number().int().nonnegative(),
         weeks: z.array(
@@ -47,6 +49,16 @@ const contributionsSchema = z.object({
     }),
   }),
 });
+
+const commitBucketSchema = z.object({
+  contributionsCollection: z.object({
+    totalCommitContributions: z.number().int().nonnegative(),
+  }),
+});
+
+const statsSchema = z
+  .object({ prs: z.object({ issueCount: z.number().int().nonnegative() }) })
+  .catchall(commitBucketSchema);
 
 const verifySchema = z.object({
   viewer: z.object({ login: z.string() }),
@@ -59,6 +71,15 @@ export interface Contributions {
   login: string;
   totalContributions: number;
   weeks: ContributionWeek[];
+  years: number[];
+}
+
+export interface ContributionStats {
+  /** Commits made today (UTC day boundary, same rule as the dot grid). */
+  todayCommits: number;
+  /** Commits across every year the account has been active. */
+  totalCommits: number;
+  openPrs: number;
 }
 
 export type GitHubErrorKind = 'invalid-token' | 'network' | 'api';
@@ -130,8 +151,52 @@ export function fetchContributions(
       totalContributions:
         viewer.contributionsCollection.contributionCalendar.totalContributions,
       weeks: viewer.contributionsCollection.contributionCalendar.weeks,
+      years: viewer.contributionsCollection.contributionYears,
     }),
   );
+}
+
+/**
+ * Fetch lifetime commits, today's commits and open PR count in a single
+ * request: one aliased contributionsCollection per active year, plus a
+ * search bucket for open PRs. Needs the login and year list from
+ * fetchContributions, so it always runs after it.
+ */
+export function fetchStats(
+  token: string,
+  login: string,
+  years: number[],
+  signal?: AbortSignal,
+): Promise<ContributionStats> {
+  const now = new Date();
+  const todayStart = `${now.toISOString().slice(0, 10)}T00:00:00Z`;
+
+  const parts = [
+    `today: viewer { contributionsCollection(from: "${todayStart}", to: "${now.toISOString()}") { totalCommitContributions } }`,
+    ...years.map(
+      (year) =>
+        `y${year}: viewer { contributionsCollection(from: "${year}-01-01T00:00:00Z", to: "${year}-12-31T23:59:59Z") { totalCommitContributions } }`,
+    ),
+    `prs: search(type: ISSUE, query: "is:pr is:open author:${login}") { issueCount }`,
+  ];
+
+  return executeQuery(
+    token,
+    `query Stats { ${parts.join(' ')} }`,
+    statsSchema,
+    signal,
+  ).then((data) => {
+    let todayCommits = 0;
+    let totalCommits = 0;
+    for (const [key, bucket] of Object.entries(data)) {
+      if (key === 'prs') continue;
+      const commits = (bucket as z.infer<typeof commitBucketSchema>)
+        .contributionsCollection.totalCommitContributions;
+      if (key === 'today') todayCommits = commits;
+      else totalCommits += commits;
+    }
+    return { todayCommits, totalCommits, openPrs: data.prs.issueCount };
+  });
 }
 
 /** Cheap liveness check used before persisting a new token. */

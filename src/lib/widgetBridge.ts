@@ -27,6 +27,9 @@ export async function syncWidget(model: WidgetModel): Promise<void> {
       login: model.login,
       total: model.total,
       todayCount: model.todayCount,
+      todayCommits: model.todayCommits,
+      totalCommits: model.totalCommits,
+      openPrs: model.openPrs,
       days,
     }),
   );
