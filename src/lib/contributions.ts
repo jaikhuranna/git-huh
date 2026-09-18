@@ -87,3 +87,51 @@ export function toWidgetModel(
     columns,
   };
 }
+
+export interface Insights {
+  currentStreak: number;
+  longestStreak: number;
+  bestDay: number;
+  activeDays: number;
+  avgPerDay: number;
+  busiestWeekday: string;
+}
+
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+/** Streaks, peaks and rhythms derived from the visible window. */
+export function insights(model: WidgetModel): Insights {
+  const days = model.columns.flat();
+
+  let currentStreak = 0;
+  for (let i = days.length - 1; i >= 0 && days[i].count > 0; i--) {
+    currentStreak += 1;
+  }
+
+  let longestStreak = 0;
+  let run = 0;
+  let bestDay = 0;
+  let activeDays = 0;
+  const weekdayTotals = new Array(WEEKDAYS.length).fill(0);
+
+  for (const day of days) {
+    run = day.count > 0 ? run + 1 : 0;
+    longestStreak = Math.max(longestStreak, run);
+    bestDay = Math.max(bestDay, day.count);
+    if (day.count > 0) activeDays += 1;
+    const weekday = new Date(`${day.date}T00:00:00`).getDay();
+    weekdayTotals[weekday] += day.count;
+  }
+
+  const busiestWeekday =
+    WEEKDAYS[weekdayTotals.indexOf(Math.max(...weekdayTotals))] ?? 'monday';
+
+  return {
+    currentStreak,
+    longestStreak,
+    bestDay,
+    activeDays,
+    avgPerDay: days.length > 0 ? model.total / days.length : 0,
+    busiestWeekday,
+  };
+}

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GitHubError, verifyToken } from '../lib/github';
+import { DEMO_TOKEN } from '../lib/token';
 import { colors, fonts } from '../theme';
 
 import { DotText } from './DotText';
@@ -39,6 +40,10 @@ export function PatForm({ onTokenVerified }: PatFormProps) {
     setChecking(true);
     setError(null);
     try {
+      if (candidate === DEMO_TOKEN) {
+        onTokenVerified(candidate);
+        return;
+      }
       await verifyToken(candidate);
       onTokenVerified(candidate);
     } catch (cause) {
@@ -68,7 +73,7 @@ export function PatForm({ onTokenVerified }: PatFormProps) {
             autoCorrect={false}
             onChangeText={setToken}
             onSubmitEditing={submit}
-            placeholder="personal access token"
+            placeholder="personal access token · or type demo"
             placeholderTextColor={colors.text.faint}
             returnKeyType="go"
             secureTextEntry
@@ -81,7 +86,7 @@ export function PatForm({ onTokenVerified }: PatFormProps) {
             <DotText style={styles.error}>{error}</DotText>
           ) : (
             <DotText style={styles.hint}>
-              no scopes needed · stored on-device only
+              demo skips the token · real tokens stay on-device
             </DotText>
           )}
 

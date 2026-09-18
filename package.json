@@ -11,10 +11,13 @@
     "expo-router": "~57.0.21",
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
+    "nothing-mtui": "github:jaikhuranna/nothing-mtui",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {

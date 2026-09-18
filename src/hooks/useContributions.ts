@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   fetchContributions,
   fetchStats,
   GitHubError,
 } from '../lib/github';
+import { demoWidgetModel } from '../lib/demo';
 import { toWidgetModel, type WidgetModel } from '../lib/contributions';
+import { DEMO_TOKEN } from '../lib/token';
 
 export type ContributionsState =
   | { status: 'idle' }
@@ -23,14 +25,19 @@ interface SettledResult {
 
 /**
  * Load and shape contributions for a token; null token means signed out.
- * Status is derived from the latest settled result, so the effect only
- * ever sets state in async callbacks — never synchronously.
+ * The literal token "demo" short-circuits to deterministic fake data —
+ * the layout sandbox for hand-tuning without touching GitHub.
  */
 export function useContributions(token: string | null): ContributionsState {
   const [result, setResult] = useState<SettledResult | null>(null);
 
+  const demoModel = useMemo(
+    () => (token === DEMO_TOKEN ? demoWidgetModel() : null),
+    [token],
+  );
+
   useEffect(() => {
-    if (!token) return;
+    if (!token || token === DEMO_TOKEN) return;
 
     const controller = new AbortController();
 
@@ -75,6 +82,7 @@ export function useContributions(token: string | null): ContributionsState {
   }, [token]);
 
   if (!token) return { status: 'idle' };
+  if (demoModel) return { status: 'ready', model: demoModel };
   if (result?.token !== token) return { status: 'loading' };
   return result.outcome;
 }

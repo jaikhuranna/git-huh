@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ContributionWidget } from '../src/components/ContributionWidget';
 import { DotText } from '../src/components/DotText';
+import { FadeIn } from '../src/components/FadeIn';
 import { PatForm } from '../src/components/PatForm';
+import { TabBar, type Tab } from '../src/components/TabBar';
 import { useContributions } from '../src/hooks/useContributions';
-import { tokenStore } from '../src/lib/token';
+import { useOpenPrs } from '../src/hooks/useOpenPrs';
+import { DEMO_TOKEN, tokenStore } from '../src/lib/token';
 import { clearWidget, syncWidget } from '../src/lib/widgetBridge';
+import { DotsView } from '../src/screens/DotsView';
+import { HomeView } from '../src/screens/HomeView';
+import { PrsView } from '../src/screens/PrsView';
 import { colors } from '../src/theme';
 
 /** undefined = restoring from Keychain, null = signed out. */
@@ -15,17 +20,21 @@ type TokenState = string | null | undefined;
 
 export default function Home() {
   const [token, setToken] = useState<TokenState>(undefined);
+  const [tab, setTab] = useState<Tab>('~home');
   const contributions = useContributions(token ?? null);
+  const model =
+    contributions.status === 'ready' ? contributions.model : null;
+  const prs = useOpenPrs(token ?? null, model?.login ?? null, tab === '~prs');
 
   useEffect(() => {
     tokenStore.get().then(setToken);
   }, []);
 
   useEffect(() => {
-    if (contributions.status === 'ready') {
-      syncWidget(contributions.model).catch(() => {});
+    if (model && token !== DEMO_TOKEN) {
+      syncWidget(model).catch(() => {});
     }
-  }, [contributions]);
+  }, [model, token]);
 
   const connect = async (verifiedToken: string) => {
     await tokenStore.set(verifiedToken);
@@ -33,9 +42,10 @@ export default function Home() {
   };
 
   const disconnect = async () => {
-    await clearWidget().catch(() => {});
+    if (token !== DEMO_TOKEN) await clearWidget().catch(() => {});
     await tokenStore.clear();
     setToken(null);
+    setTab('~home');
   };
 
   if (token === undefined) {
@@ -46,11 +56,28 @@ export default function Home() {
     return <PatForm onTokenVerified={connect} />;
   }
 
+  const isDemo = token === DEMO_TOKEN;
+
   return (
-    <SafeAreaView style={styles.screen}>
-      <View style={styles.center}>
-        {contributions.status === 'ready' && (
-          <ContributionWidget model={contributions.model} />
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <DotText style={styles.wordmark}>
+          git-huh<DotText style={styles.wordmarkAccent}>?</DotText>
+        </DotText>
+        <Pressable accessibilityRole="button" onPress={disconnect}>
+          <DotText style={styles.disconnect}>
+            {isDemo ? '~demo · exit' : 'disconnect'}
+          </DotText>
+        </Pressable>
+      </View>
+
+      <View style={styles.body}>
+        {contributions.status === 'ready' && model && (
+          <FadeIn key={tab}>
+            {tab === '~home' && <HomeView model={model} />}
+            {tab === '~dots' && <DotsView model={model} />}
+            {tab === '~prs' && <PrsView state={prs} />}
+          </FadeIn>
         )}
 
         {(contributions.status === 'loading' ||
@@ -73,13 +100,7 @@ export default function Home() {
       </View>
 
       {contributions.status === 'ready' && (
-        <Pressable
-          accessibilityRole="button"
-          onPress={disconnect}
-          style={styles.disconnect}
-        >
-          <DotText style={styles.disconnectText}>disconnect</DotText>
-        </Pressable>
+        <TabBar active={tab} onChange={setTab} />
       )}
     </SafeAreaView>
   );
@@ -90,13 +111,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvas,
     flex: 1,
   },
-  center: {
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  wordmark: {
+    fontSize: 15,
+    letterSpacing: 1,
+  },
+  wordmarkAccent: {
+    color: colors.accent,
+    fontSize: 15,
+  },
+  disconnect: {
+    color: colors.text.faint,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  body: {
     flex: 1,
-    justifyContent: 'center',
   },
   errorStack: {
     alignItems: 'center',
+    flex: 1,
     gap: 16,
+    justifyContent: 'center',
   },
   errorText: {
     color: colors.accent,
@@ -108,14 +150,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1,
     textDecorationLine: 'underline',
-  },
-  disconnect: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  disconnectText: {
-    color: colors.text.faint,
-    fontSize: 10,
-    letterSpacing: 2,
   },
 });

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>git-huh? — layout handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0d0d0d;
+    --paper: #f4f2ed;
+    --red: #d71921;
+    --dim: #6e6a63;
+    --line: #d8d4cc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Space Grotesk", sans-serif;
+    line-height: 1.55;
+  }
+  code, pre, .dot { font-family: "DotGothic16", monospace; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 64px 24px 96px; }
+
+  .kicker { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--red); font-weight: 700; }
+  h1 { font-size: clamp(44px, 9vw, 92px); line-height: 0.95; letter-spacing: -2px; margin: 10px 0 12px; }
+  h1 .q { color: var(--red); }
+  .sub { font-size: 18px; color: var(--dim); max-width: 560px; }
+  .rule { border: 0; border-top: 2px solid var(--ink); margin: 44px 0 8px; }
+
+  .num { font-size: 13px; letter-spacing: 2px; color: var(--red); font-weight: 700; }
+  h2 { font-size: clamp(28px, 4.5vw, 44px); letter-spacing: -1px; margin: 2px 0 18px; }
+  section { margin: 56px 0; }
+  p { margin-bottom: 14px; }
+  b { font-weight: 700; }
+  .dim { color: var(--dim); }
+
+  pre {
+    background: var(--ink); color: var(--paper);
+    padding: 18px 20px; border-radius: 14px;
+    font-size: 14px; line-height: 1.7; overflow-x: auto;
+    margin: 14px 0;
+  }
+  pre .c { color: #8a8a8a; }
+  pre .r { color: #ff5a52; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 14px 0; }
+  th { text-align: left; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); padding: 8px 10px; border-bottom: 2px solid var(--ink); }
+  td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { white-space: nowrap; }
+
+  .steps { counter-reset: step; margin: 18px 0; }
+  .step { display: flex; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .step::before {
+    counter-increment: step; content: counter(step, decimal-leading-zero);
+    font-family: "DotGothic16", monospace; font-size: 22px; color: var(--red);
+    min-width: 40px;
+  }
+
+  .cardgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 18px 0; }
+  .card { border: 2px solid var(--ink); border-radius: 16px; padding: 16px; }
+  .card h3 { font-size: 15px; margin-bottom: 6px; }
+  .card p { font-size: 13.5px; color: var(--dim); margin: 0; }
+  .card .dotfile { font-family: "DotGothic16", monospace; color: var(--ink); font-size: 13px; display: block; margin-bottom: 6px; word-break: break-all; }
+
+  .callout { border-left: 4px solid var(--red); background: #fff; padding: 12px 16px; border-radius: 0 12px 12px 0; margin: 16px 0; font-size: 15px; }
+  .swatches { display: flex; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+  .sw { display: flex; align-items: center; gap: 8px; font-size: 13px; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px 5px 6px; background: #fff; }
+  .sw i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.15); }
+
+  footer { margin-top: 80px; padding-top: 20px; border-top: 2px solid var(--ink); display: flex; justify-content: space-between; font-size: 13px; color: var(--dim); }
+  footer .dot { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="kicker">git-huh? · handbook for hand-coding the layout</div>
+  <h1>tweak the pixels <span class="q">?</span><br>without breaking the build</h1>
+  <p class="sub">Everything you need to hand-code layouts: the live loops, the map of the codebase, the token rules, and the ship ritual. Less guessing. No rebuild roulette.</p>
+
+  <hr class="rule">
+
+  <section>
+    <div class="num">/01</div>
+    <h2>Two live loops</h2>
+    <p><b>The app</b> hot-reloads. <b>The widget</b> does not — RemoteViews render inside the launcher, not your app process. Know which one you're touching.</p>
+
+    <div class="steps">
+      <div class="step"><div><b>App UI loop (seconds).</b> <code>npm start</code> in <code>git-huh/</code>, scan the QR with <b>Expo Go</b> from the Play Store. Same Wi-Fi. Every save lands on your phone in under a second. Type <code>demo</code> as the token — full app, fake data, zero network.</div></div>
+      <div class="step"><div><b>Widget loop (~20s).</b> Phone on USB, debugging on:</div></div>
+    </div>
+    <pre>cd git-huh/android
+ANDROID_HOME=/tmp/opencode/android-sdk ./gradlew installRelease</pre>
+    <p class="dim">Incremental after the first build. Then re-add the widget on the home screen (or wait for the 30-minute recompose) to see your change.</p>
+    <div class="callout"><b>Desktop preview:</b> <code>npm start -- --web</code> gives you a browser tab with the same hot reload. SecureStore falls back to memory there — demo mode is the intended path on web.</div>
+  </section>
+
+  <section>
+    <div class="num">/02</div>
+    <h2>Map of the codebase</h2>
+    <div class="cardgrid">
+      <div class="card"><span class="dotfile">app/index.tsx</span><p>The shell. Token gate → header → tab switch (~home / ~dots / ~prs) → TabBar. Owns sync + disconnect.</p></div>
+      <div class="card"><span class="dotfile">src/screens/HomeView.tsx</span><p>Insights home: red circles motif, count-up total, stat card row, glyph card.</p></div>
+      <div class="card"><span class="dotfile">src/screens/DotsView.tsx</span><p>The dot field card + legend + the stats mosaic (streaks, best day, busiest day).</p></div>
+      <div class="card"><span class="dotfile">src/screens/PrsView.tsx</span><p>Filter pills + PR date-cards. Left block number + status chip; tones cycle, third card inverts.</p></div>
+      <div class="card"><span class="dotfile">src/components/DotMatrix.tsx</span><p>The contribution field. Cell math, size-carried intensity, stagger entrance. Shared look, app-side.</p></div>
+      <div class="card"><span class="dotfile">src/theme/index.ts</span><p>All tokens, sourced from nothing-mtui. Change color/scale here first — never hardcode hex in components.</p></div>
+      <div class="card"><span class="dotfile">src/lib/github.ts · prs.ts</span><p>GraphQL calendar + aliased lifetime commits + REST PR search. Zod-validated at the edge.</p></div>
+      <div class="card"><span class="dotfile">src/lib/contributions.ts</span><p>Pure transforms: calendar → WidgetModel, quartile levels, insights. Testable, no React.</p></div>
+      <div class="card"><span class="dotfile">src/lib/demo.ts</span><p>Seeded fake data. The literal token "demo" routes here — layout sandbox.</p></div>
+      <div class="card"><span class="dotfile">android/.../widget/GitHuhWidget.kt</span><p>The real home-screen widget (Glance). Scaffold shell, glyph, hero number, native DotMatrix.</p></div>
+      <div class="card"><span class="dotfile">widget/WidgetState.kt · WidgetBridgeModule.kt</span><p>Payload store (SharedPreferences) + the JS→native bridge that triggers recompose.</p></div>
+      <div class="card"><span class="dotfile">widget/DotTextRenderer.kt · GlyphRenderer.kt</span><p>RemoteViews can't load fonts — text and glyphs are painted to bitmaps here.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="num">/03</div>
+    <h2>Rules of the grid</h2>
+    <p>The whole look hangs on four decisions. Break them and it stops reading as the reference cards.</p>
+    <div class="swatches">
+      <span class="sw"><i style="background:#000"></i> canvas #000000</span>
+      <span class="sw"><i style="background:#101010"></i> card #101010</span>
+      <span class="sw"><i style="background:#1c1c1c"></i> elevated #1c1c1c</span>
+      <span class="sw"><i style="background:#fff"></i> ink #f2f2f2</span>
+      <span class="sw"><i style="background:#d71921"></i> food #d71921</span>
+    </div>
+    <div class="steps">
+      <div class="step"><div><b>Every cell shows a dot.</b> Level 0 is a small visible seed (25% size, 35% alpha), not a hole. The field is a dotted surface, sparse days included.</div></div>
+      <div class="step"><div><b>Size carries intensity.</b> Levels grow 25 → 45 → 65 → 85 → 100%. Alpha only supports the story. Tune both in <code>theme/index.ts</code> (<code>dotScale</code>, <code>dotAlpha</code>).</div></div>
+      <div class="step"><div><b>Peaks square off.</b> Level 4 renders as a 2px-radius square, like the reference cards. Everything else is a circle.</div></div>
+      <div class="step"><div><b>Red is rationed.</b> One accent: today's cell, the wordmark "?", the active streak. If you're reaching for red twice in a screen, delete one.</div></div>
+    </div>
+    <p class="dim">Mirrored constants live in <code>GitHuhWidget.kt</code> (dotScales/dotAlphas) — the widget can't import TS, so change both when you change one.</p>
+  </section>
+
+  <section>
+    <div class="num">/04</div>
+    <h2>How data reaches the widget</h2>
+    <div class="steps">
+      <div class="step"><div><b>App fetches</b> calendar + stats + PRs (GitHub). Model is built pure: <code>toWidgetModel()</code>.</div></div>
+      <div class="step"><div><b>App pushes</b> a JSON snapshot through <code>WidgetBridge.sync()</code> → Kotlin writes SharedPreferences → <code>GitHuhWidget().updateAll()</code> recomposes every placed widget.</div></div>
+      <div class="step"><div><b>Widget renders only</b> what it's given. No network, no token, no JS. Re-renders on app open + system 30-minute tick.</div></div>
+    </div>
+    <p class="dim">New widget field? Add it to the payload in <code>src/lib/widgetBridge.ts</code>, parse it in <code>WidgetState.kt</code> (use <code>optInt</code> for old-payload tolerance), render it in <code>GitHuhWidget.kt</code>.</p>
+  </section>
+
+  <section>
+    <div class="num">/05</div>
+    <h2>Ship ritual</h2>
+    <pre><span class="c"># 1. gates</span>
+npx tsc --noEmit && npx expo lint
+
+<span class="c"># 2. bump (versionCode + versionName) in android/app/build.gradle + app.json</span>
+
+<span class="c"># 3. build arm64</span>
+cd android && ANDROID_HOME=/tmp/opencode/android-sdk ./gradlew assembleRelease
+
+<span class="c"># 4. release</span>
+gh release upload dev app/build/outputs/apk/release/app-arm64-v8a-release.apk --clobber
+git add -A && git commit -m "..." && git push</pre>
+    <p class="dim">Node 18 is too old for Expo CLI here — the local Node 20 lives at <code>/tmp/opencode/node20/bin</code> (prepend to PATH).</p>
+  </section>
+
+  <footer>
+    <span class="dot">git-huh? — layout handbook</span>
+    <span>not affiliated with GitHub, Inc. or Nothing Technology Ltd.</span>
+  </footer>
+</div>
+</body>
+</html>

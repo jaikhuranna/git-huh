@@ -1,32 +1,35 @@
+import { nothingWidgetColors } from 'nothing-mtui';
+
 /**
- * git-huh? design tokens.
- *
- * Nothing-style: pure black canvas, dot-matrix type, and a monochrome
- * tonal ramp. Color is used the way Nothing OS widgets use it — a single
- * red accent on an otherwise grayscale surface.
+ * Design tokens sourced from nothing-mtui — the color mapping extracted
+ * from com.nothing.communitywidgets. Dark mode, static fallbacks:
+ * widgetBg → neutral1_900 (#1b1b1b), widgetElements → #ffffff,
+ * widgetFood → #d71921 (the one allowed accent).
  */
+const mtui = nothingWidgetColors(null, 'dark');
+
 export const colors = {
   canvas: '#000000',
-  surface: '#0A0A0A',
-  outline: '#1F1F1F',
+  surface: '#101010',
+  elevated: '#1C1C1C',
+  outline: 'rgba(255,255,255,0.14)',
 
   text: {
-    primary: '#F2F2F2',
-    secondary: '#8A8A8A',
-    faint: '#4A4A4A',
+    primary: mtui.widgetElements, // #ffffff
+    secondary: 'rgba(255,255,255,0.62)',
+    faint: 'rgba(255,255,255,0.38)',
   },
 
-  /** Nothing red — reserved for "today" and the wordmark question mark. */
-  accent: '#D71921',
+  /** mtui widgetFood — Nothing red. The only hue in the entire app. */
+  accent: mtui.widgetFood,
 
   /**
-   * Contribution intensity ramp. Material-style tonal steps mapped onto a
-   * monochrome scale: dim gray (no activity) → near-white (peak day).
-   * No hue, only lightness — that restraint is what makes it read as Nothing.
-   * The bottom step stays clearly visible against `surface`; sparse days
-   * must read as dots, not gaps.
+   * Dot field, after the reference cards: every cell shows a dot. Intensity
+   * grows the dot toward a full white square on peak days — the base texture
+   * stays visible so the card reads as a dotted field, not sparse noise.
    */
-  ramp: ['#242424', '#4A4A4A', '#7A7A7A', '#B0B0B0', '#EDEDED'],
+  dotScale: [0.25, 0.45, 0.65, 0.85, 1.0],
+  dotAlpha: [0.35, 0.55, 0.75, 0.9, 1.0],
 } as const;
 
 export const fonts = {
@@ -35,5 +38,6 @@ export const fonts = {
 } as const;
 
 export const radii = {
-  widget: 28,
+  card: 28,
+  chip: 999,
 } as const;
