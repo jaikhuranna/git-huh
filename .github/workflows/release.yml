@@ -10,7 +10,7 @@ on:
       tag:
         description: 'Release tag to publish (e.g. dev-2.0.1)'
         required: true
-        default: 'dev-2.0.1'
+        default: 'dev-2.0.2'
 
 permissions:
   contents: write
@@ -59,7 +59,7 @@ jobs:
         run: |
           mkdir -p dist
           cp android/app/build/outputs/apk/release/app-universal-release.apk \
-             "dist/git-huh-${GITHUB_REF_NAME:-dev-2.0.1}.apk"
+             "dist/git-huh-${GITHUB_REF_NAME:-dev-2.0.2}.apk"
           ls -la dist
 
       - uses: actions/upload-artifact@v4
@@ -76,7 +76,7 @@ jobs:
           generate_release_notes: true
           files: dist/*.apk
           body: |
-            **git-huh 2.0.1 — board rebuild**
+            **git-huh 2.0.2 — board rebuild**
 
             Ten screens, one per pin on the "nothing github" board. The Nothing
             design language is gone from the app entirely; it survives only in
