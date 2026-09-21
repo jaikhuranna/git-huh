@@ -36,11 +36,11 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
+# generated native folders. `android/` is NOT ignored: this project has
+# hand-written native code (the two Glance widgets), which `expo prebuild`
+# would regenerate away, so the Android project is committed.
 /ios
-/android
 
 # Python bytecode from scripts/
 __pycache__/
 *.pyc
-android/local.properties
