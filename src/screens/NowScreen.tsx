@@ -121,14 +121,16 @@ function WeekDial({
   peak: number;
   size: number;
 }) {
-  const r = size / 2;
+  // Leave room for the caption underneath rather than overlaying it.
+  const dial = size - TILE_PADDING * 2 - CAPTION_ROW - 6;
+  const r = dial / 2;
   const week = model.columns[model.columns.length - 1] ?? [];
   const todayIndex = Math.max(0, week.findIndex((day) => day.isToday));
   const angle = (todayIndex / 7) * Math.PI * 2 - Math.PI / 2;
 
   return (
     <View style={[styles.tile, { height: size, width: size }]}>
-      <Svg height={size} width={size}>
+      <Svg height={dial} width={dial}>
         <Circle cx={r} cy={r} fill={colors.card} r={r - 1} />
         {Array.from({ length: 60 }, (_, i) => {
           const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
@@ -174,37 +176,55 @@ function WeekDial({
           y2={r + Math.sin(angle) * r * 0.34}
         />
       </Svg>
-      <Label style={styles.tileLabel}>this week</Label>
+      <Label style={styles.caption}>this week</Label>
     </View>
   );
 }
 
 /** The pin's app dock, re-read as the four languages you write most. */
+const TILE_PADDING = 10;
+const DOCK_GAP = 8;
+const CAPTION_ROW = 20;
+
 function Dock({ model, size }: { model: GitHubModel; size: number }) {
   const top = model.languages.slice(0, 4);
-  const cell = (size - 10) / 2;
+  const inner = size - TILE_PADDING * 2;
+  // Floor, then take a couple of pixels back, so rounding can never make the
+  // two-up row wider than the box that holds it.
+  const cell = Math.max(
+    22,
+    Math.floor((Math.min(inner, inner - CAPTION_ROW) - DOCK_GAP) / 2) - 2,
+  );
 
   return (
-    <View style={[styles.tile, styles.dock, { height: size, width: size }]}>
-      {top.map((language) => (
-        <View
-          key={language.name}
-          style={[
-            styles.dockTile,
-            {
-              backgroundColor: language.color,
-              borderRadius: cell / 2,
-              height: cell,
-              width: cell,
-            },
-          ]}
-        >
-          <Heading style={{ color: onColor(language.color) }}>
-            {language.name.slice(0, 2)}
-          </Heading>
-        </View>
-      ))}
+    <View style={[styles.tile, { height: size, width: size }]}>
+      <View style={[styles.dockGrid, { width: inner }]}>
+        {top.map((language) => (
+          <View
+            key={language.name}
+            style={[
+              styles.dockTile,
+              {
+                backgroundColor: language.color,
+                borderRadius: cell / 2,
+                height: cell,
+                width: cell,
+              },
+            ]}
+          >
+            <Heading
+              style={{
+                color: onColor(language.color),
+                fontSize: Math.min(15, cell * 0.34),
+              }}
+            >
+              {language.name.slice(0, 2)}
+            </Heading>
+          </View>
+        ))}
+      </View>
       {top.length === 0 && <Label>no languages yet</Label>}
+      <Label style={styles.caption}>top languages</Label>
     </View>
   );
 }
@@ -263,17 +283,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: radii.card,
     justifyContent: 'center',
-    padding: 10,
+    overflow: 'hidden',
+    padding: TILE_PADDING,
   },
-  tileLabel: {
-    marginTop: 6,
-    position: 'absolute',
-    bottom: 8,
+  caption: {
+    height: CAPTION_ROW,
+    lineHeight: CAPTION_ROW,
+    textAlign: 'center',
   },
-  dock: {
+  dockGrid: {
+    alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: DOCK_GAP,
+    justifyContent: 'center',
   },
   dockTile: {
     alignItems: 'center',

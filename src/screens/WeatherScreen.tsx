@@ -63,7 +63,7 @@ export function WeatherScreen({ model }: { model: GitHubModel }) {
         <Body style={styles.condition}>{condition}</Body>
 
         <View style={styles.heroRow}>
-          <Numeral>{fmt(model.todayCount)}</Numeral>
+          <Numeral style={styles.hero}>{fmt(model.todayCount)}</Numeral>
           <Label style={styles.unit}>c</Label>
         </View>
 
@@ -96,21 +96,31 @@ export function WeatherScreen({ model }: { model: GitHubModel }) {
           />
         </View>
 
-        <View style={styles.weekStrip}>
-          {(model.columns[model.columns.length - 1] ?? []).map((day) => {
-            const tall = 34 * (day.count / Math.max(1, derived.bestDay)) + 4;
-            return (
-              <View
-                key={day.date}
-                style={[
-                  styles.weekBar,
-                  { height: tall, opacity: day.isToday ? 1 : 0.5 },
-                ]}
-              />
-            );
-          })}
+        <View style={styles.weekCard}>
+          <Label style={styles.weekLabel}>this week</Label>
+          <View style={styles.weekStrip}>
+            {(model.columns[model.columns.length - 1] ?? []).map((day) => {
+              const tall =
+                46 * (day.count / Math.max(1, derived.bestDay)) + 6;
+              return (
+                <View key={day.date} style={styles.weekCol}>
+                  <View
+                    style={[
+                      styles.weekBar,
+                      { height: tall },
+                      day.isToday && styles.weekBarToday,
+                    ]}
+                  />
+                  <Label style={styles.weekDay}>
+                    {WEEKDAY_INITIALS[
+                      new Date(`${day.date}T00:00:00`).getDay()
+                    ]}
+                  </Label>
+                </View>
+              );
+            })}
+          </View>
         </View>
-        <Label style={styles.weekLabel}>this week</Label>
       </View>
     </View>
   );
@@ -142,6 +152,8 @@ function Stat({
     </View>
   );
 }
+
+const WEEKDAY_INITIALS = ['s', 'm', 't', 'w', 't', 'f', 's'] as const;
 
 /** Hairline glyphs in the spirit of the pin's rain / humidity / wind row. */
 const ICONS = {
@@ -176,7 +188,11 @@ const styles = StyleSheet.create({
   },
   condition: {
     color: colors.ink70,
-    marginTop: 34,
+    marginTop: 26,
+  },
+  hero: {
+    fontSize: 124,
+    lineHeight: 132,
   },
   heroRow: {
     alignItems: 'flex-start',
@@ -185,7 +201,7 @@ const styles = StyleSheet.create({
   },
   unit: {
     color: colors.ink70,
-    marginTop: 18,
+    marginTop: 30,
   },
   range: {
     flexDirection: 'row',
@@ -221,21 +237,37 @@ const styles = StyleSheet.create({
     height: 34,
     width: 1,
   },
+  weekCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    borderRadius: radii.card,
+    gap: 10,
+    marginTop: 26,
+    paddingBottom: 12,
+    paddingTop: 12,
+    width: '100%',
+  },
   weekStrip: {
     alignItems: 'flex-end',
     flexDirection: 'row',
-    gap: 8,
-    height: 42,
-    marginTop: 'auto',
+    gap: 10,
+  },
+  weekCol: {
+    alignItems: 'center',
+    gap: 5,
   },
   weekBar: {
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(17,16,16,0.30)',
     borderRadius: 3,
     width: 16,
   },
+  weekBarToday: {
+    backgroundColor: colors.ink,
+  },
+  weekDay: {
+    color: colors.ink70,
+  },
   weekLabel: {
     color: colors.ink,
-    marginBottom: 18,
-    marginTop: 10,
   },
 });

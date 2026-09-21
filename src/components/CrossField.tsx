@@ -14,20 +14,25 @@ import { colors, levels } from '../theme';
  */
 export function CrossField({
   days,
-  columns = 26,
+  width,
   rows = 7,
-  height = 120,
+  height = 160,
   style,
 }: {
   /** Levels 0–4, column-major. Omitted for the decorative sign-in field. */
   days?: readonly number[];
-  columns?: number;
+  /** Available width. The cell pitch is derived from it so the field
+   *  can never run past the screen edge. */
+  width: number;
   rows?: number;
   height?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  const cell = height / rows;
-  const width = cell * columns;
+  // Square cells sized to whichever axis is tighter, so the grid fits the
+  // box on both. Columns then follow from the width that is actually left.
+  const cell = Math.min(width / 26, height / rows);
+  const columns = Math.max(1, Math.floor(width / cell));
+  const drawnWidth = cell * columns;
 
   const paths = useMemo(() => {
     const cells = days ?? decorative(columns * rows);
@@ -39,8 +44,9 @@ export function CrossField({
       const row = index % rows;
       const cx = col * cell + cell / 2;
       const cy = row * cell + cell / 2;
-      // Arms shorten with level so faint crosses read as hairline ticks.
-      const arm = cell * (0.22 + 0.11 * level);
+      // Arms stop well short of the cell edge so neighbouring crosses keep
+      // clear air between them and never merge into bars.
+      const arm = cell * (0.2 + 0.07 * level);
       buckets[level].push(
         `M${cx - arm} ${cy}H${cx + arm}M${cx} ${cy - arm}V${cy + arm}`,
       );
@@ -50,8 +56,8 @@ export function CrossField({
   }, [days, columns, rows, cell]);
 
   return (
-    <View style={[{ height, width }, style]}>
-      <Svg height={height} width={width}>
+    <View style={[{ height: cell * rows, width: drawnWidth }, style]}>
+      <Svg height={cell * rows} width={drawnWidth}>
         {paths.map((d, level) =>
           d ? (
             <Path
@@ -60,7 +66,7 @@ export function CrossField({
               opacity={levels.alpha[level]}
               stroke={colors.ink}
               strokeLinecap="butt"
-              strokeWidth={0.9 + level * 0.65}
+              strokeWidth={0.8 + level * 0.5}
             />
           ) : null,
         )}

@@ -24,7 +24,6 @@ export function HeyScreen({
   // Two days per column keeps the crosses far enough apart to read as
   // separate marks rather than merging into bars, the way pin04's do.
   const levels = bucket(model.columns.flat().map((day) => day.level), 2);
-  const columns = Math.min(28, Math.floor((width - 40) / 13));
 
   return (
     <Page>
@@ -32,10 +31,10 @@ export function HeyScreen({
       <Display style={styles.handle}>~{model.login.toLowerCase()}</Display>
 
       <CrossField
-        columns={columns}
-        days={levels.slice(-columns * 7)}
-        height={196}
+        days={levels}
+        height={168}
         style={styles.field}
+        width={width - 40}
       />
 
       <Body style={styles.sentence}>

@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,6 +33,7 @@ const TOKEN_SETTINGS_URL =
  * texture, and a hairline-underlined mono input. One box, one button.
  */
 export function PatForm({ onTokenVerified }: PatFormProps) {
+  const { width } = useWindowDimensions();
   const [token, setToken] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -77,7 +79,7 @@ export function PatForm({ onTokenVerified }: PatFormProps) {
           <Display>Hey,</Display>
           <Serif style={styles.sub}>paste a token and I&apos;ll read the year.</Serif>
 
-          <CrossField height={112} style={styles.field} />
+          <CrossField height={130} style={styles.field} width={width - 40} />
 
           <TextInput
             accessibilityLabel="GitHub personal access token"
@@ -148,15 +150,18 @@ const styles = StyleSheet.create({
   },
   center: {
     flex: 1,
-    justifyContent: 'space-between',
-    paddingBottom: 32,
+    justifyContent: 'center',
+    paddingBottom: 24,
   },
   header: {
     alignItems: 'baseline',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    left: 0,
     paddingHorizontal: space.gutter,
-    paddingTop: 14,
+    position: 'absolute',
+    right: 0,
+    top: 14,
   },
   stack: {
     gap: 14,

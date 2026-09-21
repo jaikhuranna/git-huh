@@ -51,7 +51,7 @@ export function OrbitScreen({ model }: { model: GitHubModel }) {
 function Arcs({ languages, size }: { languages: LanguageShare[]; size: number }) {
   const cx = size / 2;
   const cy = size / 2;
-  const rings = [size * 0.16, size * 0.29, size * 0.42];
+  const rings = [size * 0.15, size * 0.30, size * 0.45];
 
   const nodes: ReactElement[] = [];
   const arcs: ReactElement[] = [];
@@ -78,12 +78,13 @@ function Arcs({ languages, size }: { languages: LanguageShare[]; size: number })
       const x = cx + Math.cos(angle) * radius;
       const y = cy + Math.sin(angle) * radius;
       const rank = languages.indexOf(language);
-      const letter = language.name.slice(0, 1).toUpperCase();
+      const letter = language.name.slice(0, 2);
 
       if (rank < 6) {
         // Top languages become filled chips — squares and circles alternating,
-        // exactly as the pin alternates them.
-        const chip = 15;
+        // exactly as the pin alternates them. Kept small enough that a chip on
+        // one ring can never reach the next.
+        const chip = 13;
         nodes.push(
           rank % 2 === 0 ? (
             <Rect
@@ -108,11 +109,11 @@ function Arcs({ languages, size }: { languages: LanguageShare[]; size: number })
           <SvgText
             fill={onColor(language.color)}
             fontFamily={fonts.sansBold}
-            fontSize={15}
+            fontSize={11}
             key={`letter-${language.name}`}
             textAnchor="middle"
             x={x}
-            y={y + 5}
+            y={y + 4}
           >
             {letter}
           </SvgText>,
@@ -122,11 +123,11 @@ function Arcs({ languages, size }: { languages: LanguageShare[]; size: number })
           <SvgText
             fill={colors.ink}
             fontFamily={fonts.sansBold}
-            fontSize={15}
+            fontSize={11}
             key={`letter-${language.name}`}
             textAnchor="middle"
             x={x}
-            y={y + 5}
+            y={y + 4}
           >
             {letter}
           </SvgText>,

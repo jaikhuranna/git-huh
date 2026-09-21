@@ -1,9 +1,9 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Rect } from 'react-native-svg';
 
-import { Label, Title } from '../components/Type';
+import { Data, Heading, Label, Title } from '../components/Type';
 import type { GitHubModel } from '../lib/contributions';
-import { colors, fonts } from '../theme';
+import { colors } from '../theme';
 import { fmt, Page, ScreenHead } from './shared';
 
 /**
@@ -11,17 +11,15 @@ import { fmt, Page, ScreenHead } from './shared';
  * left to right, bold percentages with the grey absolute tucked underneath.
  * Here the budget is your year: total contributions fan into what kind of
  * work they were, then into the repositories that absorbed them.
+ *
+ * Labels sit in rows beneath the diagram rather than on top of it — drawn
+ * over the ribbons they were unreadable, and the repo names collided with
+ * the percentages.
  */
 export function FlowScreen({ model }: { model: GitHubModel }) {
   const { width } = useWindowDimensions();
   const chartWidth = width - 40;
-  const chartHeight = 430;
-
-  const total =
-    model.breakdown.commits +
-    model.breakdown.pullRequests +
-    model.breakdown.issues +
-    model.breakdown.reviews;
+  const chartHeight = 300;
 
   const categories = [
     { label: 'commits', value: model.breakdown.commits },
@@ -30,22 +28,22 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
     { label: 'reviews', value: model.breakdown.reviews },
   ].filter((entry) => entry.value > 0);
 
+  const total = categories.reduce((sum, entry) => sum + entry.value, 0) || 1;
   const repos = model.topRepos.slice(0, 5);
   const repoTotal = repos.reduce((sum, repo) => sum + repo.count, 0) || 1;
 
-  // Three columns: the trunk, the kinds of work, the repositories.
-  const trunkX = 6;
-  const trunkW = 14;
-  const midX = chartWidth * 0.44;
-  const midW = 12;
-  const rightX = chartWidth * 0.72;
+  const trunkX = 0;
+  const trunkW = 8;
+  const midX = chartWidth * 0.46;
+  const midW = 8;
+  const rightX = chartWidth - 8;
 
-  const gap = 10;
+  const gap = 8;
   const usable = chartHeight - gap * Math.max(categories.length - 1, 1);
 
   let cursor = 0;
   const catBands = categories.map((entry) => {
-    const height = total > 0 ? (entry.value / total) * usable : 0;
+    const height = (entry.value / total) * usable;
     const band = { ...entry, y: cursor, height };
     cursor += height + gap;
     return band;
@@ -70,7 +68,6 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
       </View>
 
       <Svg height={chartHeight} width={chartWidth}>
-        {/* Trunk into each kind of work. */}
         {catBands.map((band, index) => {
           let trunkY = 0;
           for (let i = 0; i < index; i++) trunkY += catBands[i].height;
@@ -86,12 +83,11 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
               )}
               fill={colors.ink}
               key={band.label}
-              opacity={0.88}
+              opacity={0.85}
             />
           );
         })}
 
-        {/* Each kind of work into the repositories that absorbed it. */}
         {repoBands.map((band, index) => {
           const source = catBands[Math.min(index, catBands.length - 1)];
           if (!source) return null;
@@ -107,63 +103,55 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
               )}
               fill={colors.ink}
               key={band.nameWithOwner}
-              opacity={band.nameWithOwner === 'others' ? 0.25 : 0.5}
+              opacity={band.nameWithOwner === 'others' ? 0.18 : 0.4}
             />
           );
         })}
 
-        {/* Nodes. */}
-        <Path
-          d={`M${trunkX} 0H${trunkX + trunkW}V${chartHeight}H${trunkX}Z`}
-          fill={colors.ink}
-        />
+        <Rect fill={colors.ink} height={chartHeight} width={trunkW} x={trunkX} y={0} />
         {catBands.map((band) => (
-          <Path
-            d={`M${midX} ${band.y}H${midX + midW}V${band.y + band.height}H${midX}Z`}
+          <Rect
             fill={colors.ink}
+            height={band.height}
             key={band.label}
+            width={midW}
+            x={midX}
+            y={band.y}
           />
         ))}
-
-        {/* Labels: bold share above, grey absolute below, as in the pin. */}
-        {catBands.map((band) => (
-          <SvgText
-            fill={colors.ink}
-            fontFamily={fonts.sansBold}
-            fontSize={15}
-            key={band.label}
-            x={midX + midW + 8}
-            y={band.y + 14}
-          >
-            {`${((band.value / Math.max(total, 1)) * 100).toFixed(1)}%`}
-          </SvgText>
-        ))}
-        {catBands.map((band) => (
-          <SvgText
-            fill={colors.ink40}
-            fontFamily={fonts.mono}
-            fontSize={9}
-            key={`${band.label}-sub`}
-            x={midX + midW + 8}
-            y={band.y + 27}
-          >
-            {`${band.label} · ${fmt(band.value)}`}
-          </SvgText>
-        ))}
-
         {repoBands.map((band) => (
-          <SvgText
+          <Rect
             fill={colors.ink70}
-            fontFamily={fonts.mono}
-            fontSize={9}
+            height={band.height}
             key={band.nameWithOwner}
-            x={rightX + 6}
-            y={band.y + band.height / 2 + 3}
-          >
-            {shorten(band.nameWithOwner)}
-          </SvgText>
+            width={6}
+            x={rightX}
+            y={band.y}
+          />
         ))}
       </Svg>
+
+      <View style={styles.legend}>
+        {catBands.map((band) => (
+          <View key={band.label} style={styles.legendRow}>
+            <Heading style={styles.pct}>
+              {((band.value / total) * 100).toFixed(1)}%
+            </Heading>
+            <Data style={styles.legendName}>{band.label}</Data>
+            <Data style={styles.legendValue}>{fmt(band.value)}</Data>
+          </View>
+        ))}
+      </View>
+
+      <Label style={styles.repoHead}>into</Label>
+      <View style={styles.legend}>
+        {repoBands.map((band) => (
+          <View key={band.nameWithOwner} style={styles.legendRow}>
+            <Data style={styles.legendName}>{shorten(band.nameWithOwner)}</Data>
+            <Data style={styles.legendValue}>{fmt(band.count)}</Data>
+          </View>
+        ))}
+      </View>
     </Page>
   );
 }
@@ -193,7 +181,7 @@ function ribbon(
 /** Repo labels are long; the owner is always the same, so drop it. */
 function shorten(nameWithOwner: string): string {
   const name = nameWithOwner.split('/').pop() ?? nameWithOwner;
-  return name.length > 18 ? `${name.slice(0, 17)}…` : name;
+  return name.length > 22 ? `${name.slice(0, 21)}…` : name;
 }
 
 const styles = StyleSheet.create({
@@ -205,5 +193,29 @@ const styles = StyleSheet.create({
   },
   trunkValue: {
     color: colors.ink40,
+  },
+  legend: {
+    marginTop: 10,
+  },
+  legendRow: {
+    alignItems: 'baseline',
+    borderTopColor: colors.hair,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 8,
+  },
+  pct: {
+    fontSize: 15,
+    minWidth: 58,
+  },
+  legendName: {
+    flex: 1,
+  },
+  legendValue: {
+    color: colors.ink40,
+  },
+  repoHead: {
+    marginTop: 18,
   },
 });
