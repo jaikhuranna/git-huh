@@ -60,6 +60,12 @@ export const colors = {
   warmGradient: ['#F5B426', '#D23A0E'],
   coldGradient: ['#7FA8C9', '#2C4F78'],
 
+  /**
+   * pin11's ultramarine field, sampled from the pin itself. Used by exactly
+   * one surface — the loading screen — where it is the whole canvas.
+   */
+  klein: '#1A50D5',
+
   /** pin10 rain chart: steel for the "before" column, olive for "after". */
   steel: '#5E86A3',
   olive: '#8C8A5E',

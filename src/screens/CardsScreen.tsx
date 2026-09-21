@@ -1,14 +1,17 @@
 import type { ReactElement } from 'react';
 import { Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
+import { LanguageChip } from '../components/LanguageChip';
 import { Data, Label } from '../components/Type';
-import { repoDensity, type Activity } from '../lib/activity';
+import { repoMonths, type Activity, type MonthBar } from '../lib/activity';
 import type { GitHubModel, RepoSummary } from '../lib/contributions';
-import { colors, radii } from '../theme';
+import { colors, fonts, radii } from '../theme';
 import { ago, fmt, hash, Page, ScreenHead } from './shared';
 
-const CARD_HEIGHT = 158;
+const CARD_HEIGHT = 176;
+const CHART_HEIGHT = 58;
+const AXIS_HEIGHT = 14;
 /**
  * The deck should read as fanned cards, not one black slab: at the old
  * overlap the canvas never showed between them and the stack merged into a
@@ -19,8 +22,8 @@ const OVERLAP = 16;
 
 /**
  * pin08 — the Urbit ID cards. A fanned deck of black cards, each with a
- * sigil generated from its name, a monospace handle, and a halftone field
- * whose density is that repository's recent activity.
+ * sigil generated from its name, a monospace handle, and that repository's
+ * own commit history drawn month by month.
  */
 export function CardsScreen({
   model,
@@ -39,9 +42,9 @@ export function CardsScreen({
       <View style={styles.deck}>
         {model.repos.slice(0, 12).map((repo, index) => (
           <RepoCard
-            density={repoDensity(activity.commits, repo.nameWithOwner, 96)}
             index={index}
             key={repo.nameWithOwner}
+            months={repoMonths(activity.commits, repo.nameWithOwner, 12)}
             repo={repo}
             width={cardWidth}
           />
@@ -56,16 +59,17 @@ function RepoCard({
   repo,
   index,
   width,
-  density,
+  months,
 }: {
   repo: RepoSummary;
   index: number;
   width: number;
-  density: number[];
+  months: MonthBar[];
 }) {
   const seed = hash(repo.nameWithOwner);
   // A small, stable tilt per card — the pin's deck is never square.
   const tilt = ((seed % 5) - 2) * 0.9;
+  const total = months.reduce((sum, month) => sum + month.count, 0);
 
   return (
     <Pressable
@@ -88,14 +92,19 @@ function RepoCard({
         <Data style={styles.handle}>
           ~{repo.owner.toLowerCase()}-{repo.name.toLowerCase()}
         </Data>
+        {months.length > 0 && (
+          <Data style={styles.headCount}>
+            {fmt(total)} in {months.length}mo
+          </Data>
+        )}
       </View>
 
-      {density.length > 0 ? (
-        <Svg height={54} width={width - 36}>
-          <Halftone density={density} width={width - 36} />
+      {months.length > 0 ? (
+        <Svg height={CHART_HEIGHT + AXIS_HEIGHT} width={width - 36}>
+          <MonthChart months={months} width={width - 36} />
         </Svg>
       ) : (
-        <View style={styles.noField}>
+        <View style={styles.noChart}>
           <Data style={styles.metaText}>no commits in the sampled window</Data>
         </View>
       )}
@@ -105,8 +114,10 @@ function RepoCard({
         <Data style={styles.metaText}>⑂ {fmt(repo.forks)}</Data>
         {repo.language && (
           <View style={styles.langRow}>
-            <View
-              style={[styles.langDot, { backgroundColor: repo.language.color }]}
+            <LanguageChip
+              color={repo.language.color}
+              name={repo.language.name}
+              size={14}
             />
             <Data style={styles.metaText}>{repo.language.name}</Data>
           </View>
@@ -115,6 +126,81 @@ function RepoCard({
         {repo.isPrivate && <Data style={styles.metaText}>private</Data>}
       </View>
     </Pressable>
+  );
+}
+
+/**
+ * The repository's commit history, one bar per month, oldest on the left.
+ * The busiest month is drawn solid and carries its count; the rest step down
+ * in opacity. A month with no commits still gets a baseline tick, so a gap in
+ * the work reads as a gap rather than as missing data.
+ */
+function MonthChart({ months, width }: { months: MonthBar[]; width: number }) {
+  const peak = Math.max(...months.map((month) => month.count), 1);
+  const peakIndex = months.findIndex((month) => month.count === peak);
+  const pitch = width / months.length;
+  const barWidth = Math.max(3, Math.min(pitch - 5, 16));
+  const base = CHART_HEIGHT - 1;
+  // Leaves room above the tallest bar for its count.
+  const tallest = CHART_HEIGHT - 12;
+
+  const bars: ReactElement[] = [];
+  months.forEach((month, index) => {
+    const x = index * pitch + (pitch - barWidth) / 2;
+    const height =
+      month.count === 0 ? 2 : Math.max(3, (month.count / peak) * tallest);
+    bars.push(
+      <Rect
+        fill={colors.onBlack}
+        height={height}
+        key={month.key}
+        opacity={month.count === 0 ? 0.18 : index === peakIndex ? 1 : 0.55}
+        rx={1.5}
+        width={barWidth}
+        x={x}
+        y={base - height}
+      />,
+    );
+  });
+
+  return (
+    <>
+      {bars}
+      <Line
+        stroke={colors.onBlack}
+        strokeWidth={1}
+        opacity={0.25}
+        x1={0}
+        x2={width}
+        y1={base + 0.5}
+        y2={base + 0.5}
+      />
+      {months.map((month, index) => (
+        <SvgText
+          fill={colors.onBlack}
+          fontFamily={fonts.mono}
+          fontSize={8}
+          key={`a-${month.key}`}
+          opacity={index === peakIndex ? 0.9 : 0.45}
+          textAnchor="middle"
+          x={index * pitch + pitch / 2}
+          y={base + 11}
+        >
+          {month.initial}
+        </SvgText>
+      ))}
+      <SvgText
+        fill={colors.onBlack}
+        fontFamily={fonts.mono}
+        fontSize={9}
+        opacity={0.75}
+        textAnchor="middle"
+        x={peakIndex * pitch + pitch / 2}
+        y={base - tallest - 3}
+      >
+        {peak}
+      </SvgText>
+    </>
   );
 }
 
@@ -185,57 +271,6 @@ function Sigil({ seed, size }: { seed: number; size: number }) {
   return <>{parts}</>;
 }
 
-/**
- * The repository's own recent days, one mark per day: radius steps with that
- * day's commit count and the busiest days square off.
- *
- * This used to be `hash(repoName, col, row)` — a texture that looked like data
- * and encoded nothing. Every mark here is a real day.
- */
-function Halftone({ density, width }: { density: number[]; width: number }) {
-  const rows = 6;
-  const columns = Math.ceil(density.length / rows);
-  const pitch = width / columns;
-  const R = [0, 1.1, 1.8, 2.5, 3.1];
-  const A = [0.1, 0.42, 0.62, 0.82, 1];
-
-  const cells: ReactElement[] = [];
-  density.forEach((level, index) => {
-    const col = Math.floor(index / rows);
-    const row = index % rows;
-    const x = col * pitch + pitch / 2;
-    const y = row * 8.6 + 5;
-    if (level >= 4) {
-      cells.push(
-        <Rect
-          fill={colors.onBlack}
-          height={4.6}
-          key={index}
-          width={4.6}
-          x={x - 2.3}
-          y={y - 2.3}
-        />,
-      );
-    } else if (level === 0) {
-      cells.push(
-        <Circle cx={x} cy={y} fill={colors.onBlack} key={index} opacity={A[0]} r={0.7} />,
-      );
-    } else {
-      cells.push(
-        <Circle
-          cx={x}
-          cy={y}
-          fill={colors.onBlack}
-          key={index}
-          opacity={A[level]}
-          r={R[level]}
-        />,
-      );
-    }
-  });
-  return <>{cells}</>;
-}
-
 const styles = StyleSheet.create({
   deck: {
     alignItems: 'center',
@@ -252,24 +287,30 @@ const styles = StyleSheet.create({
     borderColor: colors.canvas,
     borderWidth: 2,
   },
-  noField: {
-    height: 54,
+  noChart: {
+    height: CHART_HEIGHT + AXIS_HEIGHT,
     justifyContent: 'center',
   },
   cardHead: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 10,
+    marginBottom: 4,
   },
   handle: {
     color: colors.onBlack,
+    flex: 1,
     fontSize: 13,
+  },
+  headCount: {
+    color: colors.onBlack55,
+    fontSize: 9,
   },
   meta: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
-    marginTop: 6,
+    marginTop: 4,
   },
   metaText: {
     color: colors.onBlack55,
@@ -279,10 +320,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 5,
-  },
-  langDot: {
-    borderRadius: 4,
-    height: 7,
-    width: 7,
   },
 });

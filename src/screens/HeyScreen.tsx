@@ -1,7 +1,9 @@
 import { Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { CrossField } from '../components/CrossField';
+import { SocialFeed } from '../components/SocialFeed';
 import { Body, Display, Label, Serif } from '../components/Type';
+import type { SocialState } from '../hooks/useSocial';
 import { insights, type GitHubModel } from '../lib/contributions';
 import { colors, fonts, radii } from '../theme';
 import { fmt, Page } from './shared';
@@ -9,13 +11,17 @@ import { fmt, Page } from './shared';
 /**
  * pin04 — Pantom's landing page. A serif greeting, a field of plus glyphs
  * standing in for the contribution year, and one sentence that carries five
- * statistics in five colours. This is the app's front door.
+ * statistics in five colours. This is the app's front door, so the activity
+ * feed lives here too: the numbers are what you did, the feed is what other
+ * people did about it.
  */
 export function HeyScreen({
   model,
+  social,
   onDisconnect,
 }: {
   model: GitHubModel;
+  social: SocialState;
   onDisconnect: () => void;
 }) {
   const { width } = useWindowDimensions();
@@ -32,7 +38,7 @@ export function HeyScreen({
 
       <CrossField
         days={levels}
-        height={168}
+        height={132}
         style={styles.field}
         width={width - 40}
       />
@@ -71,6 +77,8 @@ export function HeyScreen({
           <Label style={styles.pillLabel}>disconnect</Label>
         </Pressable>
       </View>
+
+      <SocialFeed state={social} />
     </Page>
   );
 }
@@ -90,8 +98,8 @@ const styles = StyleSheet.create({
   },
   field: {
     alignSelf: 'center',
-    marginBottom: 26,
-    marginTop: 26,
+    marginBottom: 20,
+    marginTop: 18,
   },
   sentence: {
     fontSize: 17,

@@ -75,6 +75,13 @@ Below: the colored sentence, Inter 400 17/26, each stat inline-colored:
 Then italic serif subtitle `since {year} · {activeDays} active days`.
 Two pills: filled black `open github →`, outlined `refresh`.
 
+Below the fold, the **activity feed** (`SocialFeed`): who commented on your pull requests, who
+reviewed them, who asked for your review, who mentioned you, and your own open pull requests.
+One coloured rule per category (comment blue, approval green, changes-requested red, review
+yellow, review-request purple, mention pink, yours ink), the category also written out in words,
+the comment text quoted, and a wrapped chip filter (`all · comments · reviews · mentions · yours`)
+with counts. The chips wrap rather than scroll — a nested horizontal scroller fights the pager.
+
 ### 2. `now` — pin02 (Ai OS)
 `canvasCool` background, dotted 4px grid behind the hero.
 Header: Inter 700 `Today` + Inter 700 ink40 `at a glance` on the next line (the Unified/Chat lockup).
@@ -128,10 +135,15 @@ Near-white canvas, vertical stack of **black repo cards** at slight rotation off
 overlapping by ~40% so they read as a fanned deck; the focused card lifts.
 Each card: generated **sigil** top-left (2×2 grid of quarter-circle / dot-pair / dome / disc
 primitives, chosen deterministically from a hash of the repo name), mono `~{owner}-{repo}` beside it.
-Body: **halftone dot field** — white dots, radius ∝ that repo's recent commit density, laid on a
-24×7 grid; the repo's top language color tints ~10% of the dots.
-Bottom row of the card: mono `★ {stars}  ⑂ {forks}  {language}  {pushed}`.
+Body: that repository's **commit history, one bar per month**, oldest on the left, month initials
+on the axis, the busiest month drawn solid and carrying its count. The window is the sample's own
+range (`repoMonths`), not a fixed year, so months the commit sample never reached are not drawn as
+zeroes. A repo with nothing in the window says so instead of drawing a shape.
+Bottom row of the card: mono `★ {stars}  ⑂ {forks}  {language mark + name}  {pushed}`.
 Tap opens the repo.
+
+*(Superseded: the body used to be a halftone field keyed off `hash(repo, col, row)` — a texture
+that looked like data and encoded none. Every mark on the card is now a real month.)*
 
 ### 8. `index` — pin03 (correspondence storage)
 Canvas. Header centered mono caps `PULL REQUESTS`, left `Ch. 3 /`, right `/ {count}`.
@@ -166,6 +178,21 @@ One row per contribution year (newest last, like the pin):
  - right 40%: paired horizontal bars `before` (steel `#5E86A3`) and `after` (olive `#8C8A5E`)
    with the numeric label; the top-3 years get the saturated-blue + white-label treatment.
 Row label = year, italic serif 11, with a hairline rule per row.
+
+### 11. `loading` — pin11 (art of type)
+Full-bleed ultramarine `#1A50D5`, white uppercase grotesque, one line of type repeated down the
+page with its tracking warped line by line until the block bends into a wave. In the app the
+phrase is **your own commit messages**, sampled across your whole history, five rows per message
+so the eye can follow a letter from row to row — which is the only thing that makes the wave read
+as a wave rather than a word search.
+
+Glyphs are positioned individually (`<Text x={[…]}>`): both ends pinned to the margins, the
+letters between them pushed by one cycle of a sine whose phase slips per row and travels while
+you wait. Amplitude is capped so the tightest gap still clears a capital M.
+
+Because the screen is on display *before* any request finishes, the messages come from the
+previous run (`messageCache`, written whenever activity resolves). First launch falls back to the
+pin's own trick and repeats one phrase.
 
 ## Navigation
 
@@ -214,3 +241,7 @@ Everything the GraphQL API gives that is worth showing must be surfaced:
 | followers / following | hey |
 | open PRs: number, title, repo, age, draft, url | index, hey, weather |
 | derived: streaks, best day, active days, avg/day, busiest weekday, velocity | weather, now, dots, hey |
+| commit messages + timestamps (sampled history) | clock, loading |
+| per-repo commits by month | cards |
+| PR comments, review threads, review state | hey (feed), review |
+| review requests, mentions | hey (feed) |

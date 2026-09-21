@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -9,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 import { Rail } from '../src/components/Rail';
 import { Body, Label } from '../src/components/Type';
@@ -17,11 +17,17 @@ import { PatForm } from '../src/components/PatForm';
 import { useActivity } from '../src/hooks/useActivity';
 import { useContributions } from '../src/hooks/useContributions';
 import { useOpenPrs, type PrsState } from '../src/hooks/useOpenPrs';
+import { useSocial, type SocialState } from '../src/hooks/useSocial';
 import type { GitHubModel } from '../src/lib/contributions';
 import { DEMO_TOKEN, tokenStore } from '../src/lib/token';
 import { clearWidget, syncWidget } from '../src/lib/widgetBridge';
 import type { Activity } from '../src/lib/activity';
-import { EMPTY_ACTIVITY } from '../src/lib/activity';
+import { EMPTY_ACTIVITY, spreadMessages } from '../src/lib/activity';
+import {
+  cacheLines,
+  clearCachedLines,
+  readCachedLines,
+} from '../src/lib/messageCache';
 import { ArchiveScreen } from '../src/screens/ArchiveScreen';
 import { BriefScreen } from '../src/screens/BriefScreen';
 import { ClockScreen } from '../src/screens/ClockScreen';
@@ -30,6 +36,7 @@ import { DotsScreen } from '../src/screens/DotsScreen';
 import { FlowScreen } from '../src/screens/FlowScreen';
 import { HeyScreen } from '../src/screens/HeyScreen';
 import { IndexScreen } from '../src/screens/IndexScreen';
+import { LoadingScreen } from '../src/screens/LoadingScreen';
 import { NowScreen } from '../src/screens/NowScreen';
 import { OrbitScreen } from '../src/screens/OrbitScreen';
 import { PosterScreen } from '../src/screens/PosterScreen';
@@ -75,6 +82,7 @@ function Page({
   index,
   model,
   prs,
+  social,
   activity,
   activityLoading,
   onDisconnect,
@@ -83,6 +91,7 @@ function Page({
   index: number;
   model: GitHubModel;
   prs: PrsState;
+  social: SocialState;
   activity: Activity;
   activityLoading: boolean;
   onDisconnect: () => void;
@@ -91,7 +100,9 @@ function Page({
   const name = SCREENS[index];
   return (
     <View style={{ width }}>
-      {name === 'hey' && <HeyScreen model={model} onDisconnect={onDisconnect} />}
+      {name === 'hey' && (
+        <HeyScreen model={model} onDisconnect={onDisconnect} social={social} />
+      )}
       {name === 'now' && <NowScreen model={model} />}
       {name === 'clock' && (
         <ClockScreen activity={activity} loading={activityLoading} />
@@ -123,6 +134,9 @@ export default function Home() {
   const contributions = useContributions(token ?? null);
   const model = contributions.status === 'ready' ? contributions.model : null;
   const prs = useOpenPrs(token ?? null, model?.login ?? null, page === PRS_PAGE);
+  // The feed lives on the front door, so it starts the moment we know who you
+  // are rather than waiting for a page to come into view.
+  const social = useSocial(token ?? null, model?.login ?? null, page <= 1);
   const activityState = useActivity(
     token ?? null,
     model?.login ?? null,
@@ -130,6 +144,27 @@ export default function Home() {
   );
   const activity =
     activityState.status === 'ready' ? activityState.activity : EMPTY_ACTIVITY;
+
+  // The loading screen is written in your own commit messages, which can only
+  // come from the run before this one — so this session's copy is saved for
+  // next time, and last session's is what you see today.
+  const [cached, setCached] = useState<string[]>([]);
+  const commits =
+    activityState.status === 'ready' ? activityState.activity.commits : null;
+  const fresh = useMemo(
+    () => (commits ? spreadMessages(commits, 26) : []),
+    [commits],
+  );
+  const lines = fresh.length > 0 ? fresh : cached;
+
+  useEffect(() => {
+    readCachedLines().then(setCached);
+  }, []);
+
+  useEffect(() => {
+    if (fresh.length === 0 || token === DEMO_TOKEN) return;
+    cacheLines(fresh).catch(() => {});
+  }, [fresh, token]);
 
   useEffect(() => {
     tokenStore.get().then((stored) => {
@@ -160,13 +195,20 @@ export default function Home() {
 
   const disconnect = async () => {
     if (token !== DEMO_TOKEN) await clearWidget().catch(() => {});
+    await clearCachedLines();
+    setCached([]);
     await tokenStore.clear();
     setToken(null);
     setPage(0);
   };
 
   if (token === undefined) {
-    return <View style={styles.screen} />;
+    return (
+      <>
+        <StatusBar style="light" />
+        <LoadingScreen caption="opening the drawer" lines={lines} />
+      </>
+    );
   }
 
   if (token === null) {
@@ -180,8 +222,18 @@ export default function Home() {
     );
   }
 
+  if (contributions.status === 'loading' || contributions.status === 'idle') {
+    return (
+      <>
+        <StatusBar style="light" />
+        <LoadingScreen caption="reading your year" lines={lines} />
+      </>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
       <View style={styles.chrome}>
         <Wordmark size={20} />
         <View style={styles.chromeRight}>
@@ -213,15 +265,11 @@ export default function Home() {
                 model={model}
                 onDisconnect={disconnect}
                 prs={prs}
+                social={social}
                 width={width}
               />
             ))}
           </ScrollView>
-        )}
-
-        {(contributions.status === 'loading' ||
-          contributions.status === 'idle') && (
-          <ActivityIndicator color={colors.ink} />
         )}
 
         {contributions.status === 'error' && (

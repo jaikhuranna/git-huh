@@ -328,45 +328,82 @@ export function cycleStats(pulls: PullDetail[]): CycleStats {
   };
 }
 
+/** One month of a repository's history, oldest first. */
+export interface MonthBar {
+  /** YYYY-MM, so two bars can never be confused across a year boundary. */
+  key: string;
+  /** Single letter for the axis — J F M A M J J A S O N D. */
+  initial: string;
+  /** Commits by the token owner in that month, from the sampled history. */
+  count: number;
+}
+
+const INITIALS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
 /**
- * A repository's own recent activity, as one intensity level per day for the
- * last `days` days, newest last.
+ * A repository's commit history by month, oldest first.
  *
- * The card halftone used to be a hash of the repo name — a texture that looked
- * like data and meant nothing. This is the real thing, and it returns an empty
- * array when there is nothing to draw so the card can say so rather than
- * inventing a pattern.
+ * The window is the sample's own range rather than a fixed twelve months: the
+ * history query reads a bounded number of commits per repo, so padding out to
+ * a year would draw empty bars for months the sample simply never reached and
+ * make a busy repository look abandoned. It returns an empty array when there
+ * is nothing to draw, so the card can say so instead of inventing a shape.
  */
-export function repoDensity(
+export function repoMonths(
   commits: CommitSample[],
   repo: string,
-  days: number,
+  maxMonths = 12,
   now: Date = new Date(),
-): number[] {
-  const mine = commits.filter((commit) => commit.repo === repo);
-  if (mine.length === 0) return [];
-
-  const byDay = new Map<string, number>();
-  for (const commit of mine) {
-    byDay.set(commit.date, (byDay.get(commit.date) ?? 0) + 1);
+): MonthBar[] {
+  const counts = new Map<number, number>();
+  for (const commit of commits) {
+    if (commit.repo !== repo) continue;
+    const [year, month] = commit.date.split('-');
+    const index = Number(year) * 12 + (Number(month) - 1);
+    counts.set(index, (counts.get(index) ?? 0) + 1);
   }
+  if (counts.size === 0) return [];
 
-  const out: number[] = [];
-  const cursor = new Date(now);
-  cursor.setDate(cursor.getDate() - (days - 1));
-  for (let i = 0; i < days; i++) {
-    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
-    out.push(byDay.get(key) ?? 0);
-    cursor.setDate(cursor.getDate() + 1);
+  const last = now.getFullYear() * 12 + now.getMonth();
+  const earliest = Math.min(...counts.keys());
+  const first = Math.max(earliest, last - (maxMonths - 1));
+
+  const out: MonthBar[] = [];
+  for (let index = first; index <= last; index++) {
+    const month = index % 12;
+    out.push({
+      key: `${Math.floor(index / 12)}-${String(month + 1).padStart(2, '0')}`,
+      initial: INITIALS[month],
+      count: counts.get(index) ?? 0,
+    });
   }
-
-  const peak = Math.max(...out, 1);
-  return out.map((count) =>
-    count === 0 ? 0 : Math.min(4, Math.ceil((count / peak) * 4)),
-  );
+  return out;
 }
 
 /** Every commit message, newest first — the loading screen reads these. */
 export function commitMessages(commits: CommitSample[]): string[] {
   return commits.map((commit) => commit.message).filter((m) => m.trim().length > 0);
+}
+
+/**
+ * `count` messages spread evenly across the whole history rather than taken
+ * off the top, so the loading screen shows work from all over time instead of
+ * whatever happened to land this week. Merge commits are dropped — they are
+ * GitHub's words, not yours.
+ */
+export function spreadMessages(commits: CommitSample[], count: number): string[] {
+  const seen = new Set<string>();
+  const pool: string[] = [];
+  for (const message of commitMessages(commits)) {
+    const clean = message.trim();
+    if (/^merge (branch|pull request|remote)/i.test(clean)) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pool.push(clean);
+  }
+  if (pool.length <= count) return pool;
+
+  const step = pool.length / count;
+  return Array.from({ length: count }, (_, i) => pool[Math.floor(i * step)]);
 }

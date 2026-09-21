@@ -8,6 +8,7 @@ import type {
 } from './github';
 import type { Activity, CommitSample, PullDetail } from './activity';
 import type { PullRequest } from './prs';
+import type { SocialEvent } from './social';
 
 /** Mulberry32 — tiny seeded PRNG so demo data is stable across renders. */
 function rng(seed: number): () => number {
@@ -416,3 +417,92 @@ const DEMO_BODIES = [
   'Splits the layout pass out of the renderer so the ribbon geometry can be unit tested without a canvas.',
   'Generates a deterministic sigil from a hash of the repository name, using the same four primitives as the launcher icon.',
 ];
+
+/**
+ * A believable activity feed for the demo token: every event kind at least
+ * once, so the filter chips all have something to show.
+ */
+export function demoSocial(): SocialEvent[] {
+  const base = Date.parse('2026-09-21T09:00:00Z');
+  const hours = (n: number) => new Date(base - n * 3_600_000).toISOString();
+
+  const events: SocialEvent[] = [
+    {
+      id: 'd1',
+      kind: 'comment',
+      actor: 'annapetrova',
+      title: 'feat: adaptive icon monochrome layer',
+      repo: 'jaikhuranna/git-huh',
+      number: 142,
+      url: 'https://github.com/jaikhuranna/git-huh/pull/142',
+      at: hours(2),
+      excerpt: 'The monochrome layer looks right on my Pixel, but the padding is off by a hair at 48dp.',
+    },
+    {
+      id: 'd2',
+      kind: 'review',
+      actor: 'marcusleroy',
+      state: 'CHANGES_REQUESTED',
+      title: 'refactor: split the sankey layout pass',
+      repo: 'jaikhuranna/git-huh',
+      number: 139,
+      url: 'https://github.com/jaikhuranna/git-huh/pull/139',
+      at: hours(7),
+      excerpt: 'Two passes over the same array — can this fold into one?',
+    },
+    {
+      id: 'd3',
+      kind: 'review-request',
+      actor: 'siyakapoor',
+      title: 'fix: keystore path on fresh clones',
+      repo: 'nothing-labs/mtui',
+      number: 88,
+      url: 'https://github.com/nothing-labs/mtui/pull/88',
+      at: hours(11),
+      excerpt: 'wants your review',
+    },
+    {
+      id: 'd4',
+      kind: 'mention',
+      actor: 'devonwrites',
+      title: 'Widget stops updating after a theme change',
+      repo: 'nothing-labs/mtui',
+      number: 401,
+      url: 'https://github.com/nothing-labs/mtui/issues/401',
+      at: hours(19),
+      excerpt: 'mentioned you',
+    },
+    {
+      id: 'd5',
+      kind: 'review',
+      actor: 'annapetrova',
+      state: 'APPROVED',
+      title: 'perf: memoize dot matrix columns',
+      repo: 'jaikhuranna/dot-tiles',
+      number: 57,
+      url: 'https://github.com/jaikhuranna/dot-tiles/pull/57',
+      at: hours(26),
+      excerpt: 'Nice — 40% fewer re-renders on my trace.',
+    },
+  ];
+
+  const mine: SocialEvent[] = demoPullRequests.slice(0, 4).map((pr, index) => ({
+    id: `d-open-${pr.number}`,
+    kind: 'open' as const,
+    actor: DEMO_LOGIN,
+    title: pr.title,
+    repo: pr.repo,
+    number: pr.number,
+    url: pr.htmlUrl,
+    at: new Date(base - (index + 1) * 9 * 3_600_000).toISOString(),
+    excerpt: pr.draft
+      ? 'draft'
+      : index === 0
+        ? 'approved · ready to merge'
+        : 'waiting on review',
+  }));
+
+  return [...events, ...mine].sort(
+    (a, b) => Date.parse(b.at) - Date.parse(a.at),
+  );
+}
