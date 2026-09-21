@@ -13,7 +13,12 @@ import { executeQuery } from './github';
  * contribution calendar down with it.
  */
 
-const REPO_SAMPLE = 6;
+/**
+ * The cards screen draws twelve repositories, so the history sample reaches
+ * twelve; at six, half the deck had no bars to draw and the axis under each
+ * card was a different length from the one above it.
+ */
+const REPO_SAMPLE = 12;
 const COMMITS_PER_REPO = 60;
 const PR_SAMPLE = 30;
 
@@ -341,13 +346,34 @@ export interface MonthBar {
 const INITIALS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
 /**
- * A repository's commit history by month, oldest first.
+ * The last `maxMonths` calendar months ending with this one, all at zero.
  *
- * The window is the sample's own range rather than a fixed twelve months: the
- * history query reads a bounded number of commits per repo, so padding out to
- * a year would draw empty bars for months the sample simply never reached and
- * make a busy repository look abandoned. It returns an empty array when there
- * is nothing to draw, so the card can say so instead of inventing a shape.
+ * Every repository card is drawn against this same window. The cards used to
+ * size their axis to whatever range that repo's own commits happened to
+ * cover, which meant one card showed a single bar labelled `s` and the card
+ * under it showed twelve — two charts that look comparable and are not. A
+ * shared axis costs some empty bars and buys a deck you can read down.
+ */
+export function monthWindow(maxMonths = 12, now: Date = new Date()): MonthBar[] {
+  const last = now.getFullYear() * 12 + now.getMonth();
+  const out: MonthBar[] = [];
+  for (let index = last - (maxMonths - 1); index <= last; index++) {
+    const month = ((index % 12) + 12) % 12;
+    out.push({
+      key: `${Math.floor(index / 12)}-${String(month + 1).padStart(2, '0')}`,
+      initial: INITIALS[month],
+      count: 0,
+    });
+  }
+  return out;
+}
+
+/**
+ * A repository's commit history over the shared month window, oldest first.
+ *
+ * Returns an empty array when the sample holds nothing for this repo, so the
+ * card can say the sample never reached it rather than drawing twelve zeroes
+ * and implying a year of silence.
  */
 export function repoMonths(
   commits: CommitSample[],
@@ -355,29 +381,19 @@ export function repoMonths(
   maxMonths = 12,
   now: Date = new Date(),
 ): MonthBar[] {
-  const counts = new Map<number, number>();
+  const counts = new Map<string, number>();
   for (const commit of commits) {
     if (commit.repo !== repo) continue;
-    const [year, month] = commit.date.split('-');
-    const index = Number(year) * 12 + (Number(month) - 1);
-    counts.set(index, (counts.get(index) ?? 0) + 1);
+    const key = commit.date.slice(0, 7);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   if (counts.size === 0) return [];
 
-  const last = now.getFullYear() * 12 + now.getMonth();
-  const earliest = Math.min(...counts.keys());
-  const first = Math.max(earliest, last - (maxMonths - 1));
-
-  const out: MonthBar[] = [];
-  for (let index = first; index <= last; index++) {
-    const month = index % 12;
-    out.push({
-      key: `${Math.floor(index / 12)}-${String(month + 1).padStart(2, '0')}`,
-      initial: INITIALS[month],
-      count: counts.get(index) ?? 0,
-    });
-  }
-  return out;
+  // Both sides are YYYY-MM, which is what makes the window key a lookup.
+  return monthWindow(maxMonths, now).map((bar) => ({
+    ...bar,
+    count: counts.get(bar.key) ?? 0,
+  }));
 }
 
 /** Every commit message, newest first — the loading screen reads these. */

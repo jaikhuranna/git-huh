@@ -262,6 +262,29 @@ export async function executeQuery<T>(
   return schema.parse(body.data);
 }
 
+/**
+ * `contributionYears` filtered down to years the account could actually have
+ * contributed in.
+ *
+ * GitHub derives the list from commit *author* dates, and those are just a
+ * field in the object: an import, a wrong system clock or a `git commit
+ * --date` puts a commit — and therefore a whole contribution year — decades
+ * before the account existed. That is where a 2016 account grows a "1999".
+ * The account's own createdAt is the honest floor, and today is the ceiling.
+ */
+export function plausibleYears(
+  years: number[],
+  createdAt: string,
+  now: Date = new Date(),
+): number[] {
+  const created = new Date(createdAt).getFullYear();
+  const floor = Number.isFinite(created) ? created : now.getFullYear();
+  const kept = years.filter((year) => year >= floor && year <= now.getFullYear());
+  // An account that only ever committed with a bad clock would filter down to
+  // nothing; it still has to appear somewhere on the poster.
+  return kept.length > 0 ? kept : [now.getFullYear()];
+}
+
 /** Fetch the token owner's profile, last-year calendar and type breakdown. */
 export function fetchContributions(
   token: string,
@@ -277,7 +300,10 @@ export function fetchContributions(
       totalContributions:
         viewer.contributionsCollection.contributionCalendar.totalContributions,
       weeks: viewer.contributionsCollection.contributionCalendar.weeks,
-      years: viewer.contributionsCollection.contributionYears,
+      years: plausibleYears(
+        viewer.contributionsCollection.contributionYears,
+        viewer.createdAt,
+      ),
       totalCommitContributions:
         viewer.contributionsCollection.totalCommitContributions,
       totalPullRequestContributions:

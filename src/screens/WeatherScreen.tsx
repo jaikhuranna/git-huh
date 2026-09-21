@@ -78,7 +78,7 @@ export function WeatherScreen({ model }: { model: GitHubModel }) {
 
         <View style={styles.frosted}>
           <Stat
-            icon="velocity"
+            icon={trend(derived.velocity)}
             label="velocity"
             value={`${derived.velocity > 0 ? '+' : ''}${Math.round(derived.velocity)}%`}
           />
@@ -126,12 +126,23 @@ export function WeatherScreen({ model }: { model: GitHubModel }) {
   );
 }
 
+/**
+ * Which way the velocity glyph points. The stat is signed and the arrow was
+ * not: a week that halved still drew a rising line, which is the one thing
+ * on this screen that can be read as a lie.
+ */
+function trend(velocity: number): IconName {
+  if (Math.round(velocity) > 0) return 'rising';
+  if (Math.round(velocity) < 0) return 'falling';
+  return 'level';
+}
+
 function Stat({
   icon,
   value,
   label,
 }: {
-  icon: 'velocity' | 'consistency' | 'pace';
+  icon: IconName;
   value: string;
   label: string;
 }) {
@@ -157,10 +168,14 @@ const WEEKDAY_INITIALS = ['s', 'm', 't', 'w', 't', 'f', 's'] as const;
 
 /** Hairline glyphs in the spirit of the pin's rain / humidity / wind row. */
 const ICONS = {
-  velocity: 'M3 15 L8 9 L12 12 L17 5 M13 5 H17 V9',
+  rising: 'M3 15 L8 9 L12 12 L17 5 M13 5 H17 V9',
+  falling: 'M3 5 L8 11 L12 8 L17 15 M13 15 H17 V11',
+  level: 'M3 10 H15 M12 6.5 L15.5 10 L12 13.5',
   consistency: 'M10 3 A7 7 0 1 1 9.99 3 M6.5 10 L9 12.5 L13.5 7.5',
   pace: 'M3 14 A8 8 0 0 1 17 14 M10 14 L13.5 9.5',
 } as const;
+
+type IconName = keyof typeof ICONS;
 
 const styles = StyleSheet.create({
   screen: {

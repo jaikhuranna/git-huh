@@ -23,10 +23,13 @@ import { DEMO_TOKEN, tokenStore } from '../src/lib/token';
 import { clearWidget, syncWidget } from '../src/lib/widgetBridge';
 import type { Activity } from '../src/lib/activity';
 import { EMPTY_ACTIVITY, spreadMessages } from '../src/lib/activity';
+import { fetchCommitLines } from '../src/lib/commitLines';
 import {
   cacheLines,
   clearCachedLines,
+  isStale,
   readCachedLines,
+  shuffle,
 } from '../src/lib/messageCache';
 import { ArchiveScreen } from '../src/screens/ArchiveScreen';
 import { BriefScreen } from '../src/screens/BriefScreen';
@@ -40,12 +43,19 @@ import { LoadingScreen } from '../src/screens/LoadingScreen';
 import { NowScreen } from '../src/screens/NowScreen';
 import { OrbitScreen } from '../src/screens/OrbitScreen';
 import { PosterScreen } from '../src/screens/PosterScreen';
+import { PullScreen } from '../src/screens/PullScreen';
 import { ReviewScreen } from '../src/screens/ReviewScreen';
 import { WeatherScreen } from '../src/screens/WeatherScreen';
 import { colors, space } from '../src/theme';
 
 /** undefined = restoring from the keystore, null = signed out. */
 type TokenState = string | null | undefined;
+
+/** Which pull request the detail overlay is showing, if any. */
+interface OpenPull {
+  repo: string;
+  number: number;
+}
 
 /** One screen per pin on the board, in reading order. */
 const SCREENS = [
@@ -78,23 +88,31 @@ const ACTIVITY_PAGES = [
   SCREENS.indexOf('review'),
 ];
 
+/** Lines kept for the loading screen — it draws about 26 at a time. */
+const POOL_SIZE = 40;
+
 function Page({
   index,
+  active,
   model,
   prs,
   social,
   activity,
   activityLoading,
   onDisconnect,
+  onOpenPull,
   width,
 }: {
   index: number;
+  /** True only for the page currently on screen — gates animation. */
+  active: boolean;
   model: GitHubModel;
   prs: PrsState;
   social: SocialState;
   activity: Activity;
   activityLoading: boolean;
   onDisconnect: () => void;
+  onOpenPull: (pull: OpenPull) => void;
   width: number;
 }) {
   const name = SCREENS[index];
@@ -109,12 +127,21 @@ function Page({
       )}
       {name === 'flow' && <FlowScreen model={model} />}
       {name === 'poster' && <PosterScreen model={model} />}
-      {name === 'orbit' && <OrbitScreen model={model} />}
+      {name === 'orbit' && <OrbitScreen active={active} model={model} />}
       {name === 'weather' && <WeatherScreen model={model} />}
       {name === 'cards' && <CardsScreen activity={activity} model={model} />}
-      {name === 'index' && <IndexScreen state={prs} />}
+      {name === 'index' && (
+        <IndexScreen
+          onOpen={(pr) => onOpenPull({ repo: pr.repo, number: pr.number })}
+          state={prs}
+        />
+      )}
       {name === 'brief' && (
-        <BriefScreen activity={activity} loading={activityLoading} />
+        <BriefScreen
+          activity={activity}
+          loading={activityLoading}
+          onOpen={(pr) => onOpenPull({ repo: pr.repo, number: pr.number })}
+        />
       )}
       {name === 'review' && (
         <ReviewScreen activity={activity} loading={activityLoading} />
@@ -128,43 +155,91 @@ function Page({
 export default function Home() {
   const [token, setToken] = useState<TokenState>(undefined);
   const [page, setPage] = useState(0);
+  const [openPull, setOpenPull] = useState<OpenPull | null>(null);
   const pager = useRef<ScrollView>(null);
   const { width } = useWindowDimensions();
 
   const contributions = useContributions(token ?? null);
   const model = contributions.status === 'ready' ? contributions.model : null;
-  const prs = useOpenPrs(token ?? null, model?.login ?? null, page === PRS_PAGE);
+  const login = model?.login ?? null;
+  const prs = useOpenPrs(token ?? null, login, page === PRS_PAGE);
   // The feed lives on the front door, so it starts the moment we know who you
   // are rather than waiting for a page to come into view.
-  const social = useSocial(token ?? null, model?.login ?? null, page <= 1);
+  const social = useSocial(token ?? null, login, page <= 1);
   const activityState = useActivity(
     token ?? null,
-    model?.login ?? null,
+    login,
     ACTIVITY_PAGES.some((target) => Math.abs(page - target) <= 1),
   );
   const activity =
     activityState.status === 'ready' ? activityState.activity : EMPTY_ACTIVITY;
 
-  // The loading screen is written in your own commit messages, which can only
-  // come from the run before this one — so this session's copy is saved for
-  // next time, and last session's is what you see today.
-  const [cached, setCached] = useState<string[]>([]);
-  const commits =
-    activityState.status === 'ready' ? activityState.activity.commits : null;
-  const fresh = useMemo(
-    () => (commits ? spreadMessages(commits, 26) : []),
-    [commits],
-  );
-  const lines = fresh.length > 0 ? fresh : cached;
+  /**
+   * The loading screen is written in your own commit messages, which is a
+   * problem, because it is on screen before anything has been fetched. So
+   * the words are a pool kept on the device: every launch shuffles what is
+   * already there and shows it immediately, and only a pool older than a
+   * week sends a request to replace it.
+   */
+  const [lines, setLines] = useState<string[]>([]);
+  const [refreshWords, setRefreshWords] = useState(false);
 
   useEffect(() => {
-    readCachedLines().then(setCached);
+    let cancelled = false;
+    readCachedLines().then((cache) => {
+      if (cancelled) return;
+      setLines(shuffle(cache.lines));
+      setRefreshWords(isStale(cache));
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Set once the search has written a pool, so the weaker backstop below
+  // cannot land on top of it if activity happens to resolve a moment later.
+  const searched = useRef(false);
+
   useEffect(() => {
-    if (fresh.length === 0 || token === DEMO_TOKEN) return;
-    cacheLines(fresh).catch(() => {});
-  }, [fresh, token]);
+    if (!refreshWords || !token || token === DEMO_TOKEN || !login) return;
+
+    const controller = new AbortController();
+    fetchCommitLines(token, login, controller.signal)
+      .then(async (fresh) => {
+        if (fresh.length === 0) return;
+        searched.current = true;
+        await cacheLines(fresh);
+        setLines(shuffle(fresh));
+        setRefreshWords(false);
+      })
+      .catch(() => {
+        // Commit search is not available to every account; the sampled
+        // history below is the backstop.
+      });
+
+    return () => controller.abort();
+  }, [login, refreshWords, token]);
+
+  const commits =
+    activityState.status === 'ready' ? activityState.activity.commits : null;
+  const sampled = useMemo(
+    () => (commits ? spreadMessages(commits, POOL_SIZE) : []),
+    [commits],
+  );
+
+  useEffect(() => {
+    // Only if the search never landed: this pool is the last few days of the
+    // repos you pushed to most recently, which is a much narrower slice of
+    // your history than the search gives.
+    if (!refreshWords || searched.current) return;
+    if (sampled.length === 0 || token === DEMO_TOKEN) return;
+    cacheLines(sampled).catch(() => {});
+  }, [refreshWords, sampled, token]);
+
+  // Shown while the cache is empty and the refresh is still in the air —
+  // whatever the history sample has, rather than the placeholder.
+  const shuffledSample = useMemo(() => shuffle(sampled), [sampled]);
+  const words = lines.length > 0 ? lines : shuffledSample;
 
   useEffect(() => {
     tokenStore.get().then((stored) => {
@@ -196,17 +271,19 @@ export default function Home() {
   const disconnect = async () => {
     if (token !== DEMO_TOKEN) await clearWidget().catch(() => {});
     await clearCachedLines();
-    setCached([]);
+    setLines([]);
+    setRefreshWords(true);
     await tokenStore.clear();
     setToken(null);
     setPage(0);
+    setOpenPull(null);
   };
 
   if (token === undefined) {
     return (
       <>
         <StatusBar style="light" />
-        <LoadingScreen caption="opening the drawer" lines={lines} />
+        <LoadingScreen caption="opening the drawer" lines={words} />
       </>
     );
   }
@@ -226,68 +303,86 @@ export default function Home() {
     return (
       <>
         <StatusBar style="light" />
-        <LoadingScreen caption="reading your year" lines={lines} />
+        <LoadingScreen caption="reading your year" lines={words} />
       </>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <StatusBar style="dark" />
-      <View style={styles.chrome}>
-        <Wordmark size={20} />
-        <View style={styles.chromeRight}>
-          <Label>{SCREENS[page]}</Label>
-          <Pressable accessibilityRole="button" onPress={disconnect}>
-            <Label>{token === DEMO_TOKEN ? 'demo · exit' : 'disconnect'}</Label>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.body}>
-        {model && (
-          <ScrollView
-            horizontal
-            keyboardDismissMode="on-drag"
-            onMomentumScrollEnd={(event) =>
-              setPage(Math.round(event.nativeEvent.contentOffset.x / width))
-            }
-            pagingEnabled
-            ref={pager}
-            showsHorizontalScrollIndicator={false}
-          >
-            {SCREENS.map((name, index) => (
-              <Page
-                activity={activity}
-                activityLoading={activityState.status === 'loading'}
-                index={index}
-                key={name}
-                model={model}
-                onDisconnect={disconnect}
-                prs={prs}
-                social={social}
-                width={width}
-              />
-            ))}
-          </ScrollView>
-        )}
-
-        {contributions.status === 'error' && (
-          <View style={styles.errorStack}>
-            <Body style={styles.errorText}>
-              {contributions.error.kind === 'invalid-token'
-                ? 'that token expired or was revoked'
-                : 'could not reach github'}
-            </Body>
+    <>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <StatusBar style="dark" />
+        <View style={styles.chrome}>
+          <Wordmark size={20} />
+          <View style={styles.chromeRight}>
+            <Label>{SCREENS[page]}</Label>
             <Pressable accessibilityRole="button" onPress={disconnect}>
-              <Label style={styles.reset}>start over</Label>
+              <Label>{token === DEMO_TOKEN ? 'demo · exit' : 'disconnect'}</Label>
             </Pressable>
           </View>
-        )}
-      </View>
+        </View>
 
-      {model && <Rail names={SCREENS} onSelect={goTo} page={page} />}
-    </SafeAreaView>
+        <View style={styles.body}>
+          {model && (
+            <ScrollView
+              horizontal
+              keyboardDismissMode="on-drag"
+              onMomentumScrollEnd={(event) =>
+                setPage(Math.round(event.nativeEvent.contentOffset.x / width))
+              }
+              pagingEnabled
+              ref={pager}
+              showsHorizontalScrollIndicator={false}
+            >
+              {SCREENS.map((name, index) => (
+                <Page
+                  activity={activity}
+                  activityLoading={activityState.status === 'loading'}
+                  active={index === page && openPull === null}
+                  index={index}
+                  key={name}
+                  model={model}
+                  onDisconnect={disconnect}
+                  onOpenPull={setOpenPull}
+                  prs={prs}
+                  social={social}
+                  width={width}
+                />
+              ))}
+            </ScrollView>
+          )}
+
+          {contributions.status === 'error' && (
+            <View style={styles.errorStack}>
+              <Body style={styles.errorText}>
+                {contributions.error.kind === 'invalid-token'
+                  ? 'that token expired or was revoked'
+                  : 'could not reach github'}
+              </Body>
+              <Pressable accessibilityRole="button" onPress={disconnect}>
+                <Label style={styles.reset}>start over</Label>
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        {model && <Rail names={SCREENS} onSelect={goTo} page={page} />}
+      </SafeAreaView>
+
+      {/* Over the pager rather than inside it: the detail page has its own
+          horizontal scrollers, and nested inside the pager every one of them
+          would lose its drag to the page swipe. */}
+      {openPull && (
+        <View style={styles.overlay}>
+          <PullScreen
+            number={openPull.number}
+            onClose={() => setOpenPull(null)}
+            repo={openPull.repo}
+            token={token}
+          />
+        </View>
+      )}
+    </>
   );
 }
 
@@ -295,6 +390,14 @@ const styles = StyleSheet.create({
   screen: {
     backgroundColor: colors.canvas,
     flex: 1,
+  },
+  overlay: {
+    backgroundColor: colors.canvas,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   chrome: {
     alignItems: 'baseline',

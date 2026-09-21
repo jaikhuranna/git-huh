@@ -1,35 +1,55 @@
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
-import { Body, Data, Heading, Label, Serif } from '../components/Type';
+import { Markdown } from '../components/Markdown';
+import { Squiggle } from '../components/Squiggle';
+import { Data, Heading, Label, Serif } from '../components/Type';
 import type { Activity, PullDetail } from '../lib/activity';
-import { colors, fonts, radii } from '../theme';
-import { ago, fmt, Page } from './shared';
+import { colors, fonts, radii, space } from '../theme';
+import { ago, fmt } from './shared';
 
 /**
  * pin03's filing card, opened up. The `index` screen lists pull requests;
  * this one actually reads one — the description, the diff, the review state.
- * That body text is the data you only get by following the object's URL,
- * and nothing else in the app touches it.
+ *
+ * The description is rendered rather than printed. GitHub hands back raw
+ * Markdown, and this screen used to put it on the page verbatim: a heading
+ * arrived as a literal `## Problem` and a list as a column of hyphens.
+ *
+ * Paging lives in a bar pinned to the bottom, so `next` is in the same place
+ * on every pull request. It used to sit under the description, which meant
+ * its position depended on how much the author had written — a long body put
+ * it below the fold and a one-liner put it halfway up the screen.
  */
 export function BriefScreen({
   activity,
   loading,
+  onOpen,
 }: {
   activity: Activity;
   loading: boolean;
+  onOpen: (pr: PullDetail) => void;
 }) {
+  const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
   const pulls = activity.pulls;
-  const pr = pulls[Math.min(index, pulls.length - 1)];
+  const at = Math.min(index, Math.max(0, pulls.length - 1));
+  const pr = pulls[at];
+  const body = width - space.gutter * 2;
 
   return (
-    <Page>
+    <View style={styles.screen}>
       <View style={styles.masthead}>
         <Data style={styles.chapter}>Ch. 4 /</Data>
         <Data style={styles.title}>THE BRIEF</Data>
         <Data style={styles.chapter}>
-          {pulls.length ? `${Math.min(index + 1, pulls.length)} / ${pulls.length}` : '—'}
+          {pulls.length ? `${at + 1} / ${pulls.length}` : '—'}
         </Data>
       </View>
 
@@ -40,67 +60,104 @@ export function BriefScreen({
 
       {pr && (
         <>
-          <View style={styles.card}>
-            <View style={styles.tabRow}>
-              <View style={styles.tab}>
-                <Data style={styles.tabText}>#{pr.number}</Data>
+          <ScrollView
+            contentContainerStyle={styles.page}
+            showsVerticalScrollIndicator={false}
+            style={styles.scroll}
+          >
+            <View style={styles.card}>
+              <View style={styles.tabRow}>
+                <View style={styles.tab}>
+                  <Data style={styles.tabText}>#{pr.number}</Data>
+                </View>
+                <StateChip pr={pr} />
               </View>
-              <StateChip pr={pr} />
+
+              <Data style={styles.repo}>{pr.repo}</Data>
+              <Heading style={styles.prTitle}>{pr.title}</Heading>
+
+              <DiffBar pr={pr} />
+
+              <View style={styles.statRow}>
+                <Data style={styles.stat}>{fmt(pr.changedFiles)} files</Data>
+                <Data style={styles.stat}>{fmt(pr.commits)} commits</Data>
+                <Data style={styles.stat}>{fmt(pr.comments)} comments</Data>
+                <Data style={styles.stat}>{ago(pr.createdAt)}</Data>
+              </View>
+
+              {pr.labels.length > 0 && (
+                <View style={styles.labels}>
+                  {pr.labels.map((label) => (
+                    <View
+                      key={label.name}
+                      style={[styles.label, { borderColor: `#${label.color}` }]}
+                    >
+                      <Data style={styles.labelText}>{label.name}</Data>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
 
-            <Data style={styles.repo}>{pr.repo}</Data>
-            <Heading style={styles.prTitle}>{pr.title}</Heading>
+            <Serif style={styles.bodyHead}>The description</Serif>
+            <Squiggle
+              amplitude={2.4}
+              length={body * 0.45}
+              opacity={0.45}
+              style={styles.headRule}
+              wavelength={13}
+            />
 
-            <DiffBar pr={pr} />
+            {/* Clamped: this is the shelf copy, and the whole thing is one
+                tap away on the pull request itself. */}
+            <Markdown limit={900} source={pr.body} width={body} />
 
-            <View style={styles.statRow}>
-              <Data style={styles.stat}>{fmt(pr.changedFiles)} files</Data>
-              <Data style={styles.stat}>{fmt(pr.commits)} commits</Data>
-              <Data style={styles.stat}>{fmt(pr.comments)} comments</Data>
-              <Data style={styles.stat}>{ago(pr.createdAt)}</Data>
-            </View>
-
-            {pr.labels.length > 0 && (
-              <View style={styles.labels}>
-                {pr.labels.map((label) => (
-                  <View
-                    key={label.name}
-                    style={[styles.label, { borderColor: `#${label.color}` }]}
-                  >
-                    <Data style={styles.labelText}>{label.name}</Data>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          <Serif style={styles.bodyHead}>The description</Serif>
-          <Body style={styles.body}>
-            {pr.body.trim().length > 0
-              ? clamp(pr.body)
-              : 'No description was written for this pull request.'}
-          </Body>
-
-          <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              disabled={index >= pulls.length - 1}
-              onPress={() => setIndex((i) => Math.min(i + 1, pulls.length - 1))}
-              style={[styles.pill, index >= pulls.length - 1 && styles.muted]}
+              onPress={() => onOpen(pr)}
+              style={styles.openRow}
             >
-              <Label style={styles.pillLabel}>next →</Label>
+              <Label style={styles.openLabel}>
+                read the whole thing · talk · diff →
+              </Label>
             </Pressable>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <Squiggle
+              amplitude={2.4}
+              length={width}
+              opacity={0.35}
+              style={styles.footerRule}
+              wavelength={15}
+            />
             <Pressable
-              accessibilityRole="link"
-              onPress={() => Linking.openURL(pr.url).catch(() => {})}
-              style={[styles.pill, styles.solid]}
+              accessibilityRole="button"
+              disabled={at <= 0}
+              onPress={() => setIndex(Math.max(0, at - 1))}
+              style={[styles.pill, at <= 0 && styles.muted]}
             >
-              <Label style={styles.solidLabel}>open on github</Label>
+              <Label style={styles.pillLabel}>← prev</Label>
+            </Pressable>
+            <Data style={styles.counter}>
+              {at + 1} of {pulls.length}
+            </Data>
+            <Pressable
+              accessibilityRole="button"
+              disabled={at >= pulls.length - 1}
+              onPress={() => setIndex(Math.min(pulls.length - 1, at + 1))}
+              style={[
+                styles.pill,
+                styles.solid,
+                at >= pulls.length - 1 && styles.muted,
+              ]}
+            >
+              <Label style={styles.solidLabel}>next →</Label>
             </Pressable>
           </View>
         </>
       )}
-    </Page>
+    </View>
   );
 }
 
@@ -141,21 +198,27 @@ function DiffBar({ pr }: { pr: PullDetail }) {
   );
 }
 
-/** PR bodies can be enormous; show the opening and say so. */
-function clamp(body: string, limit = 420): string {
-  const text = body.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
-  if (text.length <= limit) return text;
-  return `${text.slice(0, limit).trimEnd()}…`;
-}
-
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    paddingTop: 4,
+  },
   masthead: {
     alignItems: 'baseline',
     borderBottomColor: colors.ink,
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginHorizontal: space.gutter,
     paddingBottom: 8,
+  },
+  scroll: {
+    flex: 1,
+  },
+  page: {
+    paddingBottom: 24,
+    paddingHorizontal: space.gutter,
+    paddingTop: 16,
   },
   chapter: {
     color: colors.ink70,
@@ -169,7 +232,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderColor: colors.hairStrong,
     borderWidth: 1,
-    marginTop: 16,
     padding: 16,
   },
   tabRow: {
@@ -262,14 +324,40 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 22,
   },
-  body: {
-    color: colors.ink70,
-    marginTop: 8,
+  headRule: {
+    marginBottom: 2,
+    marginTop: 2,
   },
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
+  openRow: {
+    borderColor: colors.hair,
+    borderRadius: radii.pill,
+    borderWidth: 1,
     marginTop: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  openLabel: {
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  footer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingBottom: 6,
+    paddingHorizontal: space.gutter,
+    paddingTop: 12,
+  },
+  footerRule: {
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  counter: {
+    color: colors.ink40,
+    fontSize: 10,
   },
   pill: {
     alignItems: 'center',
@@ -290,7 +378,7 @@ const styles = StyleSheet.create({
     color: colors.onBlack,
   },
   muted: {
-    opacity: 0.35,
+    opacity: 0.3,
   },
   note: {
     marginTop: 24,

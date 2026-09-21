@@ -1,10 +1,15 @@
-import type { ReactElement } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { LanguageChip } from '../components/LanguageChip';
 import { Data, Label } from '../components/Type';
-import { repoMonths, type Activity, type MonthBar } from '../lib/activity';
+import {
+  monthWindow,
+  repoMonths,
+  type Activity,
+  type MonthBar,
+} from '../lib/activity';
 import type { GitHubModel, RepoSummary } from '../lib/contributions';
 import { colors, fonts, radii } from '../theme';
 import { ago, fmt, hash, Page, ScreenHead } from './shared';
@@ -19,6 +24,8 @@ const AXIS_HEIGHT = 14;
  * still stacking, and keeps each card's footer clear of the one below.
  */
 const OVERLAP = 16;
+/** Months every card's axis covers — see `monthWindow`. */
+const MONTHS = 12;
 
 /**
  * pin08 — the Urbit ID cards. A fanned deck of black cards, each with a
@@ -34,6 +41,10 @@ export function CardsScreen({
 }) {
   const { width } = useWindowDimensions();
   const cardWidth = width - 52;
+  // One axis for the whole deck. Every card is drawn against the same twelve
+  // months, including the ones the commit sample never reached, so a bar on
+  // one card sits over the same month as the bar above it.
+  const axis = useMemo(() => monthWindow(MONTHS), []);
 
   return (
     <Page>
@@ -42,9 +53,10 @@ export function CardsScreen({
       <View style={styles.deck}>
         {model.repos.slice(0, 12).map((repo, index) => (
           <RepoCard
+            axis={axis}
             index={index}
             key={repo.nameWithOwner}
-            months={repoMonths(activity.commits, repo.nameWithOwner, 12)}
+            months={repoMonths(activity.commits, repo.nameWithOwner, MONTHS)}
             repo={repo}
             width={cardWidth}
           />
@@ -60,15 +72,19 @@ function RepoCard({
   index,
   width,
   months,
+  axis,
 }: {
   repo: RepoSummary;
   index: number;
   width: number;
   months: MonthBar[];
+  axis: MonthBar[];
 }) {
   const seed = hash(repo.nameWithOwner);
   // A small, stable tilt per card — the pin's deck is never square.
   const tilt = ((seed % 5) - 2) * 0.9;
+  const sampled = months.length > 0;
+  const bars = sampled ? months : axis;
   const total = months.reduce((sum, month) => sum + month.count, 0);
 
   return (
@@ -92,22 +108,14 @@ function RepoCard({
         <Data style={styles.handle}>
           ~{repo.owner.toLowerCase()}-{repo.name.toLowerCase()}
         </Data>
-        {months.length > 0 && (
-          <Data style={styles.headCount}>
-            {fmt(total)} in {months.length}mo
-          </Data>
-        )}
+        <Data style={styles.headCount}>
+          {sampled ? `${fmt(total)} in ${MONTHS}mo` : 'not in the sample'}
+        </Data>
       </View>
 
-      {months.length > 0 ? (
-        <Svg height={CHART_HEIGHT + AXIS_HEIGHT} width={width - 36}>
-          <MonthChart months={months} width={width - 36} />
-        </Svg>
-      ) : (
-        <View style={styles.noChart}>
-          <Data style={styles.metaText}>no commits in the sampled window</Data>
-        </View>
-      )}
+      <Svg height={CHART_HEIGHT + AXIS_HEIGHT} width={width - 36}>
+        <MonthChart months={bars} sampled={sampled} width={width - 36} />
+      </Svg>
 
       <View style={styles.meta}>
         <Data style={styles.metaText}>★ {fmt(repo.stars)}</Data>
@@ -135,9 +143,17 @@ function RepoCard({
  * in opacity. A month with no commits still gets a baseline tick, so a gap in
  * the work reads as a gap rather than as missing data.
  */
-function MonthChart({ months, width }: { months: MonthBar[]; width: number }) {
+function MonthChart({
+  months,
+  sampled,
+  width,
+}: {
+  months: MonthBar[];
+  sampled: boolean;
+  width: number;
+}) {
   const peak = Math.max(...months.map((month) => month.count), 1);
-  const peakIndex = months.findIndex((month) => month.count === peak);
+  const peakIndex = sampled ? months.findIndex((month) => month.count === peak) : -1;
   const pitch = width / months.length;
   const barWidth = Math.max(3, Math.min(pitch - 5, 16));
   const base = CHART_HEIGHT - 1;
@@ -166,6 +182,19 @@ function MonthChart({ months, width }: { months: MonthBar[]; width: number }) {
   return (
     <>
       {bars}
+      {!sampled && (
+        <SvgText
+          fill={colors.onBlack}
+          fontFamily={fonts.mono}
+          fontSize={9}
+          opacity={0.45}
+          textAnchor="middle"
+          x={width / 2}
+          y={base - tallest / 2}
+        >
+          outside the commit sample
+        </SvgText>
+      )}
       <Line
         stroke={colors.onBlack}
         strokeWidth={1}
@@ -189,17 +218,19 @@ function MonthChart({ months, width }: { months: MonthBar[]; width: number }) {
           {month.initial}
         </SvgText>
       ))}
-      <SvgText
-        fill={colors.onBlack}
-        fontFamily={fonts.mono}
-        fontSize={9}
-        opacity={0.75}
-        textAnchor="middle"
-        x={peakIndex * pitch + pitch / 2}
-        y={base - tallest - 3}
-      >
-        {peak}
-      </SvgText>
+      {peakIndex >= 0 && (
+        <SvgText
+          fill={colors.onBlack}
+          fontFamily={fonts.mono}
+          fontSize={9}
+          opacity={0.75}
+          textAnchor="middle"
+          x={peakIndex * pitch + pitch / 2}
+          y={base - tallest - 3}
+        >
+          {peak}
+        </SvgText>
+      )}
     </>
   );
 }
@@ -286,10 +317,6 @@ const styles = StyleSheet.create({
     // where two cards sit almost flush.
     borderColor: colors.canvas,
     borderWidth: 2,
-  },
-  noChart: {
-    height: CHART_HEIGHT + AXIS_HEIGHT,
-    justifyContent: 'center',
   },
   cardHead: {
     alignItems: 'center',

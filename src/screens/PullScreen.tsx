@@ -1,0 +1,564 @@
+import { useEffect, useState } from 'react';
+import {
+  BackHandler,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { Diff } from '../components/Diff';
+import { Markdown } from '../components/Markdown';
+import { Squiggle } from '../components/Squiggle';
+import { Body, Data, Heading, Label, Micro } from '../components/Type';
+import { usePullDetail } from '../hooks/usePullDetail';
+import { parsePatch, type PullComment, type PullDetailFull } from '../lib/pullDetail';
+import { colors, fonts, radii, space } from '../theme';
+import { ago, fmt } from './shared';
+
+type Tab = 'brief' | 'talk' | 'diff';
+
+/**
+ * A pull request, opened.
+ *
+ * The filing index and the brief both stop at the cover of the object: a
+ * number, a title, a size. This is the inside — what was written, what
+ * people said back, and the lines that actually changed.
+ *
+ * The conversation is drawn in wavy rules throughout. Everything else in
+ * this app is ruled and filed and measured, and a review thread is none of
+ * those things; the wave is what marks the part of a pull request that is
+ * two people arguing rather than a statistic.
+ */
+export function PullScreen({
+  token,
+  repo,
+  number,
+  onClose,
+}: {
+  token: string | null;
+  repo: string;
+  number: number;
+  onClose: () => void;
+}) {
+  const { width } = useWindowDimensions();
+  const state = usePullDetail(token, repo, number);
+  const [tab, setTab] = useState<Tab>('brief');
+  const body = width - space.gutter * 2;
+
+  // The overlay is not a route, so the system back button has to be told
+  // about it — without this it leaves the app from a pull request.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        onClose();
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [onClose]);
+
+  const pull = state.status === 'ready' ? state.pull : null;
+
+  return (
+    <SafeAreaView edges={['top', 'bottom']} style={styles.screen}>
+      <View style={styles.chrome}>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={12}
+          onPress={onClose}
+          style={styles.back}
+        >
+          <Label style={styles.backLabel}>← back</Label>
+        </Pressable>
+        <Data style={styles.chromeRepo} numberOfLines={1}>
+          {repo} #{number}
+        </Data>
+      </View>
+
+      {state.status === 'loading' && (
+        <Label style={styles.note}>opening the file…</Label>
+      )}
+      {state.status === 'error' && (
+        <View style={styles.errorStack}>
+          <Body style={styles.error}>could not open this pull request</Body>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() =>
+              Linking.openURL(`https://github.com/${repo}/pull/${number}`).catch(
+                () => {},
+              )
+            }
+          >
+            <Label style={styles.underline}>open it on github</Label>
+          </Pressable>
+        </View>
+      )}
+
+      {pull && (
+        <>
+          <Header pull={pull} width={body} />
+
+          <View style={styles.tabs}>
+            {(
+              [
+                ['brief', 'the brief'],
+                ['talk', `talk ${pull.comments.length}`],
+                ['diff', `files ${pull.changedFiles}`],
+              ] as const
+            ).map(([value, label]) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: tab === value }}
+                key={value}
+                onPress={() => setTab(value)}
+                style={[styles.tab, tab === value && styles.tabOn]}
+              >
+                <Label style={tab === value ? styles.tabLabelOn : undefined}>
+                  {label}
+                </Label>
+              </Pressable>
+            ))}
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.page}
+            showsVerticalScrollIndicator={false}
+          >
+            {tab === 'brief' && <Markdown source={pull.body} width={body} />}
+            {tab === 'talk' && <Conversation pull={pull} width={body} />}
+            {tab === 'diff' && (
+              <Diff files={pull.files} moreFiles={pull.moreFiles} width={body} />
+            )}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <Squiggle
+              amplitude={2.4}
+              length={width}
+              opacity={0.35}
+              style={styles.footerRule}
+              wavelength={15}
+            />
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => Linking.openURL(pull.url).catch(() => {})}
+              style={[styles.pill, styles.solid]}
+            >
+              <Label style={styles.solidLabel}>open on github</Label>
+            </Pressable>
+            <Data style={styles.branch} numberOfLines={1}>
+              {pull.headRefName} → {pull.baseRefName}
+            </Data>
+          </View>
+        </>
+      )}
+    </SafeAreaView>
+  );
+}
+
+function Header({ pull, width }: { pull: PullDetailFull; width: number }) {
+  const total = Math.max(1, pull.additions + pull.deletions);
+  const addShare = pull.additions / total;
+
+  return (
+    <View style={styles.header}>
+      <View style={styles.titleRow}>
+        <Heading style={styles.title}>{pull.title}</Heading>
+        <StateChip pull={pull} />
+      </View>
+
+      <View style={styles.diffTrack}>
+        <View style={[styles.diffAdd, { flex: Math.max(addShare, 0.02) }]} />
+        <View style={[styles.diffDel, { flex: Math.max(1 - addShare, 0.02) }]} />
+      </View>
+
+      <View style={styles.statRow}>
+        <Data style={styles.add}>+{fmt(pull.additions)}</Data>
+        <Data style={styles.del}>−{fmt(pull.deletions)}</Data>
+        <Data style={styles.stat}>{fmt(pull.changedFiles)} files</Data>
+        <Data style={styles.stat}>{fmt(pull.commits)} commits</Data>
+        <Data style={styles.stat}>~{pull.author}</Data>
+        <Data style={styles.stat}>{ago(pull.createdAt)}</Data>
+      </View>
+
+      <Squiggle
+        amplitude={2.6}
+        length={width}
+        opacity={0.4}
+        style={styles.headerRule}
+        wavelength={14}
+      />
+    </View>
+  );
+}
+
+function StateChip({ pull }: { pull: PullDetailFull }) {
+  const [text, tone] = pull.isDraft
+    ? ['draft', colors.ink40]
+    : pull.state === 'MERGED'
+      ? ['merged', colors.purple]
+      : pull.state === 'CLOSED'
+        ? ['closed', colors.red]
+        : pull.reviewDecision === 'APPROVED'
+          ? ['approved', colors.green]
+          : pull.reviewDecision === 'CHANGES_REQUESTED'
+            ? ['changes', colors.yellow]
+            : ['open', colors.blue];
+
+  return (
+    <View style={[styles.stateChip, { backgroundColor: tone }]}>
+      <Data style={styles.stateText}>{text}</Data>
+    </View>
+  );
+}
+
+function Conversation({ pull, width }: { pull: PullDetailFull; width: number }) {
+  if (pull.comments.length === 0) {
+    return <Label style={styles.note}>nobody has said anything yet</Label>;
+  }
+
+  return (
+    <View>
+      {pull.comments.map((comment, index) => (
+        <View key={comment.id}>
+          {index > 0 && (
+            <Squiggle
+              amplitude={2.2}
+              length={width}
+              opacity={0.3}
+              phase={index * 5}
+              style={styles.between}
+              wavelength={12}
+            />
+          )}
+          <Comment comment={comment} width={width} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const TONE: Record<string, string> = {
+  APPROVED: colors.green,
+  CHANGES_REQUESTED: colors.red,
+  COMMENTED: colors.blue,
+};
+
+function Comment({
+  comment,
+  width,
+  reply = false,
+}: {
+  comment: PullComment;
+  width: number;
+  reply?: boolean;
+}) {
+  const tone =
+    comment.kind === 'review'
+      ? (TONE[comment.state ?? ''] ?? colors.yellow)
+      : comment.kind === 'thread'
+        ? colors.purple
+        : colors.blue;
+
+  // The spine is sized off the body it runs beside; there is no way to ask
+  // an SVG to be "as tall as my sibling", so it is measured after layout.
+  const [height, setHeight] = useState(48);
+
+  return (
+    <View style={[styles.comment, reply && styles.reply]}>
+      <Squiggle
+        amplitude={2}
+        color={tone}
+        length={height}
+        opacity={0.75}
+        phase={comment.id.length}
+        vertical
+        wavelength={11}
+      />
+
+      <View
+        onLayout={(event) => {
+          const measured = Math.max(24, event.nativeEvent.layout.height);
+          setHeight((current) =>
+            Math.abs(current - measured) < 1 ? current : measured,
+          );
+        }}
+        style={styles.commentBody}
+      >
+        <View style={styles.byline}>
+          <Data style={styles.author}>~{comment.author}</Data>
+          <Micro style={[styles.kind, { color: tone }]}>{kindOf(comment)}</Micro>
+          <Micro style={styles.when}>{ago(comment.createdAt)}</Micro>
+        </View>
+
+        {comment.path && (
+          <Data style={styles.anchor} numberOfLines={1}>
+            on {comment.path}
+          </Data>
+        )}
+
+        {comment.diffHunk && <Hunk hunk={comment.diffHunk} />}
+
+        <Markdown source={comment.body} width={width - 34} />
+
+        {comment.replies?.map((child) => (
+          <Comment comment={child} key={child.id} reply width={width - 20} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function kindOf(comment: PullComment): string {
+  if (comment.kind === 'review') {
+    return (comment.state ?? 'reviewed').toLowerCase().replace(/_/g, ' ');
+  }
+  if (comment.kind === 'thread') {
+    return comment.resolved ? 'resolved thread' : 'on the diff';
+  }
+  return 'commented';
+}
+
+/** The few lines a review thread is arguing about, in the diff's own voice. */
+function Hunk({ hunk }: { hunk: string }) {
+  const { lines } = parsePatch(hunk);
+  const shown = lines.slice(-6);
+  if (shown.length === 0) return null;
+
+  return (
+    <View style={styles.hunk}>
+      {shown.map((line, index) => (
+        <Data
+          key={index}
+          numberOfLines={1}
+          style={[
+            styles.hunkLine,
+            line.kind === 'add' && styles.hunkAdd,
+            line.kind === 'del' && styles.hunkDel,
+          ]}
+        >
+          {line.kind === 'add' ? '+' : line.kind === 'del' ? '−' : ' '}
+          {line.text}
+        </Data>
+      ))}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: colors.canvas,
+    flex: 1,
+  },
+  chrome: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 14,
+    paddingHorizontal: space.gutter,
+    paddingTop: 10,
+  },
+  back: {
+    paddingVertical: 4,
+  },
+  backLabel: {
+    color: colors.ink,
+  },
+  chromeRepo: {
+    color: colors.ink40,
+    flex: 1,
+    fontSize: 10,
+    textAlign: 'right',
+  },
+  header: {
+    paddingHorizontal: space.gutter,
+    paddingTop: 10,
+  },
+  titleRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  title: {
+    flex: 1,
+    fontSize: 18,
+    lineHeight: 24,
+  },
+  stateChip: {
+    borderRadius: radii.pill,
+    paddingHorizontal: 11,
+    paddingVertical: 3,
+  },
+  stateText: {
+    color: colors.onBlack,
+    fontSize: 10,
+  },
+  diffTrack: {
+    borderRadius: 2,
+    flexDirection: 'row',
+    gap: 2,
+    height: 5,
+    marginTop: 14,
+    overflow: 'hidden',
+  },
+  diffAdd: {
+    backgroundColor: colors.green,
+  },
+  diffDel: {
+    backgroundColor: colors.red,
+  },
+  statRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 9,
+  },
+  add: {
+    color: colors.green,
+    fontSize: 11,
+  },
+  del: {
+    color: colors.red,
+    fontSize: 11,
+  },
+  stat: {
+    color: colors.ink70,
+    fontSize: 11,
+  },
+  headerRule: {
+    marginTop: 10,
+  },
+  tabs: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: space.gutter,
+    paddingTop: 4,
+  },
+  tab: {
+    borderColor: colors.hair,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  tabOn: {
+    backgroundColor: colors.black,
+    borderColor: colors.black,
+  },
+  tabLabelOn: {
+    color: colors.onBlack,
+  },
+  page: {
+    paddingBottom: 26,
+    paddingHorizontal: space.gutter,
+    paddingTop: 10,
+  },
+  between: {
+    marginVertical: 14,
+  },
+  comment: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  reply: {
+    marginTop: 12,
+    opacity: 0.92,
+  },
+  commentBody: {
+    flex: 1,
+  },
+  byline: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  author: {
+    color: colors.ink,
+    fontSize: 12,
+  },
+  kind: {
+    fontFamily: fonts.monoMedium,
+  },
+  when: {
+    color: colors.ink40,
+    marginLeft: 'auto',
+  },
+  anchor: {
+    color: colors.ink40,
+    fontSize: 10,
+    marginTop: 5,
+  },
+  hunk: {
+    backgroundColor: colors.recess,
+    borderRadius: radii.tile,
+    marginTop: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  hunkLine: {
+    color: colors.ink70,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  hunkAdd: {
+    color: colors.green,
+  },
+  hunkDel: {
+    color: colors.red,
+  },
+  footer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    paddingBottom: 8,
+    paddingHorizontal: space.gutter,
+    paddingTop: 12,
+  },
+  footerRule: {
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  pill: {
+    alignItems: 'center',
+    borderColor: colors.hair,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  solid: {
+    backgroundColor: colors.black,
+    borderColor: colors.black,
+  },
+  solidLabel: {
+    color: colors.onBlack,
+  },
+  branch: {
+    color: colors.ink40,
+    flex: 1,
+    fontSize: 10,
+  },
+  note: {
+    marginTop: 26,
+    textAlign: 'center',
+  },
+  errorStack: {
+    alignItems: 'center',
+    gap: 14,
+    marginTop: 30,
+  },
+  error: {
+    color: colors.red,
+  },
+  underline: {
+    color: colors.ink,
+    textDecorationLine: 'underline',
+  },
+});

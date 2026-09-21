@@ -46,15 +46,26 @@ on-device from the last one.
 - `src/screens/` — one file per screen: `Hey`, `Now`, `Clock`, `Flow`,
   `Poster`, `Orbit`, `Weather`, `Cards`, `Index`, `Brief`, `Review`, `Dots`,
   `Archive`, plus `Loading` (pin11, shown while the first request is in
-  flight). Order and navigation live in `app/index.tsx`.
+  flight) and `Pull`. Order and navigation live in `app/index.tsx`.
+- **`Pull` is not in the rail.** It is a full-screen overlay rendered *over*
+  the pager from `app/index.tsx`, opened by tapping a row on `index` or the
+  link on `brief`. It has horizontal scrollers of its own (the diff), and a
+  horizontal scroller nested inside the pager loses every drag to the page
+  swipe — which is also why the poster's year chips wrap instead of scrolling.
 - `src/lib/activity.ts` — the second-tier data layer: sampled commit history
   and pull request detail. `src/lib/social.ts` — the home screen's activity
   feed, built from search plus each PR's comment and review connections
   **deliberately not** from the notifications API, which would need a
   `notifications` scope the app never asks for.
-- `src/lib/messageCache.ts` — last run's commit messages, which is what the
-  loading screen is made of. It has to be on screen before the request that
-  would fetch them, hence the cache.
+- `src/lib/messageCache.ts` — the pool of commit messages the loading screen
+  is made of. It has to be on screen before the request that would fetch
+  them, hence the cache; it is refetched only when more than a week old and
+  otherwise just reshuffled. `src/lib/commitLines.ts` fills it, oldest-heavy,
+  from the REST commit-search endpoint — GraphQL has no commit search, and
+  `activity.ts` only ever sees the last few days.
+- `src/lib/pullDetail.ts` — one pull request in full: GraphQL for the object,
+  its comments and its review threads, REST for the file patches (GraphQL's
+  `files` connection carries no patch text), plus the unified-diff parser.
 - `src/lib/` — GitHub GraphQL, the `GitHubModel` view model, seeded demo data.
 - `src/theme/index.ts` — every colour, font and radius. Use these tokens; do
   not invent values in screens.
@@ -111,6 +122,18 @@ If a build dies with `ninja: error: manifest 'build.ninja' still dirty` or a
 JVM `SIGBUS` in `PerfLongVariant::sample`, delete the offending
 `node_modules/*/android/.cxx` directory and pass
 `-Dorg.gradle.jvmargs="… -XX:-UsePerfData"`.
+
+## A trap: react-native-svg text and a downloaded font
+
+A single `<Svg>` holding a page's worth of `<Text>` in one of the Google
+fonts **crashes the app** — `SIGSEGV` in `MountingCoordinator::pullTransaction`,
+before the first frame, with no JS error. The trigger is the total glyph
+count inside one canvas; it goes away if either the custom `fontFamily` or
+the shared canvas is removed. The loading screen therefore draws **one `<Svg>`
+per row**. If a new screen needs a lot of SVG text in a loaded face, split the
+canvases rather than debugging the stack trace again. It reproduces on the
+x86_64 emulator and is easy to mistake for an emulator-only fault — the arm64
+release build happened to survive it.
 
 ## Checks
 

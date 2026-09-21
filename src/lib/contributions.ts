@@ -58,6 +58,14 @@ export interface YearSummary {
   total: number;
   /** Jan..Dec totals for that year. */
   months: number[];
+  /**
+   * Weekly totals for that year's own calendar, oldest first. The poster
+   * draws every year from this, so 2019 gets the same column resolution as
+   * this year instead of collapsing to twelve months.
+   */
+  weeks: number[];
+  /** The month each week belongs to, 0–11, parallel to `weeks`. */
+  weekMonths: number[];
   /** Contributions on/before today's month-day in that year. */
   beforeToday: number;
   /** Contributions after today's month-day in that year. */
@@ -197,13 +205,51 @@ function toYearSummary(year: YearStats, now: Date): YearSummary {
     else afterToday += day.contributionCount;
   }
 
-  return { year: year.year, total: year.totalContributions, months, beforeToday, afterToday };
+  return {
+    year: year.year,
+    total: year.totalContributions,
+    months,
+    weeks: weeklyTotals(year.weeks),
+    weekMonths: weekMonths(year.weeks),
+    beforeToday,
+    afterToday,
+  };
 }
 
 function weeklyTotals(weeks: ContributionWeek[]): number[] {
   return weeks.map((week) =>
     week.contributionDays.reduce((sum, day) => sum + day.contributionCount, 0),
   );
+}
+
+/** Which month each week sits in — its first day's, so the axis reads left to right. */
+function weekMonths(weeks: ContributionWeek[]): number[] {
+  return weeks.map((week) => {
+    const first = week.contributionDays[0]?.date;
+    return first ? Number(first.slice(5, 7)) - 1 : 0;
+  });
+}
+
+/**
+ * The year to print after "since".
+ *
+ * The earliest contribution year is the interesting number, but it is
+ * computed from commit author dates, which are a text field anyone can set —
+ * one imported repository with a 1999 timestamp and a 2016 account claims to
+ * have been here since 1999. The account's own creation year is the earliest
+ * thing that can honestly be said, so it is the floor, and this year is the
+ * ceiling.
+ */
+export function sinceYear(
+  contributions: Pick<Contributions, 'years' | 'createdAt'>,
+  now: Date = new Date(),
+): number {
+  const thisYear = now.getFullYear();
+  const created = new Date(contributions.createdAt).getFullYear();
+  const floor = Number.isFinite(created) ? created : thisYear;
+  const earliest =
+    contributions.years.length > 0 ? Math.min(...contributions.years) : floor;
+  return Math.min(Math.max(earliest, floor), thisYear);
 }
 
 /** Shape raw calendar + stats data into the app's view model. Pure and testable. */
@@ -250,10 +296,7 @@ export function toGitHubModel(
     followers: stats.followers,
     stars: stats.stars,
     repoCount: stats.repoCount,
-    since:
-      contributions.years.length > 0
-        ? Math.min(...contributions.years)
-        : now.getFullYear(),
+    since: sinceYear(contributions, now),
     columns,
     breakdown: {
       commits: contributions.totalCommitContributions,

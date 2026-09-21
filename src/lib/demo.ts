@@ -7,6 +7,7 @@ import type {
   YearStats,
 } from './github';
 import type { Activity, CommitSample, PullDetail } from './activity';
+import { parsePatch, type PullDetailFull } from './pullDetail';
 import type { PullRequest } from './prs';
 import type { SocialEvent } from './social';
 
@@ -506,3 +507,131 @@ export function demoSocial(): SocialEvent[] {
     (a, b) => Date.parse(b.at) - Date.parse(a.at),
   );
 }
+
+/**
+ * One opened pull request for the demo token: a description with headings
+ * and a list, a review thread anchored to a line, a plain comment, and a
+ * real unified diff — so the detail screen can be laid out without a
+ * network, and every branch of the renderer has something to draw.
+ */
+export function demoPullDetail(repo: string, number: number): PullDetailFull {
+  const listed = demoPullRequests.find((pr) => pr.number === number);
+  const opened = listed?.createdAt ?? '2026-09-16T10:24:00Z';
+  const at = (hours: number) =>
+    new Date(Date.parse(opened) + hours * 3_600_000).toISOString();
+
+  return {
+    number,
+    title: listed?.title ?? 'feat: adaptive icon monochrome layer',
+    url: listed?.htmlUrl ?? `https://github.com/${repo}/pull/${number}`,
+    body: DEMO_PULL_BODY,
+    repo,
+    author: DEMO_LOGIN,
+    state: 'OPEN',
+    isDraft: listed?.draft ?? false,
+    createdAt: opened,
+    mergedAt: null,
+    baseRefName: 'main',
+    headRefName: 'monochrome-layer',
+    additions: 54,
+    deletions: 13,
+    changedFiles: 2,
+    commits: 3,
+    reviewDecision: 'REVIEW_REQUIRED',
+    labels: [{ name: 'enhancement', color: 'a2eeef' }],
+    comments: [
+      {
+        id: 'demo-c1',
+        kind: 'comment',
+        author: 'coderabbitai',
+        body: 'Walked the diff. The fallback path reads cleanly now — one nit inline about the cast.',
+        createdAt: at(2),
+        url: '#',
+      },
+      {
+        id: 'demo-t1',
+        kind: 'thread',
+        author: 'theo',
+        body: 'Is the `as const` load-bearing here? If the array is already readonly the cast is noise.',
+        createdAt: at(5),
+        url: '#',
+        path: 'src/lib/widgetBridge.ts',
+        diffHunk:
+          '@@ -12,6 +12,9 @@ export function widgetPayload(\n   const modes = ["light", "dark"] as const;\n+  const layers = ["foreground", "monochrome"] as const;',
+        resolved: false,
+        replies: [
+          {
+            id: 'demo-t1r1',
+            kind: 'thread',
+            author: DEMO_LOGIN,
+            body: 'It is — without it the tuple widens to `string[]` and the bridge signature stops matching.',
+            createdAt: at(6),
+            url: '#',
+          },
+        ],
+      },
+      {
+        id: 'demo-r1',
+        kind: 'review',
+        author: 'theo',
+        body: 'Good change. Holding for the one thread above, then this is fine to land.',
+        createdAt: at(6.5),
+        url: '#',
+        state: 'CHANGES_REQUESTED',
+      },
+    ],
+    files: [
+      {
+        path: 'src/lib/widgetBridge.ts',
+        status: 'modified',
+        additions: 9,
+        deletions: 2,
+        hasPatch: true,
+        ...parsePatch(
+          '@@ -10,8 +10,15 @@ export function widgetPayload(model) {\n' +
+            '   const modes = ["light", "dark"] as const;\n' +
+            '-  const layers = ["foreground"];\n' +
+            '-  return { modes, layers };\n' +
+            '+  const layers = ["foreground", "monochrome"] as const;\n' +
+            '+\n' +
+            '+  // Themed icons ask for the monochrome layer and fall back to the\n' +
+            '+  // foreground when a launcher does not ship one.\n' +
+            '+  return {\n' +
+            '+    modes,\n' +
+            '+    layers,\n' +
+            '+    fallback: layers[0],\n' +
+            '+  };\n' +
+            ' }\n',
+        ),
+      },
+      {
+        path: 'assets/android-icon-monochrome.png',
+        status: 'added',
+        additions: 0,
+        deletions: 0,
+        hasPatch: false,
+        truncated: false,
+        lines: [],
+      },
+    ],
+    moreFiles: 0,
+  };
+}
+
+const DEMO_PULL_BODY = `## Problem
+
+Themed icons fell back to the full-colour foreground, so the launcher tinted
+an already-coloured bitmap and the icon came out muddy on a dark wallpaper.
+
+## Fix
+
+- ship \`android-icon-monochrome.png\` at every density
+- declare the layer in \`app.json\`
+- teach \`widgetPayload\` that a launcher may ask for either layer
+
+\`\`\`ts
+const layers = ["foreground", "monochrome"] as const;
+\`\`\`
+
+> Checked against Pixel Launcher and Nothing Launcher on a tinted wallpaper.
+`;
