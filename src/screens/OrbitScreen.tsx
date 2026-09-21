@@ -1,9 +1,11 @@
 import type { ReactElement } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 
+import { LanguageChip } from '../components/LanguageChip';
 import { Data, Label } from '../components/Type';
 import type { GitHubModel, LanguageShare } from '../lib/contributions';
+import { languageMark } from '../lib/languageMarks';
 import { colors, fonts } from '../theme';
 import { onColor, Page, ScreenHead } from './shared';
 
@@ -30,8 +32,10 @@ export function OrbitScreen({ model }: { model: GitHubModel }) {
       <View style={styles.legend}>
         {model.languages.slice(0, 8).map((language) => (
           <View key={language.name} style={styles.legendRow}>
-            <View
-              style={[styles.swatch, { backgroundColor: language.color }]}
+            <LanguageChip
+              color={language.color}
+              name={language.name}
+              size={20}
             />
             <Data style={styles.legendName}>{language.name}</Data>
             <Data style={styles.legendShare}>
@@ -106,32 +110,12 @@ function Arcs({ languages, size }: { languages: LanguageShare[]; size: number })
           ),
         );
         nodes.push(
-          <SvgText
-            fill={onColor(language.color)}
-            fontFamily={fonts.sansBold}
-            fontSize={11}
-            key={`letter-${language.name}`}
-            textAnchor="middle"
-            x={x}
-            y={y + 4}
-          >
-            {letter}
-          </SvgText>,
+          mark(language.name, x, y, chip * 1.05, onColor(language.color)),
         );
       } else {
-        nodes.push(
-          <SvgText
-            fill={colors.ink}
-            fontFamily={fonts.sansBold}
-            fontSize={11}
-            key={`letter-${language.name}`}
-            textAnchor="middle"
-            x={x}
-            y={y + 4}
-          >
-            {letter}
-          </SvgText>,
-        );
+        // Off-chip languages get the mark in ink, or their initials when
+        // devicon has no icon for them.
+        nodes.push(mark(language.name, x, y, 17, colors.ink, letter));
       }
     });
   });
@@ -141,6 +125,48 @@ function Arcs({ languages, size }: { languages: LanguageShare[]; size: number })
       {arcs}
       {nodes}
     </>
+  );
+}
+
+/**
+ * A language's devicon mark placed on the arc. Icons are authored on their own
+ * viewBox, so they are scaled and translated into position rather than drawn
+ * at absolute coordinates.
+ */
+function mark(
+  name: string,
+  cx: number,
+  cy: number,
+  size: number,
+  tint: string,
+  fallbackLetter?: string,
+): ReactElement {
+  const icon = languageMark(name);
+  if (!icon) {
+    return (
+      <SvgText
+        fill={tint}
+        fontFamily={fonts.sansBold}
+        fontSize={11}
+        key={`letter-${name}`}
+        textAnchor="middle"
+        x={cx}
+        y={cy + 4}
+      >
+        {fallbackLetter ?? name.slice(0, 2)}
+      </SvgText>
+    );
+  }
+  const box = icon.viewBox.split(/\s+/).map(Number);
+  const span = Math.max(box[2] || 128, box[3] || 128);
+  const scale = size / span;
+  return (
+    <G
+      key={`mark-${name}`}
+      transform={`translate(${cx - size / 2}, ${cy - size / 2}) scale(${scale})`}
+    >
+      <Path d={icon.d} fill={tint} />
+    </G>
   );
 }
 
@@ -174,11 +200,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     paddingVertical: 7,
-  },
-  swatch: {
-    borderRadius: 2,
-    height: 9,
-    width: 9,
   },
   legendName: {
     flex: 1,

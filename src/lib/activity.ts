@@ -78,6 +78,10 @@ export interface CommitSample {
   /** Local hour 0–23, which is the point of collecting these at all. */
   hour: number;
   weekday: number;
+  /** Local calendar day, YYYY-MM-DD. */
+  date: string;
+  /** owner/name, so a repo's own activity can be drawn on its own card. */
+  repo: string;
   additions: number;
   deletions: number;
   message: string;
@@ -200,6 +204,8 @@ export async function fetchActivity(
       commits.push({
         hour: when.getHours(),
         weekday: when.getDay(),
+        date: `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}`,
+        repo: repo.nameWithOwner,
         additions: node.additions,
         deletions: node.deletions,
         message: node.messageHeadline,
@@ -320,4 +326,47 @@ export function cycleStats(pulls: PullDetail[]): CycleStats {
     open,
     closed,
   };
+}
+
+/**
+ * A repository's own recent activity, as one intensity level per day for the
+ * last `days` days, newest last.
+ *
+ * The card halftone used to be a hash of the repo name — a texture that looked
+ * like data and meant nothing. This is the real thing, and it returns an empty
+ * array when there is nothing to draw so the card can say so rather than
+ * inventing a pattern.
+ */
+export function repoDensity(
+  commits: CommitSample[],
+  repo: string,
+  days: number,
+  now: Date = new Date(),
+): number[] {
+  const mine = commits.filter((commit) => commit.repo === repo);
+  if (mine.length === 0) return [];
+
+  const byDay = new Map<string, number>();
+  for (const commit of mine) {
+    byDay.set(commit.date, (byDay.get(commit.date) ?? 0) + 1);
+  }
+
+  const out: number[] = [];
+  const cursor = new Date(now);
+  cursor.setDate(cursor.getDate() - (days - 1));
+  for (let i = 0; i < days; i++) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+    out.push(byDay.get(key) ?? 0);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const peak = Math.max(...out, 1);
+  return out.map((count) =>
+    count === 0 ? 0 : Math.min(4, Math.ceil((count / peak) * 4)),
+  );
+}
+
+/** Every commit message, newest first — the loading screen reads these. */
+export function commitMessages(commits: CommitSample[]): string[] {
+  return commits.map((commit) => commit.message).filter((m) => m.trim().length > 0);
 }

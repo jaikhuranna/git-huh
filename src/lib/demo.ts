@@ -351,9 +351,13 @@ export function demoActivity(): Activity {
       centre + (random() + random() + random() - 1.5) * spread,
     );
     const size = Math.round(4 + random() * random() * 320);
+    const daysAgo = Math.floor(random() * 120);
+    const when = new Date(Date.parse('2026-09-21T12:00:00Z') - daysAgo * 86_400_000);
     commits.push({
       hour: ((hour % 24) + 24) % 24,
-      weekday: Math.floor(random() * 7),
+      weekday: when.getDay(),
+      date: `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}`,
+      repo: `jaikhuranna/${DEMO_REPOS[Math.floor(random() * DEMO_REPOS.length)]}`,
       additions: Math.round(size * (0.45 + random() * 0.5)),
       deletions: Math.round(size * (0.1 + random() * 0.45)),
       message: DEMO_MESSAGES[Math.floor(random() * DEMO_MESSAGES.length)],
@@ -394,6 +398,8 @@ export function demoActivity(): Activity {
   void now;
   return { commits, pulls };
 }
+
+const DEMO_REPOS = ['git-huh', 'nothing-mtui', 'dot-tiles', 'orbit-widget', 'flux-cli', 'pixel-rain'];
 
 const DEMO_MESSAGES = [
   'fix(widget): today cell timezone drift',

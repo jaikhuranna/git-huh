@@ -1,10 +1,11 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, G, Line, Rect } from 'react-native-svg';
 
-import { Heading, Label, Title } from '../components/Type';
+import { LanguageChip } from '../components/LanguageChip';
+import { Label, Title } from '../components/Type';
 import { insights, type GitHubModel } from '../lib/contributions';
 import { colors, radii } from '../theme';
-import { fmt, onColor, Page } from './shared';
+import { fmt, Page } from './shared';
 
 /**
  * pin02 — Ai OS. The one screen that is allowed a dot matrix, because the pin
@@ -200,27 +201,12 @@ function Dock({ model, size }: { model: GitHubModel; size: number }) {
     <View style={[styles.tile, { height: size, width: size }]}>
       <View style={[styles.dockGrid, { width: inner }]}>
         {top.map((language) => (
-          <View
+          <LanguageChip
+            color={language.color}
             key={language.name}
-            style={[
-              styles.dockTile,
-              {
-                backgroundColor: language.color,
-                borderRadius: cell / 2,
-                height: cell,
-                width: cell,
-              },
-            ]}
-          >
-            <Heading
-              style={{
-                color: onColor(language.color),
-                fontSize: Math.min(15, cell * 0.34),
-              }}
-            >
-              {language.name.slice(0, 2)}
-            </Heading>
-          </View>
+            name={language.name}
+            size={cell}
+          />
         ))}
       </View>
       {top.length === 0 && <Label>no languages yet</Label>}
@@ -296,10 +282,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: DOCK_GAP,
-    justifyContent: 'center',
-  },
-  dockTile: {
-    alignItems: 'center',
     justifyContent: 'center',
   },
   ruler: {

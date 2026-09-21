@@ -79,20 +79,27 @@ function Row({ pr, index }: { pr: PullRequest; index: number }) {
       <Pressable
         accessibilityRole="link"
         onPress={() => Linking.openURL(pr.htmlUrl).catch(() => {})}
-        style={[styles.row, draft && styles.rowDraft]}
+        style={[styles.row, draft && styles.rowDraftEdge]}
       >
         <View style={styles.tab}>
           <Data style={styles.tabText}>{pr.number}</Data>
         </View>
 
         <View style={styles.rowBody}>
-          <Data style={[styles.repo, draft && styles.onDark]}>{pr.repo}</Data>
-          <Body numberOfLines={2} style={[styles.prTitle, draft && styles.onDark]}>
+          <View style={styles.repoRow}>
+            <Data style={styles.repo}>{pr.repo}</Data>
+            {draft && (
+              <View style={styles.draftChip}>
+                <Data style={styles.draftText}>draft</Data>
+              </View>
+            )}
+          </View>
+          <Body numberOfLines={2} style={styles.prTitle}>
             {pr.title}
           </Body>
         </View>
 
-        <View style={[styles.dateBlock, draft && styles.dateBlockDraft]}>
+        <View style={styles.dateBlock}>
           <Data style={styles.dateText}>{prAge(pr.createdAt)}</Data>
         </View>
       </Pressable>
@@ -153,9 +160,24 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     paddingVertical: 8,
   },
-  rowDraft: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
+  rowDraftEdge: {
+    borderLeftColor: colors.ink,
+    borderLeftWidth: 3,
+  },
+  repoRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  draftChip: {
+    backgroundColor: colors.ink20,
+    borderRadius: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  draftText: {
+    color: colors.ink70,
+    fontSize: 9,
   },
   tab: {
     backgroundColor: colors.black,
@@ -178,16 +200,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 17,
   },
-  onDark: {
-    color: colors.onBlack,
-  },
   dateBlock: {
     backgroundColor: colors.black,
     paddingHorizontal: 8,
     paddingVertical: 4,
-  },
-  dateBlockDraft: {
-    backgroundColor: colors.onBlack25,
   },
   dateText: {
     color: colors.onBlack,

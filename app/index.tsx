@@ -66,6 +66,7 @@ const PRS_PAGE = SCREENS.indexOf('index');
  */
 const ACTIVITY_PAGES = [
   SCREENS.indexOf('clock'),
+  SCREENS.indexOf('cards'),
   SCREENS.indexOf('brief'),
   SCREENS.indexOf('review'),
 ];
@@ -99,7 +100,7 @@ function Page({
       {name === 'poster' && <PosterScreen model={model} />}
       {name === 'orbit' && <OrbitScreen model={model} />}
       {name === 'weather' && <WeatherScreen model={model} />}
-      {name === 'cards' && <CardsScreen model={model} />}
+      {name === 'cards' && <CardsScreen activity={activity} model={model} />}
       {name === 'index' && <IndexScreen state={prs} />}
       {name === 'brief' && (
         <BriefScreen activity={activity} loading={activityLoading} />

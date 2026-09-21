@@ -3,20 +3,32 @@ import { Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { Data, Label } from '../components/Type';
+import { repoDensity, type Activity } from '../lib/activity';
 import type { GitHubModel, RepoSummary } from '../lib/contributions';
 import { colors, radii } from '../theme';
 import { ago, fmt, hash, Page, ScreenHead } from './shared';
 
 const CARD_HEIGHT = 158;
-/** Cards overlap so the deck reads as a fan, like the pin's stacked IDs. */
-const OVERLAP = 58;
+/**
+ * The deck should read as fanned cards, not one black slab: at the old
+ * overlap the canvas never showed between them and the stack merged into a
+ * single shape. This leaves a clear band of background at every seam while
+ * still stacking, and keeps each card's footer clear of the one below.
+ */
+const OVERLAP = 16;
 
 /**
  * pin08 — the Urbit ID cards. A fanned deck of black cards, each with a
  * sigil generated from its name, a monospace handle, and a halftone field
  * whose density is that repository's recent activity.
  */
-export function CardsScreen({ model }: { model: GitHubModel }) {
+export function CardsScreen({
+  model,
+  activity,
+}: {
+  model: GitHubModel;
+  activity: Activity;
+}) {
   const { width } = useWindowDimensions();
   const cardWidth = width - 52;
 
@@ -27,6 +39,7 @@ export function CardsScreen({ model }: { model: GitHubModel }) {
       <View style={styles.deck}>
         {model.repos.slice(0, 12).map((repo, index) => (
           <RepoCard
+            density={repoDensity(activity.commits, repo.nameWithOwner, 96)}
             index={index}
             key={repo.nameWithOwner}
             repo={repo}
@@ -43,10 +56,12 @@ function RepoCard({
   repo,
   index,
   width,
+  density,
 }: {
   repo: RepoSummary;
   index: number;
   width: number;
+  density: number[];
 }) {
   const seed = hash(repo.nameWithOwner);
   // A small, stable tilt per card — the pin's deck is never square.
@@ -75,9 +90,15 @@ function RepoCard({
         </Data>
       </View>
 
-      <Svg height={54} width={width - 36}>
-        <Halftone repo={repo} seed={seed} width={width - 36} />
-      </Svg>
+      {density.length > 0 ? (
+        <Svg height={54} width={width - 36}>
+          <Halftone density={density} width={width - 36} />
+        </Svg>
+      ) : (
+        <View style={styles.noField}>
+          <Data style={styles.metaText}>no commits in the sampled window</Data>
+        </View>
+      )}
 
       <View style={styles.meta}>
         <Data style={styles.metaText}>★ {fmt(repo.stars)}</Data>
@@ -165,62 +186,53 @@ function Sigil({ seed, size }: { seed: number; size: number }) {
 }
 
 /**
- * White dots whose radius follows a per-repo activity field. Peak cells go
- * square, which is the detail that makes the pin's cards read as halftone
- * rather than as a scatter.
+ * The repository's own recent days, one mark per day: radius steps with that
+ * day's commit count and the busiest days square off.
+ *
+ * This used to be `hash(repoName, col, row)` — a texture that looked like data
+ * and encoded nothing. Every mark here is a real day.
  */
-function Halftone({
-  repo,
-  seed,
-  width,
-}: {
-  repo: RepoSummary;
-  seed: number;
-  width: number;
-}) {
-  const rows = 7;
-  const columns = Math.floor(width / 9);
+function Halftone({ density, width }: { density: number[]; width: number }) {
+  const rows = 6;
+  const columns = Math.ceil(density.length / rows);
   const pitch = width / columns;
-
-  // Recency drives overall density: a repo pushed today is a brighter card.
-  const age = Math.max(
-    0,
-    (Date.now() - new Date(repo.pushedAt).getTime()) / 86_400_000,
-  );
-  const vigour = Math.max(0.18, 1 - age / 240);
+  const R = [0, 1.1, 1.8, 2.5, 3.1];
+  const A = [0.1, 0.42, 0.62, 0.82, 1];
 
   const cells: ReactElement[] = [];
-  for (let c = 0; c < columns; c++) {
-    for (let r = 0; r < rows; r++) {
-      const local = hash(`${seed}:${c}:${r}`) % 1000;
-      const level = Math.min(4, Math.floor((local / 1000) * 5 * vigour));
-      const x = c * pitch + pitch / 2;
-      const y = r * 7.6 + 4;
-      if (level === 4) {
-        cells.push(
-          <Rect
-            fill={colors.onBlack}
-            height={4.4}
-            key={`${c}-${r}`}
-            width={4.4}
-            x={x - 2.2}
-            y={y - 2.2}
-          />,
-        );
-      } else {
-        cells.push(
-          <Circle
-            cx={x}
-            cy={y}
-            fill={colors.onBlack}
-            key={`${c}-${r}`}
-            opacity={[0.1, 0.3, 0.55, 0.8][level]}
-            r={[0.7, 1.2, 1.8, 2.4][level]}
-          />,
-        );
-      }
+  density.forEach((level, index) => {
+    const col = Math.floor(index / rows);
+    const row = index % rows;
+    const x = col * pitch + pitch / 2;
+    const y = row * 8.6 + 5;
+    if (level >= 4) {
+      cells.push(
+        <Rect
+          fill={colors.onBlack}
+          height={4.6}
+          key={index}
+          width={4.6}
+          x={x - 2.3}
+          y={y - 2.3}
+        />,
+      );
+    } else if (level === 0) {
+      cells.push(
+        <Circle cx={x} cy={y} fill={colors.onBlack} key={index} opacity={A[0]} r={0.7} />,
+      );
+    } else {
+      cells.push(
+        <Circle
+          cx={x}
+          cy={y}
+          fill={colors.onBlack}
+          key={index}
+          opacity={A[level]}
+          r={R[level]}
+        />,
+      );
     }
-  }
+  });
   return <>{cells}</>;
 }
 
@@ -235,6 +247,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.card,
     height: CARD_HEIGHT,
     padding: 18,
+    // A hairline of canvas around every card, so the seams stay visible even
+    // where two cards sit almost flush.
+    borderColor: colors.canvas,
+    borderWidth: 2,
+  },
+  noField: {
+    height: 54,
+    justifyContent: 'center',
   },
   cardHead: {
     alignItems: 'center',
