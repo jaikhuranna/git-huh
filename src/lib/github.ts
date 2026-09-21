@@ -220,7 +220,8 @@ interface GraphQLResponse {
   errors?: { message: string }[];
 }
 
-async function executeQuery<T>(
+/** Shared by activity.ts, which runs its own queries against the same rules. */
+export async function executeQuery<T>(
   token: string,
   query: string,
   schema: z.ZodType<T>,

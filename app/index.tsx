@@ -14,12 +14,17 @@ import { Rail } from '../src/components/Rail';
 import { Body, Label } from '../src/components/Type';
 import { Wordmark } from '../src/components/Wordmark';
 import { PatForm } from '../src/components/PatForm';
+import { useActivity } from '../src/hooks/useActivity';
 import { useContributions } from '../src/hooks/useContributions';
 import { useOpenPrs, type PrsState } from '../src/hooks/useOpenPrs';
 import type { GitHubModel } from '../src/lib/contributions';
 import { DEMO_TOKEN, tokenStore } from '../src/lib/token';
 import { clearWidget, syncWidget } from '../src/lib/widgetBridge';
+import type { Activity } from '../src/lib/activity';
+import { EMPTY_ACTIVITY } from '../src/lib/activity';
 import { ArchiveScreen } from '../src/screens/ArchiveScreen';
+import { BriefScreen } from '../src/screens/BriefScreen';
+import { ClockScreen } from '../src/screens/ClockScreen';
 import { CardsScreen } from '../src/screens/CardsScreen';
 import { DotsScreen } from '../src/screens/DotsScreen';
 import { FlowScreen } from '../src/screens/FlowScreen';
@@ -28,6 +33,7 @@ import { IndexScreen } from '../src/screens/IndexScreen';
 import { NowScreen } from '../src/screens/NowScreen';
 import { OrbitScreen } from '../src/screens/OrbitScreen';
 import { PosterScreen } from '../src/screens/PosterScreen';
+import { ReviewScreen } from '../src/screens/ReviewScreen';
 import { WeatherScreen } from '../src/screens/WeatherScreen';
 import { colors, space } from '../src/theme';
 
@@ -38,12 +44,15 @@ type TokenState = string | null | undefined;
 const SCREENS = [
   'hey',
   'now',
+  'clock',
   'flow',
   'poster',
   'orbit',
   'weather',
   'cards',
   'index',
+  'brief',
+  'review',
   'dots',
   'archive',
 ] as const;
@@ -51,31 +60,55 @@ const SCREENS = [
 /** The `index` screen is the only one that needs the PR list. */
 const PRS_PAGE = SCREENS.indexOf('index');
 
+/**
+ * Commit timestamps and PR bodies are a second, heavier request, so they are
+ * only fetched once one of the screens that needs them is within reach.
+ */
+const ACTIVITY_PAGES = [
+  SCREENS.indexOf('clock'),
+  SCREENS.indexOf('brief'),
+  SCREENS.indexOf('review'),
+];
+
 function Page({
   index,
   model,
   prs,
+  activity,
+  activityLoading,
   onDisconnect,
   width,
 }: {
   index: number;
   model: GitHubModel;
   prs: PrsState;
+  activity: Activity;
+  activityLoading: boolean;
   onDisconnect: () => void;
   width: number;
 }) {
+  const name = SCREENS[index];
   return (
     <View style={{ width }}>
-      {index === 0 && <HeyScreen model={model} onDisconnect={onDisconnect} />}
-      {index === 1 && <NowScreen model={model} />}
-      {index === 2 && <FlowScreen model={model} />}
-      {index === 3 && <PosterScreen model={model} />}
-      {index === 4 && <OrbitScreen model={model} />}
-      {index === 5 && <WeatherScreen model={model} />}
-      {index === 6 && <CardsScreen model={model} />}
-      {index === 7 && <IndexScreen state={prs} />}
-      {index === 8 && <DotsScreen model={model} />}
-      {index === 9 && <ArchiveScreen model={model} />}
+      {name === 'hey' && <HeyScreen model={model} onDisconnect={onDisconnect} />}
+      {name === 'now' && <NowScreen model={model} />}
+      {name === 'clock' && (
+        <ClockScreen activity={activity} loading={activityLoading} />
+      )}
+      {name === 'flow' && <FlowScreen model={model} />}
+      {name === 'poster' && <PosterScreen model={model} />}
+      {name === 'orbit' && <OrbitScreen model={model} />}
+      {name === 'weather' && <WeatherScreen model={model} />}
+      {name === 'cards' && <CardsScreen model={model} />}
+      {name === 'index' && <IndexScreen state={prs} />}
+      {name === 'brief' && (
+        <BriefScreen activity={activity} loading={activityLoading} />
+      )}
+      {name === 'review' && (
+        <ReviewScreen activity={activity} loading={activityLoading} />
+      )}
+      {name === 'dots' && <DotsScreen model={model} />}
+      {name === 'archive' && <ArchiveScreen model={model} />}
     </View>
   );
 }
@@ -89,6 +122,13 @@ export default function Home() {
   const contributions = useContributions(token ?? null);
   const model = contributions.status === 'ready' ? contributions.model : null;
   const prs = useOpenPrs(token ?? null, model?.login ?? null, page === PRS_PAGE);
+  const activityState = useActivity(
+    token ?? null,
+    model?.login ?? null,
+    ACTIVITY_PAGES.some((target) => Math.abs(page - target) <= 1),
+  );
+  const activity =
+    activityState.status === 'ready' ? activityState.activity : EMPTY_ACTIVITY;
 
   useEffect(() => {
     tokenStore.get().then((stored) => {
@@ -165,6 +205,8 @@ export default function Home() {
           >
             {SCREENS.map((name, index) => (
               <Page
+                activity={activity}
+                activityLoading={activityState.status === 'loading'}
                 index={index}
                 key={name}
                 model={model}

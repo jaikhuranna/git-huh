@@ -6,6 +6,7 @@ import type {
   RepoNode,
   YearStats,
 } from './github';
+import type { Activity, CommitSample, PullDetail } from './activity';
 import type { PullRequest } from './prs';
 
 /** Mulberry32 — tiny seeded PRNG so demo data is stable across renders. */
@@ -331,3 +332,81 @@ export function demoGitHubModel(now: Date = new Date()): GitHubModel {
 
 /** Back-compat alias — the builder used to be called this everywhere. */
 export const demoWidgetModel = demoGitHubModel;
+
+/**
+ * Commit timestamps and pull request detail for the demo token. Shaped so
+ * the clock has a believable double hump (a working day and a late-evening
+ * session) rather than a flat field.
+ */
+export function demoActivity(): Activity {
+  const random = rng(4242);
+  const commits: CommitSample[] = [];
+
+  // Two clusters: office hours, and the after-dinner session.
+  for (let i = 0; i < 260; i++) {
+    const evening = random() < 0.42;
+    const centre = evening ? 22 : 11;
+    const spread = evening ? 2.4 : 3.2;
+    const hour = Math.round(
+      centre + (random() + random() + random() - 1.5) * spread,
+    );
+    const size = Math.round(4 + random() * random() * 320);
+    commits.push({
+      hour: ((hour % 24) + 24) % 24,
+      weekday: Math.floor(random() * 7),
+      additions: Math.round(size * (0.45 + random() * 0.5)),
+      deletions: Math.round(size * (0.1 + random() * 0.45)),
+      message: DEMO_MESSAGES[Math.floor(random() * DEMO_MESSAGES.length)],
+    });
+  }
+
+  const now = Date.parse('2026-09-21T09:00:00Z');
+  const pulls: PullDetail[] = demoPullRequests.map((pr, index) => {
+    const openedAt = Date.parse(pr.createdAt);
+    const merged = index % 3 !== 0;
+    const cycle = (3 + random() * 90) * 3_600_000;
+    const additions = Math.round(20 + random() * 600);
+    return {
+      number: pr.number,
+      title: pr.title,
+      url: pr.htmlUrl,
+      body: DEMO_BODIES[index % DEMO_BODIES.length],
+      repo: pr.repo,
+      state: merged ? ('MERGED' as const) : ('OPEN' as const),
+      isDraft: pr.draft,
+      createdAt: pr.createdAt,
+      mergedAt: merged ? new Date(openedAt + cycle).toISOString() : null,
+      closedAt: merged ? new Date(openedAt + cycle).toISOString() : null,
+      additions,
+      deletions: Math.round(additions * (0.15 + random() * 0.8)),
+      changedFiles: 1 + Math.floor(random() * 14),
+      commits: 1 + Math.floor(random() * 9),
+      comments: Math.floor(random() * 12),
+      reviewDecision: merged ? 'APPROVED' : index % 2 ? 'REVIEW_REQUIRED' : null,
+      firstReviewAt: new Date(openedAt + cycle * 0.35).toISOString(),
+      labels:
+        index % 2 === 0
+          ? [{ name: 'enhancement', color: 'a2eeef' }]
+          : [{ name: 'bug', color: 'd73a4a' }],
+    };
+  });
+
+  void now;
+  return { commits, pulls };
+}
+
+const DEMO_MESSAGES = [
+  'fix(widget): today cell timezone drift',
+  'refactor: split the sankey layout pass',
+  'feat: halftone sigil generator',
+  'chore: bump glance to 1.1.1',
+  'perf: memoize dot matrix columns',
+  'docs: release ritual checklist',
+];
+
+const DEMO_BODIES = [
+  'The monochrome layer was missing from the adaptive icon, so themed icons fell back to the full-colour foreground and looked wrong on a tinted home screen.\n\nAdds the layer and regenerates every density.',
+  'The widget read the day boundary in UTC while the grid read it locally, so around midnight the accent cell landed on the wrong square. Both now agree on the local date.',
+  'Splits the layout pass out of the renderer so the ribbon geometry can be unit tested without a canvas.',
+  'Generates a deterministic sigil from a hash of the repository name, using the same four primitives as the launcher icon.',
+];
