@@ -1,0 +1,71 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>index</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<style>
+  .screen { padding: 4px var(--gutter) 0; overflow-y: auto; }
+  .masthead {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 1px solid var(--ink); padding-bottom: 8px;
+  }
+  .masthead .c { color: var(--ink70); font-size: 11px; }
+  .masthead .t { font-size: 12px; letter-spacing: 1.6px; }
+  .tabs { display: flex; gap: 8px; margin-top: 14px; }
+  .tab {
+    border: 1px solid var(--hair); border-radius: 8px 8px 0 0;
+    padding: 7px 16px; cursor: pointer; background: none;
+  }
+  .tab.on { background: var(--black); border-color: var(--black); }
+  .tab.on .label { color: var(--on-black); }
+  .drawer { margin-top: 10px; }
+  .rowwrap { margin-bottom: 4px; }
+  .row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); border: 1px solid var(--hair-strong);
+    padding: 8px 8px 8px 0; text-decoration: none; color: inherit;
+  }
+  .row.draft { background: var(--black); border-color: var(--black); }
+  .row.draft .body .t, .row.draft .body .r { color: var(--on-black); }
+  .numtab { background: var(--black); color: var(--on-black); padding: 10px 8px; font: 400 11px/1 var(--mono); }
+  .body { flex: 1; min-width: 0; }
+  .body .r { color: var(--ink70); font: 400 9px/13px var(--mono); }
+  .body .t { font: 400 13px/17px var(--sans); }
+  .date { background: var(--black); color: var(--on-black); padding: 4px 8px; font: 400 10px/1 var(--mono); }
+  .row.draft .date { background: var(--on-black-25); }
+  .lip { height: 2px; background: var(--ink); margin-top: 12px; }
+  .figure { color: var(--ink70); font: 400 11px/1 var(--mono); margin-top: 10px; text-align: center; }
+</style></head>
+<body><div class="phone"><div class="screen" id="s"></div></div>
+<script type="module">
+import { model, chrome, age } from './data.js';
+const c = chrome('index');
+document.querySelector('.phone').insertAdjacentHTML('afterbegin', c.header);
+document.querySelector('.phone').insertAdjacentHTML('beforeend', c.rail);
+
+let filter = 'open';
+function render() {
+  const rows = model.prs.filter(p => filter === 'open' ? !p.draft : p.draft);
+  document.getElementById('s').innerHTML = `
+    <div class="masthead">
+      <span class="data c">Ch. 3 /</span>
+      <span class="data t">PULL REQUESTS</span>
+      <span class="data c">/ ${model.prs.length}</span>
+    </div>
+    <div class="tabs">${['open','draft'].map(v =>
+      `<button class="tab ${v===filter?'on':''}" data-v="${v}"><span class="label">${v}</span></button>`).join('')}</div>
+    <div class="drawer">
+      ${rows.map((pr, i) => `
+        <div class="rowwrap" style="padding-left:${Math.min(i,6)*10}px">
+          <a class="row ${pr.draft?'draft':''}" href="#">
+            <span class="numtab">${pr.number}</span>
+            <span class="body"><span class="r">${pr.repo}</span><br><span class="t">${pr.title}</span></span>
+            <span class="date">${age(pr.createdAt)}</span>
+          </a>
+        </div>`).join('') || '<div class="label" style="text-align:center;margin-top:18px">nothing filed here · go ship</div>'}
+      <div class="lip"></div>
+      <div class="figure">Figure 3-1. Open pull requests</div>
+    </div>`;
+  document.querySelectorAll('.tab').forEach(el =>
+    el.addEventListener('click', () => { filter = el.dataset.v; render(); }));
+}
+render();
+</script></body></html>

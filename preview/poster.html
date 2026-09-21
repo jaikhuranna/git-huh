@@ -1,0 +1,82 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>poster</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<style>
+  .phone { background: var(--canvas-flat); }
+  .rail { background: var(--canvas-flat); }
+  .screen { padding: 4px var(--gutter) 0; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 18px; }
+  .head .label { color: var(--ink); }
+  .chips { display: flex; gap: 8px; padding-top: 16px; overflow-x: auto; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    border: 1px solid var(--hair); border-radius: 999px; padding: 7px 14px;
+    white-space: nowrap; cursor: pointer; background: none;
+  }
+  .chip.on { background: var(--black); border-color: var(--black); }
+  .chip.on .label { color: var(--on-black); }
+</style></head>
+<body><div class="phone"><div class="screen" id="s"></div></div>
+<script type="module">
+import { model, chrome, fmt } from './data.js';
+const c = chrome('poster');
+document.querySelector('.phone').insertAdjacentHTML('afterbegin', c.header);
+document.querySelector('.phone').insertAdjacentHTML('beforeend', c.rail);
+
+const W = 393 - 40, H = 420;
+const POSTER = ['var(--black)','var(--black)','var(--black)','var(--ibm-blue)','var(--ibm-red)','var(--ibm-green)'];
+
+function hash(s) {
+  let v = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { v ^= s.charCodeAt(i); v = Math.imul(v, 0x01000193) >>> 0; }
+  return v;
+}
+
+/** A solid column that breaks into drifting squares across its top third. */
+function rain(values, peak) {
+  const count = Math.max(values.length, 1);
+  const pitch = W / count;
+  const cell = Math.max(3, Math.min(9, pitch - 1));
+  const rows = Math.floor(H / cell);
+  let out = '';
+  values.forEach((value, col) => {
+    const filled = Math.round((value / peak) * rows);
+    const solid = Math.floor(filled * 0.7);
+    for (let row = 0; row < filled; row++) {
+      const seed = hash(`${col}:${row}`);
+      const dissolving = row >= solid;
+      const progress = filled > solid ? (row - solid) / (filled - solid) : 0;
+      if (dissolving && (seed % 100) / 100 < progress * 0.85) continue;
+      const drift = dissolving ? ((seed >> 7) % 3) - 1 : 0;
+      const x = (col + drift) * pitch;
+      if (x < 0 || x > W - cell) continue;
+      out += `<rect x="${x}" y="${H-(row+1)*cell}" width="${cell-1}" height="${cell-1}"
+        fill="${POSTER[seed % POSTER.length]}"/>`;
+    }
+  });
+  return out;
+}
+
+const years = model.years.map(y => y.year).sort((a,b) => b-a);
+let active = years[0];
+
+function render() {
+  const latest = years[0];
+  const entry = model.years.find(y => y.year === active);
+  const series = active === latest && model.insights.weeks.length
+    ? { values: model.insights.weeks, unit: 'week' }
+    : { values: entry ? entry.months : [], unit: 'month' };
+  const total = series.values.reduce((s,v) => s+v, 0);
+  const peak = Math.max(1, ...series.values);
+
+  document.getElementById('s').innerHTML = `
+    <div class="head"><span class="label">${active}</span><span class="wordmark">git-huh?</span></div>
+    <svg width="${W}" height="${H}">${rain(series.values, peak)}</svg>
+    <div class="label" style="margin-top:12px">${fmt(total)} contributions · peak ${series.unit} ${series.values.indexOf(peak)+1} at ${fmt(peak)}</div>
+    <div class="chips">${years.map(y =>
+      `<button class="chip ${y===active?'on':''}" data-y="${y}"><span class="label">${y}</span></button>`).join('')}</div>`;
+  document.querySelectorAll('.chip').forEach(el =>
+    el.addEventListener('click', () => { active = Number(el.dataset.y); render(); }));
+}
+render();
+</script></body></html>

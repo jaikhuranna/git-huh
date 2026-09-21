@@ -1,0 +1,84 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>flow</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<style>
+  .screen { padding: 4px var(--gutter) 0; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 14px; }
+  .head .label:first-child { color: var(--ink); }
+  .trunk { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+</style></head>
+<body><div class="phone"><div class="screen" id="s"></div></div>
+<script type="module">
+import { model, chrome, fmt } from './data.js';
+const c = chrome('flow');
+document.querySelector('.phone').insertAdjacentHTML('afterbegin', c.header);
+document.querySelector('.phone').insertAdjacentHTML('beforeend', c.rail);
+
+const W = 393 - 40, H = 430;
+const b = model.breakdown;
+const total = b.commits + b.pullRequests + b.issues + b.reviews;
+const cats = [
+  { label: 'commits', value: b.commits },
+  { label: 'pull requests', value: b.pullRequests },
+  { label: 'issues', value: b.issues },
+  { label: 'reviews', value: b.reviews },
+].filter(e => e.value > 0);
+
+const repos = model.topRepos.slice(0, 5);
+const repoTotal = repos.reduce((s, r) => s + r.count, 0) || 1;
+
+const trunkX = 2, trunkW = 9, midX = W * .38, midW = 12, rightX = W * .72, gap = 10;
+const usable = H - gap * Math.max(cats.length - 1, 1);
+
+let cur = 0;
+const catBands = cats.map(e => {
+  const height = (e.value / total) * usable;
+  const band = { ...e, y: cur, height }; cur += height + gap; return band;
+});
+let rcur = 0;
+const repoUsable = H - gap * Math.max(repos.length - 1, 1);
+const repoBands = repos.map(r => {
+  const height = (r.count / repoTotal) * repoUsable;
+  const band = { ...r, y: rcur, height }; rcur += height + gap; return band;
+});
+
+// A ribbon is a closed shape between two cubic curves, so links read as
+// flowing bands rather than trapezoids.
+const ribbon = (x0, y0t, y0b, x1, y1t, y1b) => {
+  const m = (x0 + x1) / 2;
+  return `M${x0} ${y0t} C${m} ${y0t} ${m} ${y1t} ${x1} ${y1t} L${x1} ${y1b} C${m} ${y1b} ${m} ${y0b} ${x0} ${y0b} Z`;
+};
+
+let paths = '';
+let trunkY = 0;
+catBands.forEach(band => {
+  paths += `<path d="${ribbon(trunkX+trunkW, trunkY, trunkY+band.height, midX, band.y, band.y+band.height)}"
+    fill="var(--ink)" opacity=".88"/>`;
+  trunkY += band.height;
+});
+repoBands.forEach((band, i) => {
+  const src = catBands[Math.min(i, catBands.length - 1)];
+  if (!src) return;
+  paths += `<path d="${ribbon(midX+midW, src.y+src.height*.1, src.y+src.height*.9, rightX, band.y, band.y+band.height)}"
+    fill="var(--ink)" opacity="${band.nameWithOwner === 'others' ? .25 : .5}"/>`;
+});
+
+const nodes = `<rect x="${trunkX}" y="0" width="${trunkW}" height="${H}" fill="var(--ink)"/>`
+  + catBands.map(b2 => `<rect x="${midX}" y="${b2.y}" width="${midW}" height="${b2.height}" fill="var(--ink)"/>`).join('');
+
+const labels = catBands.map(b2 => `
+  <text x="${midX+midW+8}" y="${b2.y+14}" fill="var(--ink)" font-family="Inter" font-weight="700" font-size="15">
+    ${((b2.value/total)*100).toFixed(1)}%</text>
+  <text x="${midX+midW+8}" y="${b2.y+27}" fill="var(--ink40)" font-family="IBM Plex Mono" font-size="9">
+    ${b2.label} · ${fmt(b2.value)}</text>`).join('')
+  + repoBands.map(b2 => {
+      const name = (b2.nameWithOwner.split('/').pop() || '');
+      return `<text x="${rightX+6}" y="${b2.y+b2.height/2+3}" fill="var(--ink70)" font-family="IBM Plex Mono" font-size="9">
+        ${name.length > 18 ? name.slice(0,17)+'…' : name}</text>`;
+    }).join('');
+
+document.getElementById('s').innerHTML = `
+  <div class="head"><span class="label">where it went</span><span class="label">last 12 months</span></div>
+  <div class="trunk"><span class="title">100%</span><span class="label">${fmt(total)} contributions</span></div>
+  <svg width="${W}" height="${H}">${paths}${nodes}${labels}</svg>`;
+</script></body></html>

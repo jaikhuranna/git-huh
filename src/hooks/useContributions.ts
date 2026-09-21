@@ -1,27 +1,46 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { demoGitHubModel } from '../lib/demo';
 import {
   fetchContributions,
   fetchStats,
   GitHubError,
+  type ContributionStats,
 } from '../lib/github';
-import { demoWidgetModel } from '../lib/demo';
-import { toWidgetModel, type WidgetModel } from '../lib/contributions';
+import { toGitHubModel, type GitHubModel } from '../lib/contributions';
 import { DEMO_TOKEN } from '../lib/token';
 
 export type ContributionsState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; model: WidgetModel }
+  | { status: 'ready'; model: GitHubModel }
   | { status: 'error'; error: GitHubError };
 
 /** Async result stamped with the token that produced it. */
 interface SettledResult {
   token: string;
   outcome:
-    | { status: 'ready'; model: WidgetModel }
+    | { status: 'ready'; model: GitHubModel }
     | { status: 'error'; error: GitHubError };
 }
+
+/**
+ * Everything the second query would have provided, zeroed. The calendar is
+ * the load-bearing request; the stats query is large enough that a rate limit
+ * or a slow repository bucket should degrade the extra screens rather than
+ * take the whole app down.
+ */
+const EMPTY_STATS: ContributionStats = {
+  todayCommits: 0,
+  totalCommits: 0,
+  openPrs: 0,
+  followers: 0,
+  following: 0,
+  stars: 0,
+  repoCount: 0,
+  repos: [],
+  years: [],
+};
 
 /**
  * Load and shape contributions for a token; null token means signed out.
@@ -32,7 +51,7 @@ export function useContributions(token: string | null): ContributionsState {
   const [result, setResult] = useState<SettledResult | null>(null);
 
   const demoModel = useMemo(
-    () => (token === DEMO_TOKEN ? demoWidgetModel() : null),
+    () => (token === DEMO_TOKEN ? demoGitHubModel() : null),
     [token],
   );
 
@@ -43,7 +62,7 @@ export function useContributions(token: string | null): ContributionsState {
 
     fetchContributions(token, controller.signal)
       .then(async (contributions) => {
-        let stats: Awaited<ReturnType<typeof fetchStats>>;
+        let stats: ContributionStats;
         try {
           stats = await fetchStats(
             token,
@@ -57,9 +76,10 @@ export function useContributions(token: string | null): ContributionsState {
           if (error instanceof GitHubError && error.kind === 'invalid-token') {
             throw error;
           }
-          stats = { todayCommits: 0, totalCommits: 0, openPrs: 0 };
+          if (error instanceof Error && error.name === 'AbortError') throw error;
+          stats = EMPTY_STATS;
         }
-        return toWidgetModel(contributions, stats);
+        return toGitHubModel(contributions, stats);
       })
       .then((model) =>
         setResult({ token, outcome: { status: 'ready', model } }),

@@ -1,9 +1,11 @@
 {
   "name": "git-huh",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "main": "expo-router/entry",
   "dependencies": {
-    "@expo-google-fonts/dotgothic16": "^0.4.1",
+    "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
+    "@expo-google-fonts/instrument-serif": "^0.4.1",
+    "@expo-google-fonts/inter": "^0.4.1",
     "expo": "~57.0.23",
     "expo-constants": "~57.0.18",
     "expo-font": "~57.0.4",
@@ -17,6 +19,7 @@
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.13.0",
     "react-native-web": "^0.21.2",
     "zod": "^4.6.5"
   },

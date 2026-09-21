@@ -2,12 +2,12 @@
   "expo": {
     "name": "git-huh?",
     "slug": "git-huh",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "githuh",
-    "userInterfaceStyle": "dark",
-    "backgroundColor": "#000000",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F2F0EB",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.githuh"
@@ -15,7 +15,7 @@
     "android": {
       "package": "app.githuh",
       "adaptiveIcon": {
-        "backgroundColor": "#000000",
+        "backgroundColor": "#0B0B0A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
@@ -25,6 +25,11 @@
       "expo-router",
       "expo-secure-store",
       "expo-font"
-    ]
+    ],
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F2F0EB"
+    }
   }
 }

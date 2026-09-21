@@ -1,0 +1,67 @@
+/* Mirrors src/theme/index.ts one-for-one. If you change one, change both. */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Inter:wght@200;300;400;500;600;700;800&display=swap');
+
+:root {
+  --canvas: #F2F0EB;
+  --canvas-cool: #E4E3DE;
+  --canvas-flat: #EFEFEF;
+  --canvas-cream: #F7F5F0;
+
+  --card: #FBFAF7;
+  --recess: #E9E7E1;
+  --hair: rgba(17, 16, 16, 0.12);
+  --hair-strong: rgba(17, 16, 16, 0.28);
+
+  --ink: #111110;
+  --ink70: #5B5A55;
+  --ink40: #93918B;
+  --ink20: #C6C4BE;
+
+  --black: #0B0B0A;
+  --on-black: #F4F2ED;
+  --on-black-55: rgba(244, 242, 237, 0.55);
+  --on-black-25: rgba(244, 242, 237, 0.25);
+
+  --blue: #2F7FE0;
+  --red: #E8412B;
+  --green: #1F9A53;
+  --yellow: #F5B426;
+  --purple: #6B4FBB;
+  --pink: #F2A0C4;
+
+  --pastel-1: #F2A65A;
+  --pastel-2: #B9A7E6;
+  --pastel-3: #9BC995;
+  --pastel-4: #F2A0C4;
+
+  --ibm-blue: #3B9FE0;
+  --ibm-red: #EE3124;
+  --ibm-green: #2DA44E;
+
+  --steel: #5E86A3;
+  --olive: #8C8A5E;
+  --rain: #2F6FA8;
+
+  --serif: 'Instrument Serif', serif;
+  --sans: 'Inter', -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+
+  --r-sheet: 28px;
+  --r-card: 20px;
+  --r-tile: 14px;
+
+  --gutter: 20px;
+}
+
+.label {
+  font: 500 11px/14px var(--mono);
+  letter-spacing: 0.8px;
+  text-transform: lowercase;
+  color: var(--ink40);
+}
+.data { font: 400 12px/16px var(--mono); }
+.micro { font: 400 9px/12px var(--mono); }
+.heading { font: 600 15px/20px var(--sans); color: var(--ink); }
+.body { font: 400 14px/20px var(--sans); color: var(--ink); }
+.title { font: 700 24px/28px var(--sans); color: var(--ink); letter-spacing: -0.4px; }
+.display { font: 400 44px/46px var(--serif); color: var(--ink); }

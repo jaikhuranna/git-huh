@@ -1,0 +1,74 @@
+/* Phone-sized stage. Every screen is authored at exactly 393x852 (Pixel 7 /
+   iPhone 14 logical size) so the screenshot loop compares like for like. */
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+
+body {
+  background: #D8D6D1;
+  font-family: var(--sans);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+}
+
+.phone {
+  width: 393px;
+  height: 852px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+
+/* App chrome shared by every screen. */
+.chrome {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px var(--gutter) 10px;
+  flex: none;
+}
+.wordmark { font: 400 20px/20px var(--serif); color: var(--ink); letter-spacing: -0.2px; }
+.wordmark span { color: var(--ink); }
+.chrome-right { display: flex; align-items: baseline; gap: 12px; }
+
+.screen { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+
+/* Bottom rail — named, scrollable, no anonymous dots. */
+.rail {
+  flex: none;
+  border-top: 1px solid var(--hair);
+  display: flex;
+  gap: 18px;
+  padding: 10px var(--gutter) 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--canvas);
+}
+.rail::-webkit-scrollbar { display: none; }
+.rail a {
+  font: 500 11px/14px var(--mono);
+  letter-spacing: 0.8px;
+  color: var(--ink40);
+  text-decoration: none;
+  padding-bottom: 4px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.rail a.on { color: var(--ink); border-bottom-color: var(--ink); }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font: 500 12px/1 var(--mono);
+  letter-spacing: 0.4px;
+  border: 1px solid var(--hair);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.pill.solid { background: var(--black); color: var(--on-black); border-color: var(--black); }

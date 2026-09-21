@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -12,19 +13,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GitHubError, verifyToken } from '../lib/github';
 import { DEMO_TOKEN } from '../lib/token';
-import { colors, fonts } from '../theme';
+import { colors, fallbacks, fonts, radii, space } from '../theme';
 
-import { DotText } from './DotText';
+import { CrossField } from './CrossField';
+import { Body, Display, Label, Serif } from './Type';
 import { Wordmark } from './Wordmark';
 
 interface PatFormProps {
-  /** Called with a token that GitHub has already accepted. */
+  /** Called with a token GitHub has already accepted. */
   onTokenVerified: (token: string) => void;
 }
 
+const TOKEN_SETTINGS_URL =
+  'https://github.com/settings/tokens/new?scopes=read:user,repo&description=git-huh';
+
 /**
- * The entire app interface: one empty box for a personal access token.
- * Nothing chrome, nothing decoration — the dot font does the talking.
+ * Sign-in, given the pin04 treatment: serif greeting, the cross field as
+ * texture, and a hairline-underlined mono input. One box, one button.
  */
 export function PatForm({ onTokenVerified }: PatFormProps) {
   const [token, setToken] = useState('');
@@ -63,48 +68,72 @@ export function PatForm({ onTokenVerified }: PatFormProps) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.center}
       >
+        <View style={styles.header}>
+          <Wordmark size={20} />
+          <Label>2.0</Label>
+        </View>
+
         <View style={styles.stack}>
-          <Wordmark size={28} />
+          <Display>Hey,</Display>
+          <Serif style={styles.sub}>paste a token and I&apos;ll read the year.</Serif>
+
+          <CrossField height={112} style={styles.field} />
 
           <TextInput
             accessibilityLabel="GitHub personal access token"
             autoCapitalize="none"
-            autoComplete="off"
             autoCorrect={false}
-            onChangeText={setToken}
+            editable={!checking}
+            onChangeText={(next) => {
+              setToken(next);
+              if (error) setError(null);
+            }}
             onSubmitEditing={submit}
-            placeholder="personal access token · or type demo"
-            placeholderTextColor={colors.text.faint}
+            placeholder="ghp_…"
+            placeholderTextColor={colors.ink40}
             returnKeyType="go"
             secureTextEntry
-            spellCheck={false}
             style={styles.input}
             value={token}
           />
 
           {error ? (
-            <DotText style={styles.error}>{error}</DotText>
+            <Body style={styles.error}>{error}</Body>
           ) : (
-            <DotText style={styles.hint}>
-              demo skips the token · real tokens stay on-device
-            </DotText>
+            <Label style={styles.hint}>
+              needs read:user and repo · stored in the keystore, never sent
+              anywhere but github
+            </Label>
           )}
 
+          <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={!canSubmit}
+              onPress={submit}
+              style={[styles.pill, styles.solid, !canSubmit && styles.muted]}
+            >
+              {checking ? (
+                <ActivityIndicator color={colors.onBlack} size="small" />
+              ) : (
+                <Label style={styles.solidLabel}>connect</Label>
+              )}
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onTokenVerified(DEMO_TOKEN)}
+              style={styles.pill}
+            >
+              <Label style={styles.pillLabel}>try the demo</Label>
+            </Pressable>
+          </View>
+
           <Pressable
-            accessibilityRole="button"
-            disabled={!canSubmit}
-            onPress={submit}
-            style={({ pressed }) => [
-              styles.button,
-              !canSubmit && styles.buttonDisabled,
-              pressed && styles.buttonPressed,
-            ]}
+            accessibilityRole="link"
+            onPress={() => Linking.openURL(TOKEN_SETTINGS_URL).catch(() => {})}
           >
-            {checking ? (
-              <ActivityIndicator color={colors.text.primary} size="small" />
-            ) : (
-              <DotText style={styles.buttonLabel}>connect →</DotText>
-            )}
+            <Label style={styles.link}>make a token on github →</Label>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -119,52 +148,77 @@ const styles = StyleSheet.create({
   },
   center: {
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
+    justifyContent: 'space-between',
+    paddingBottom: 32,
+  },
+  header: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: space.gutter,
+    paddingTop: 14,
   },
   stack: {
-    gap: 20,
+    gap: 14,
+    paddingHorizontal: space.gutter,
+  },
+  sub: {
+    color: colors.ink70,
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  field: {
+    marginBottom: 4,
   },
   input: {
-    borderColor: colors.outline,
-    borderRadius: 14,
-    borderWidth: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.dot,
+    borderBottomColor: colors.hairStrong,
+    borderBottomWidth: 1,
+    color: colors.ink,
+    fontFamily: fonts.mono,
     fontSize: 15,
-    letterSpacing: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingBottom: 10,
+    paddingTop: 6,
   },
   hint: {
-    color: colors.text.faint,
-    fontSize: 11,
-    letterSpacing: 1,
+    lineHeight: 16,
   },
   error: {
-    color: colors.accent,
-    fontSize: 11,
-    letterSpacing: 1,
+    color: colors.red,
+    fontSize: 12,
   },
-  button: {
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  pill: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderColor: colors.text.primary,
-    borderRadius: 999,
+    borderColor: colors.hair,
+    borderRadius: radii.pill,
     borderWidth: 1,
-    minWidth: 132,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 11,
   },
-  buttonDisabled: {
-    borderColor: colors.outline,
-    opacity: 0.5,
+  pillLabel: {
+    color: colors.ink,
   },
-  buttonPressed: {
-    backgroundColor: colors.outline,
+  solid: {
+    backgroundColor: colors.black,
+    borderColor: colors.black,
+    minWidth: 108,
   },
-  buttonLabel: {
-    fontSize: 14,
-    letterSpacing: 2,
+  solidLabel: {
+    color: colors.onBlack,
+  },
+  muted: {
+    opacity: 0.4,
+  },
+  link: {
+    color: colors.ink70,
+    marginTop: 2,
   },
 });
+
+/** Kept next to the input so the fallback family is discoverable here. */
+PatForm.monoFallback = fallbacks.mono;

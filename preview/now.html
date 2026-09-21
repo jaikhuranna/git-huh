@@ -1,0 +1,125 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>now</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<style>
+  .phone { background: var(--canvas-cool); }
+  .rail { background: var(--canvas-cool); }
+  .screen { padding: 4px var(--gutter) 0; display: flex; flex-direction: column; }
+  h1 { font: 700 24px/28px var(--sans); letter-spacing: -.4px; }
+  h1.dim { color: var(--ink40); margin-top: -2px; }
+  .hero { display: flex; flex-direction: column; align-items: center; margin-top: 16px; }
+  .hero .cap { margin-top: 10px; }
+  .row { display: flex; gap: 12px; margin-top: 20px; }
+  .tile {
+    flex: 1; background: var(--card); border-radius: var(--r-card);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 10px; position: relative; aspect-ratio: 1;
+  }
+  .tile .t { position: absolute; bottom: 8px; }
+  .dock { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: center; }
+  .dock i {
+    border-radius: 50%; aspect-ratio: 1; display: grid; place-items: center;
+    font: 600 15px/1 var(--sans); font-style: normal;
+  }
+  .ruler { margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
+</style></head>
+<body><div class="phone"><div class="screen" id="s"></div></div>
+<script type="module">
+import { model, chrome, fmt } from './data.js';
+const c = chrome('now');
+document.querySelector('.phone').insertAdjacentHTML('afterbegin', c.header);
+document.querySelector('.phone').insertAdjacentHTML('beforeend', c.rail);
+
+// 5x7 segment font — digits only, which is all the readout shows.
+const G = {
+ '0':['01110','10001','10011','10101','11001','10001','01110'],
+ '1':['00100','01100','00100','00100','00100','00100','01110'],
+ '2':['01110','10001','00001','00010','00100','01000','11111'],
+ '3':['11111','00010','00100','00010','00001','10001','01110'],
+ '4':['00010','00110','01010','10010','11111','00010','00010'],
+ '5':['11111','10000','11110','00001','00001','10001','01110'],
+ '6':['00110','01000','10000','11110','10001','10001','01110'],
+ '7':['11111','00001','00010','00100','01000','01000','01000'],
+ '8':['01110','10001','10001','01110','10001','10001','01110'],
+ '9':['01110','10001','10001','01111','00001','00010','01100'],
+};
+
+function led(count, width) {
+  const pitch = 8, height = 188;
+  const cols = Math.floor(width / pitch), rows = Math.floor(height / pitch);
+  const digits = String(count).split('');
+  const gw = 6;
+  const scale = Math.max(1, Math.min(4, Math.floor((cols - 2) / (digits.length * gw))));
+  const originCol = Math.floor((cols - digits.length * gw * scale) / 2);
+  const originRow = Math.floor((rows - 7 * scale) / 2);
+  const lit = new Set();
+  digits.forEach((d, i) => (G[d] || G['0']).forEach((bits, r) =>
+    [...bits].forEach((bit, cidx) => {
+      if (bit !== '1') return;
+      for (let dy = 0; dy < scale; dy++) for (let dx = 0; dx < scale; dx++)
+        lit.add(`${originCol + i*gw*scale + cidx*scale + dx},${originRow + r*scale + dy}`);
+    })));
+  let out = '';
+  for (let r = 0; r < rows; r++) for (let cc = 0; cc < cols; cc++) {
+    const on = lit.has(`${cc},${r}`);
+    out += `<circle cx="${cc*pitch+pitch/2}" cy="${r*pitch+pitch/2}" r="${on?3.2:1.2}" fill="var(--ink)" opacity="${on?1:.12}"/>`;
+  }
+  return `<svg width="${cols*pitch}" height="${rows*pitch}">${out}</svg>`;
+}
+
+function dial(size, peak, todayIndex) {
+  const r = size / 2;
+  let ticks = '';
+  for (let i = 0; i < 60; i++) {
+    const a = i/60*Math.PI*2 - Math.PI/2, rad = r - 9.5;
+    ticks += `<circle cx="${r+Math.cos(a)*rad}" cy="${r+Math.sin(a)*rad}" r=".8" fill="var(--ink)" opacity=".28"/>`;
+  }
+  for (let i = 0; i < 7; i++) {
+    const a = i/7*Math.PI*2 - Math.PI/2, o = r-4, inn = r-13, on = i === peak;
+    ticks += `<line x1="${r+Math.cos(a)*inn}" y1="${r+Math.sin(a)*inn}" x2="${r+Math.cos(a)*o}" y2="${r+Math.sin(a)*o}"
+      stroke="${on?'var(--red)':'var(--ink)'}" stroke-width="${on?2.4:1.6}" stroke-linecap="round"/>`;
+  }
+  const ha = todayIndex/7*Math.PI*2 - Math.PI/2;
+  return `<svg width="${size}" height="${size}">
+    <circle cx="${r}" cy="${r}" r="${r-1}" fill="var(--card)"/>${ticks}
+    <circle cx="${r}" cy="${r}" r="${r*.42}" fill="var(--black)"/>
+    <line x1="${r}" y1="${r}" x2="${r+Math.cos(ha)*r*.34}" y2="${r+Math.sin(ha)*r*.34}"
+      stroke="var(--on-black)" stroke-width="2" stroke-linecap="round"/></svg>`;
+}
+
+function ruler(days, width) {
+  const h = 62, step = width / days.length;
+  const peak = Math.max(1, ...days.map(d => d.count));
+  const ticks = days.map((d, i) => {
+    const t = 8 + (d.count / peak) * 32, x = i*step + step/2;
+    return `<line x1="${x}" y1="${h-14}" x2="${x}" y2="${h-14-t}"
+      stroke="${d.isToday?'var(--red)':'var(--on-black)'}" stroke-width="${d.isToday?2:1}"/>`;
+  }).join('');
+  return `<svg width="${width}" height="${h}">
+    <rect width="${width}" height="${h}" rx="14" fill="var(--black)"/>${ticks}</svg>`;
+}
+
+const W = 393 - 40;
+const last7 = model.days.slice(-7);
+const todayIdx = Math.max(0, last7.findIndex(d => d.isToday));
+const luminance = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return (((n>>16)&255)*299 + ((n>>8)&255)*587 + (n&255)*114) / 1000;
+};
+
+document.getElementById('s').innerHTML = `
+  <h1>Today</h1><h1 class="dim">at a glance</h1>
+  <div class="hero">
+    ${led(model.todayCount, W)}
+    <span class="label cap">yesterday ${fmt(model.insights.yesterdayCount)} · best ${fmt(model.insights.bestDay)}</span>
+  </div>
+  <div class="row">
+    <div class="tile">${dial((W-12)/2 - 20, model.insights.peakWeekday, todayIdx)}<span class="label t">this week</span></div>
+    <div class="tile dock">
+      ${model.languages.slice(0,4).map(l =>
+        `<i style="background:${l.color};color:${luminance(l.color)>150?'var(--ink)':'var(--on-black)'}">${l.name.slice(0,2)}</i>`).join('')}
+    </div>
+  </div>
+  <div class="ruler">${ruler(model.days.slice(-30), W)}<span class="label" style="margin-top:8px">last 30 days</span></div>
+`;
+</script></body></html>

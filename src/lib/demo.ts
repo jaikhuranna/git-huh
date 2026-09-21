@@ -1,5 +1,11 @@
-import { toWidgetModel, type WidgetModel } from './contributions';
-import type { ContributionStats, Contributions } from './github';
+import { toGitHubModel, toISODate, type GitHubModel } from './contributions';
+import type {
+  Contributions,
+  ContributionStats,
+  ContributionWeek,
+  RepoNode,
+  YearStats,
+} from './github';
 import type { PullRequest } from './prs';
 
 /** Mulberry32 — tiny seeded PRNG so demo data is stable across renders. */
@@ -15,6 +21,11 @@ function rng(seed: number): () => number {
 }
 
 const DEMO_LOGIN = 'jaikhuranna';
+const DEMO_NAME = 'Jai Khurana';
+const DEMO_BIO = 'Building small, honest software. Currently: git-huh.';
+const DEMO_AVATAR = 'https://avatars.githubusercontent.com/u/0?v=4';
+const DEMO_CREATED_AT = '2016-03-12T00:00:00Z';
+const YEAR_COUNT = 6;
 
 export const demoPullRequests: PullRequest[] = [
   {
@@ -59,32 +70,107 @@ export const demoPullRequests: PullRequest[] = [
   },
 ];
 
-function demoContributions(now: Date): Contributions {
-  const random = rng(20260917);
-  const weeks: Contributions['weeks'] = [];
+/** Real GitHub language colors — the demo has to look like a real profile. */
+const LANGUAGES = [
+  { name: 'TypeScript', color: '#3178c6' },
+  { name: 'Kotlin', color: '#A97BFF' },
+  { name: 'Swift', color: '#F05138' },
+  { name: 'Python', color: '#3572A5' },
+  { name: 'Rust', color: '#dea584' },
+  { name: 'Go', color: '#00ADD8' },
+  { name: 'C', color: '#555555' },
+  { name: 'Shell', color: '#89e051' },
+];
 
-  // One full year ending today, Sunday-aligned like GitHub's calendar.
+const REPO_NAMES = [
+  'git-huh',
+  'nothing-mtui',
+  'dot-tiles',
+  'orbit-widget',
+  'flux-cli',
+  'pixel-rain',
+  'quiet-hours',
+  'sig-noise',
+  'halftone',
+  'index-cards',
+  'weather-glass',
+  'poster-grid',
+];
+
+/** Relative activity per calendar month — dips around the holidays, humps in spring/autumn. */
+const MONTH_SHAPE = [0.55, 0.5, 0.75, 0.9, 1.05, 1.15, 0.85, 0.7, 1.2, 1.3, 1.0, 0.6];
+
+/** Sun=0 .. Sat=6. Wednesday is this demo's clear peak weekday. */
+const WEEKDAY_SHAPE = [0.35, 0.9, 1.0, 1.35, 1.05, 1.15, 0.4];
+
+/** Career-progression curve: quieter early years, busier recently. */
+function yearActivityBase(yearIndex: number): number {
+  return 1.4 + (yearIndex / Math.max(1, YEAR_COUNT - 1)) * 2.6;
+}
+
+function dayCount(random: () => number, base: number, month: number, weekday: number): number {
+  const weight = base * MONTH_SHAPE[month] * WEEKDAY_SHAPE[weekday];
+  const noise = random() < 0.1 ? 0 : random() * weight * 1.8;
+  return Math.max(0, Math.round(noise));
+}
+
+/**
+ * One date -> contribution-count map spanning every demo year plus the
+ * rolling window, so the same date always yields the same count whether it's
+ * read through a per-year calendar or the default 365-day window.
+ */
+function buildDailyMap(now: Date, random: () => number): { map: Map<string, number>; startYear: number } {
+  const startYear = now.getFullYear() - (YEAR_COUNT - 1);
+  const start = new Date(startYear, 0, 1);
+  // Sunday-aligned end, matching GitHub's calendar so full weeks render cleanly.
+  const end = new Date(now);
+  end.setDate(end.getDate() + (6 - end.getDay()));
+
+  const map = new Map<string, number>();
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const yearIndex = cursor.getFullYear() - startYear;
+    const base = yearActivityBase(yearIndex);
+    const count = cursor > now ? 0 : dayCount(random, base, cursor.getMonth(), cursor.getDay());
+    map.set(toISODate(cursor), count);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return { map, startYear };
+}
+
+/**
+ * Hand-placed streaks so the derived insights are worth looking at: a long
+ * one buried mid-history for the dots screen's dot-to-dot line, and a
+ * shorter live one ending today so currentStreak < longestStreak.
+ */
+function injectStreaks(map: Map<string, number>, now: Date, random: () => number): void {
+  const longStart = new Date(now);
+  longStart.setDate(longStart.getDate() - 130);
+  for (let i = 0; i < 18; i++) {
+    const d = new Date(longStart);
+    d.setDate(d.getDate() + i);
+    map.set(toISODate(d), 2 + Math.floor(random() * 5));
+  }
+
+  for (let i = 0; i < 9; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    map.set(toISODate(d), 1 + Math.floor(random() * 6));
+  }
+}
+
+function rollingWeeks(map: Map<string, number>, now: Date): ContributionWeek[] {
   const end = new Date(now);
   end.setDate(end.getDate() + (6 - end.getDay()));
   const start = new Date(end);
   start.setDate(start.getDate() - 370);
 
-  let cursor = new Date(start);
-  let week: { contributionDays: { date: string; contributionCount: number }[] } = {
-    contributionDays: [],
-  };
+  const weeks: ContributionWeek[] = [];
+  let week: ContributionWeek = { contributionDays: [] };
+  const cursor = new Date(start);
   while (cursor <= end) {
-    const iso = cursor.toISOString().slice(0, 10);
-    const weekend = cursor.getDay() === 0 || cursor.getDay() === 6;
-    const burst = random() < 0.14 ? 6 : 0;
-    const count = Math.max(
-      0,
-      Math.round(
-        (weekend ? random() * 2 : random() * 7 + burst) -
-          (random() < 0.08 ? 3 : 0),
-      ),
-    );
-    week.contributionDays.push({ date: iso, contributionCount: count });
+    const iso = toISODate(cursor);
+    week.contributionDays.push({ date: iso, contributionCount: map.get(iso) ?? 0 });
     if (week.contributionDays.length === 7) {
       weeks.push(week);
       week = { contributionDays: [] };
@@ -92,31 +178,156 @@ function demoContributions(now: Date): Contributions {
     cursor.setDate(cursor.getDate() + 1);
   }
   if (week.contributionDays.length > 0) weeks.push(week);
+  return weeks;
+}
 
-  const totalContributions = weeks
-    .flatMap((w) => w.contributionDays)
-    .reduce((sum, d) => sum + d.contributionCount, 0);
+function chunkWeeks(days: { date: string; contributionCount: number }[]): ContributionWeek[] {
+  const weeks: ContributionWeek[] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push({ contributionDays: days.slice(i, i + 7) });
+  }
+  return weeks;
+}
 
-  const years = Array.from(
-    { length: 4 },
-    (_, i) => now.getFullYear() - i,
-  );
+function demoYears(map: Map<string, number>, startYear: number, now: Date): YearStats[] {
+  const years: YearStats[] = [];
+  for (let i = 0; i < YEAR_COUNT; i++) {
+    const year = startYear + i;
+    const start = new Date(year, 0, 1);
+    const end = new Date(year, 11, 31);
+    const days: { date: string; contributionCount: number }[] = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const iso = toISODate(d);
+      days.push({ date: iso, contributionCount: map.get(iso) ?? 0 });
+    }
+    const totalContributions = days.reduce((sum, day) => sum + day.contributionCount, 0);
+    years.push({
+      year,
+      // The per-year API bucket only reports commits; ~60% of contributions
+      // being commits is a believable split for the demo.
+      totalCommits: Math.round(totalContributions * 0.6),
+      totalContributions,
+      weeks: chunkWeeks(days),
+    });
+  }
+  return years;
+}
 
-  return {
+/** Sample `count` distinct languages without replacement. */
+function pickLanguages(random: () => number, count: number): typeof LANGUAGES {
+  const pool = [...LANGUAGES];
+  const picked: typeof LANGUAGES = [];
+  for (let i = 0; i < count && pool.length > 0; i++) {
+    const index = Math.floor(random() * pool.length);
+    picked.push(pool.splice(index, 1)[0]);
+  }
+  return picked;
+}
+
+function demoRepos(now: Date, random: () => number): RepoNode[] {
+  const count = 8 + Math.floor(random() * 5); // 8-12
+  return REPO_NAMES.slice(0, count).map((name, index) => {
+    const [primary, ...secondary] = pickLanguages(random, 1 + Math.floor(random() * 3));
+    const languages = [
+      { name: primary.name, color: primary.color, size: 40_000 + Math.floor(random() * 200_000) },
+      ...secondary.map((lang) => ({
+        name: lang.name,
+        color: lang.color,
+        size: 2_000 + Math.floor(random() * 40_000),
+      })),
+    ];
+
+    const pushedAt = new Date(now);
+    pushedAt.setDate(pushedAt.getDate() - Math.floor(random() * 200));
+
+    return {
+      name,
+      nameWithOwner: `${DEMO_LOGIN}/${name}`,
+      description: `${name.replace(/-/g, ' ')} — a small, honest tool.`,
+      stargazerCount: Math.floor(random() * 400) + (index === 0 ? 200 : 0),
+      forkCount: Math.floor(random() * 40),
+      isPrivate: random() < 0.25,
+      pushedAt: pushedAt.toISOString(),
+      url: `https://github.com/${DEMO_LOGIN}/${name}`,
+      primaryLanguage: { name: primary.name, color: primary.color },
+      languages,
+    };
+  });
+}
+
+/** More than 4 entries so the flow screen's "others" bucket has something to show. */
+function demoCommitsByRepo(
+  repos: RepoNode[],
+  totalCommits: number,
+  random: () => number,
+): { nameWithOwner: string; count: number }[] {
+  const shuffled = [...repos].sort(() => random() - 0.5).slice(0, Math.min(7, repos.length));
+  const weights = shuffled.map((_, i) => 1 / (i + 1.4));
+  const weightSum = weights.reduce((sum, w) => sum + w, 0);
+  return shuffled.map((repo, i) => ({
+    nameWithOwner: repo.nameWithOwner,
+    count: Math.max(1, Math.round((weights[i] / weightSum) * totalCommits)),
+  }));
+}
+
+function splitBreakdown(total: number, random: () => number) {
+  const commits = Math.round(total * (0.54 + random() * 0.06));
+  const pullRequests = Math.round(total * (0.16 + random() * 0.05));
+  const issues = Math.round(total * (0.08 + random() * 0.04));
+  const reviews = Math.max(0, total - commits - pullRequests - issues);
+  return { commits, pullRequests, issues, reviews };
+}
+
+function sumDays(weeks: ContributionWeek[]): number {
+  return weeks.flatMap((week) => week.contributionDays).reduce((sum, day) => sum + day.contributionCount, 0);
+}
+
+/** Deterministic fake profile that exercises every screen — no empty arrays, no zeros. */
+export function demoGitHubModel(now: Date = new Date()): GitHubModel {
+  const random = rng(20260917);
+
+  const { map, startYear } = buildDailyMap(now, random);
+  injectStreaks(map, now, random);
+
+  const repos = demoRepos(now, random);
+  const weeks = rollingWeeks(map, now);
+  const totalContributions = sumDays(weeks);
+  const breakdown = splitBreakdown(totalContributions, random);
+  const commitsByRepo = demoCommitsByRepo(repos, breakdown.commits, random);
+  const years = demoYears(map, startYear, now);
+
+  const contributions: Contributions = {
     login: DEMO_LOGIN,
+    name: DEMO_NAME,
+    avatarUrl: DEMO_AVATAR,
+    bio: DEMO_BIO,
+    createdAt: DEMO_CREATED_AT,
     totalContributions,
     weeks,
+    years: Array.from({ length: YEAR_COUNT }, (_, i) => startYear + i),
+    totalCommitContributions: breakdown.commits,
+    totalPullRequestContributions: breakdown.pullRequests,
+    totalIssueContributions: breakdown.issues,
+    totalPullRequestReviewContributions: breakdown.reviews,
+    commitContributionsByRepository: commitsByRepo,
+  };
+
+  const todayCount = map.get(toISODate(now)) ?? 0;
+  const stats: ContributionStats = {
+    todayCommits: todayCount > 0 ? Math.max(1, Math.round(todayCount * 0.7)) : 0,
+    totalCommits: years.reduce((sum, year) => sum + year.totalCommits, 0),
+    openPrs: demoPullRequests.length,
+    followers: 214,
+    following: 97,
+    stars: repos.reduce((sum, repo) => sum + repo.stargazerCount, 0),
+    // More repos exist than the demo details, same as a real account.
+    repoCount: repos.length + 26,
+    repos,
     years,
   };
+
+  return toGitHubModel(contributions, stats, now);
 }
 
-const demoStats: ContributionStats = {
-  todayCommits: 3,
-  totalCommits: 3214,
-  openPrs: demoPullRequests.length,
-};
-
-/** Deterministic fake model — same shape the real pipeline produces. */
-export function demoWidgetModel(now: Date = new Date()): WidgetModel {
-  return toWidgetModel(demoContributions(now), demoStats, now);
-}
+/** Back-compat alias — the builder used to be called this everywhere. */
+export const demoWidgetModel = demoGitHubModel;

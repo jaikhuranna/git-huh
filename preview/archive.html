@@ -1,0 +1,66 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>archive</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<style>
+  .phone { background: var(--canvas-cream); }
+  .rail { background: var(--canvas-cream); }
+  .screen { padding: 4px var(--gutter) 0; overflow-y: auto; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 12px; }
+  .head .label:first-child { color: var(--ink); }
+  .heads { display: flex; justify-content: space-between; padding-bottom: 8px; }
+  .heads span { color: var(--ink70); font: 400 12px/1 var(--serif); }
+  .heads .it { font-style: italic; }
+</style></head>
+<body><div class="phone"><div class="screen" id="s"></div></div>
+<script type="module">
+import { model, chrome, fmt } from './data.js';
+const c = chrome('archive');
+document.querySelector('.phone').insertAdjacentHTML('afterbegin', c.header);
+document.querySelector('.phone').insertAdjacentHTML('beforeend', c.rail);
+
+const W = 393 - 40, ROW = 52;
+// The pin runs oldest at the top, newest at the bottom.
+const years = [...model.years].sort((a,b) => a.year - b.year);
+const monthsW = W * .56, barsX = W * .62, barsW = W - barsX;
+const H = years.length * ROW + 12;
+
+const peakMonth = Math.max(1, ...years.flatMap(y => y.months));
+const peakSplit = Math.max(1, ...years.map(y => Math.max(y.beforeToday, y.afterToday)));
+const top3 = new Set([...years].sort((a,b) => b.total - a.total).slice(0,3).map(y => y.year));
+
+// Today, carried back across every year.
+const todayX = 28 + ((8 + 19/31) / 12) * (monthsW - 34);
+let svg = `<line x1="${todayX}" y1="0" x2="${todayX}" y2="${years.length*ROW}" stroke="var(--ink)" stroke-width=".75"/>`;
+
+years.forEach((y, idx) => {
+  const top = idx * ROW, mid = top + ROW/2;
+  const median = [...y.months].sort((a,b) => a-b)[6] || 0;
+  const step = (monthsW - 34) / 12;
+
+  svg += `<line x1="0" y1="${top+ROW}" x2="${barsX+barsW}" y2="${top+ROW}" stroke="var(--hair)" stroke-width="1" opacity=".5"/>`;
+  svg += `<text x="0" y="${mid+3}" font-family="Instrument Serif" font-style="italic" font-size="11" fill="var(--ink70)">${y.year}</text>`;
+
+  y.months.forEach((v, m) => {
+    if (!v) return;
+    const r = 2 + (v/peakMonth)*11;
+    const quiet = v < median;
+    svg += `<circle cx="${28 + m*step + step/2}" cy="${mid}" r="${r}"
+      fill="${quiet ? 'var(--olive)' : 'var(--rain)'}" opacity="${quiet ? .5 : (.35 + (v/peakMonth)*.5).toFixed(2)}"/>`;
+  });
+
+  const bw = Math.max((y.beforeToday/peakSplit) * (barsW*.46), 2);
+  const aw = Math.max((y.afterToday/peakSplit) * (barsW*.46), 2);
+  const hot = top3.has(y.year);
+  svg += `<rect x="${barsX + barsW*.46 - bw}" y="${mid-5.5}" width="${bw}" height="11" fill="${hot?'var(--rain)':'var(--steel)'}"/>`;
+  svg += `<rect x="${barsX + barsW*.5}" y="${mid-5.5}" width="${aw}" height="11" fill="var(--olive)"/>`;
+  svg += `<text x="${barsX + barsW*.46 - 3}" y="${mid+3}" text-anchor="end" font-family="IBM Plex Mono" font-size="8"
+    fill="${hot?'var(--on-black)':'var(--ink70)'}">${fmt(y.beforeToday)}</text>`;
+  svg += `<text x="${barsX + barsW*.5 + aw + 3}" y="${mid+3}" font-family="IBM Plex Mono" font-size="8"
+    fill="var(--ink70)">${fmt(y.afterToday)}</text>`;
+});
+
+document.getElementById('s').innerHTML = `
+  <div class="head"><span class="label">every year</span><span class="label">${years.length} on record</span></div>
+  <div class="heads"><span class="it">Contribution Year</span><span>Today</span><span class="it">before · after</span></div>
+  <svg width="${W}" height="${H}">${svg}</svg>`;
+</script></body></html>

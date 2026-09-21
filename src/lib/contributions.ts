@@ -1,7 +1,10 @@
+import { brightCycle } from '../theme';
 import type {
   Contributions,
   ContributionStats,
   ContributionWeek,
+  RepoNode,
+  YearStats,
 } from './github';
 
 /** Weeks of history rendered in the widget's dot matrix. */
@@ -18,15 +21,81 @@ export interface GridDay {
 
 export type GridColumn = GridDay[];
 
-export interface WidgetModel {
+export interface Breakdown {
+  commits: number;
+  pullRequests: number;
+  issues: number;
+  reviews: number;
+}
+
+export interface TopRepo {
+  nameWithOwner: string;
+  count: number;
+}
+
+export interface RepoSummary {
+  name: string;
+  nameWithOwner: string;
+  owner: string;
+  description: string;
+  stars: number;
+  forks: number;
+  isPrivate: boolean;
+  pushedAt: string;
+  language: { name: string; color: string } | null;
+  url: string;
+}
+
+export interface LanguageShare {
+  name: string;
+  color: string;
+  bytes: number;
+  share: number;
+}
+
+export interface YearSummary {
+  year: number;
+  total: number;
+  /** Jan..Dec totals for that year. */
+  months: number[];
+  /** Contributions on/before today's month-day in that year. */
+  beforeToday: number;
+  /** Contributions after today's month-day in that year. */
+  afterToday: number;
+}
+
+export interface GitHubModel {
   login: string;
+  name: string;
+  avatarUrl: string;
+  bio: string;
+  following: number;
   total: number;
   todayCount: number;
   todayCommits: number;
   totalCommits: number;
   openPrs: number;
+  followers: number;
+  stars: number;
+  repoCount: number;
+  /** First year the account contributed, from contributionYears. */
+  since: number;
+  /** Full year of weeks, column-major, today flagged. */
   columns: GridColumn[];
+  breakdown: Breakdown;
+  /** Top repos by commit count, capped at 4 + an "others" bucket. */
+  topRepos: TopRepo[];
+  repos: RepoSummary[];
+  /** Aggregated across all repos, sorted by bytes desc. */
+  languages: LanguageShare[];
+  /** Per contribution year, oldest first. */
+  years: YearSummary[];
+  /** Weekly totals across the visible year, oldest first. */
+  weeks: number[];
 }
+
+/** Back-compat alias — the type used to be called this everywhere. */
+export type WidgetModel = GitHubModel;
 
 /** Local calendar date as YYYY-MM-DD, matching GitHub's day strings. */
 export function toISODate(date: Date): string {
@@ -42,25 +111,115 @@ function levelFor(count: number, max: number): Level {
   return Math.min(4, Math.ceil((count / max) * 4)) as Level;
 }
 
-function lastWeeks(weeks: ContributionWeek[], count: number): ContributionWeek[] {
-  return weeks.slice(Math.max(0, weeks.length - count));
+/** Deterministic hash so a repeated language name always lands on the same bright. */
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
 }
 
-/** Shape raw calendar data into the widget's view model. Pure and testable. */
-export function toWidgetModel(
+function fallbackColor(name: string): string {
+  return brightCycle[hashString(name) % brightCycle.length];
+}
+
+function normalizeLanguage(
+  lang: { name: string; color: string | null } | null,
+): { name: string; color: string } | null {
+  if (!lang) return null;
+  return { name: lang.name, color: lang.color ?? fallbackColor(lang.name) };
+}
+
+function toRepoSummary(node: RepoNode): RepoSummary {
+  const owner = node.nameWithOwner.split('/')[0] ?? node.nameWithOwner;
+  return {
+    name: node.name,
+    nameWithOwner: node.nameWithOwner,
+    owner,
+    description: node.description ?? '',
+    stars: node.stargazerCount,
+    forks: node.forkCount,
+    isPrivate: node.isPrivate,
+    pushedAt: node.pushedAt ?? '',
+    language: normalizeLanguage(node.primaryLanguage),
+    url: node.url,
+  };
+}
+
+/** Top 4 repos by commit count, with the rest folded into "others". */
+function toTopRepos(byRepo: { nameWithOwner: string; count: number }[]): TopRepo[] {
+  const sorted = [...byRepo].sort((a, b) => b.count - a.count);
+  const top = sorted.slice(0, 4);
+  const rest = sorted.slice(4);
+  const othersCount = rest.reduce((sum, repo) => sum + repo.count, 0);
+  return othersCount > 0
+    ? [...top, { nameWithOwner: 'others', count: othersCount }]
+    : top;
+}
+
+/** Byte totals per language across every repo, sorted desc. */
+function toLanguages(repos: RepoNode[]): LanguageShare[] {
+  const totals = new Map<string, { color: string | null; bytes: number }>();
+  for (const repo of repos) {
+    for (const lang of repo.languages) {
+      const entry = totals.get(lang.name) ?? { color: lang.color, bytes: 0 };
+      entry.bytes += lang.size;
+      if (!entry.color && lang.color) entry.color = lang.color;
+      totals.set(lang.name, entry);
+    }
+  }
+  const totalBytes = [...totals.values()].reduce((sum, t) => sum + t.bytes, 0);
+  return [...totals.entries()]
+    .map(([name, { color, bytes }]) => ({
+      name,
+      color: color ?? fallbackColor(name),
+      bytes,
+      share: totalBytes > 0 ? bytes / totalBytes : 0,
+    }))
+    .sort((a, b) => b.bytes - a.bytes);
+}
+
+/** Monthly shape + before/after-today split for one contribution year. */
+function toYearSummary(year: YearStats, now: Date): YearSummary {
+  const cutoff = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate(),
+  ).padStart(2, '0')}`;
+  const months = new Array(12).fill(0) as number[];
+  let beforeToday = 0;
+  let afterToday = 0;
+
+  for (const day of year.weeks.flatMap((week) => week.contributionDays)) {
+    const [, month, dayOfMonth] = day.date.split('-');
+    months[Number(month) - 1] += day.contributionCount;
+    const monthDay = `${month}-${dayOfMonth}`;
+    if (monthDay <= cutoff) beforeToday += day.contributionCount;
+    else afterToday += day.contributionCount;
+  }
+
+  return { year: year.year, total: year.totalContributions, months, beforeToday, afterToday };
+}
+
+function weeklyTotals(weeks: ContributionWeek[]): number[] {
+  return weeks.map((week) =>
+    week.contributionDays.reduce((sum, day) => sum + day.contributionCount, 0),
+  );
+}
+
+/** Shape raw calendar + stats data into the app's view model. Pure and testable. */
+export function toGitHubModel(
   contributions: Contributions,
   stats: ContributionStats,
   now: Date = new Date(),
-): WidgetModel {
+): GitHubModel {
   const today = toISODate(now);
-  const columns: GridColumn[] = lastWeeks(contributions.weeks, GRID_WEEKS).map(
-    (week) =>
-      week.contributionDays.map((day) => ({
-        date: day.date,
-        count: day.contributionCount,
-        level: 0 as Level,
-        isToday: day.date === today,
-      })),
+  const columns: GridColumn[] = contributions.weeks.map((week) =>
+    week.contributionDays.map((day) => ({
+      date: day.date,
+      count: day.contributionCount,
+      level: 0 as Level,
+      isToday: day.date === today,
+    })),
   );
 
   const allDays = columns.flat();
@@ -79,28 +238,93 @@ export function toWidgetModel(
 
   return {
     login: contributions.login,
+    name: contributions.name ?? contributions.login,
+    avatarUrl: contributions.avatarUrl,
+    bio: contributions.bio ?? '',
+    following: stats.following,
     total: contributions.totalContributions,
     todayCount: allDays.find((day) => day.isToday)?.count ?? 0,
     todayCommits: stats.todayCommits,
     totalCommits: stats.totalCommits,
     openPrs: stats.openPrs,
+    followers: stats.followers,
+    stars: stats.stars,
+    repoCount: stats.repoCount,
+    since:
+      contributions.years.length > 0
+        ? Math.min(...contributions.years)
+        : now.getFullYear(),
     columns,
+    breakdown: {
+      commits: contributions.totalCommitContributions,
+      pullRequests: contributions.totalPullRequestContributions,
+      issues: contributions.totalIssueContributions,
+      reviews: contributions.totalPullRequestReviewContributions,
+    },
+    topRepos: toTopRepos(contributions.commitContributionsByRepository),
+    repos: stats.repos.map(toRepoSummary),
+    languages: toLanguages(stats.repos),
+    years: stats.years.map((year) => toYearSummary(year, now)),
+    weeks: weeklyTotals(contributions.weeks),
   };
 }
 
 export interface Insights {
   currentStreak: number;
   longestStreak: number;
+  /** Indices into the flattened day array (columns.flat()) for the dots screen. */
+  longestStreakRange: { startIndex: number; endIndex: number };
   bestDay: number;
   activeDays: number;
   avgPerDay: number;
   busiestWeekday: string;
+  /** Same info as busiestWeekday, as a 0 (Sun) .. 6 (Sat) index. */
+  peakWeekday: number;
+  /** Index into model.columns of the highest-total week. */
+  peakWeekIndex: number;
+  yesterdayCount: number;
+  /** This week's total vs the previous week's, as a signed percentage. */
+  velocity: number;
+  /** activeDays / total days in the visible window, 0-1. */
+  consistency: number;
 }
 
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
+/** Totals per weekday over the full year — sunday first. */
+export function weekdayTotals(model: GitHubModel): number[] {
+  const totals = new Array(WEEKDAYS.length).fill(0);
+  for (const day of model.columns.flat()) {
+    totals[new Date(`${day.date}T00:00:00`).getDay()] += day.count;
+  }
+  return totals;
+}
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+export interface MonthBucket {
+  label: string;
+  total: number;
+}
+
+/** Totals per calendar month across the visible year, oldest first. */
+export function monthlyTotals(model: GitHubModel): MonthBucket[] {
+  const byKey = new Map<string, number>();
+  for (const day of model.columns.flat()) {
+    const key = day.date.slice(0, 7); // YYYY-MM
+    byKey.set(key, (byKey.get(key) ?? 0) + day.count);
+  }
+  return [...byKey.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .slice(-12)
+    .map(([key, total]) => ({
+      label: MONTHS[Number(key.slice(5, 7)) - 1] ?? key,
+      total,
+    }));
+}
+
 /** Streaks, peaks and rhythms derived from the visible window. */
-export function insights(model: WidgetModel): Insights {
+export function insights(model: GitHubModel): Insights {
   const days = model.columns.flat();
 
   let currentStreak = 0;
@@ -109,29 +333,70 @@ export function insights(model: WidgetModel): Insights {
   }
 
   let longestStreak = 0;
+  let longestStart = 0;
+  let longestEnd = -1;
   let run = 0;
+  let runStart = 0;
   let bestDay = 0;
   let activeDays = 0;
-  const weekdayTotals = new Array(WEEKDAYS.length).fill(0);
+  const weekdayTotalsArr = new Array(WEEKDAYS.length).fill(0);
 
-  for (const day of days) {
-    run = day.count > 0 ? run + 1 : 0;
-    longestStreak = Math.max(longestStreak, run);
+  days.forEach((day, index) => {
+    if (day.count > 0) {
+      run = run === 0 ? 1 : run + 1;
+      if (run === 1) runStart = index;
+      if (run > longestStreak) {
+        longestStreak = run;
+        longestStart = runStart;
+        longestEnd = index;
+      }
+    } else {
+      run = 0;
+    }
     bestDay = Math.max(bestDay, day.count);
     if (day.count > 0) activeDays += 1;
     const weekday = new Date(`${day.date}T00:00:00`).getDay();
-    weekdayTotals[weekday] += day.count;
-  }
+    weekdayTotalsArr[weekday] += day.count;
+  });
 
-  const busiestWeekday =
-    WEEKDAYS[weekdayTotals.indexOf(Math.max(...weekdayTotals))] ?? 'monday';
+  const peakWeekday = weekdayTotalsArr.indexOf(Math.max(...weekdayTotalsArr));
+  const busiestWeekday = WEEKDAYS[peakWeekday] ?? 'monday';
+
+  let peakWeekIndex = 0;
+  let peakWeekTotal = -1;
+  model.columns.forEach((column, index) => {
+    const total = column.reduce((sum, day) => sum + day.count, 0);
+    if (total > peakWeekTotal) {
+      peakWeekTotal = total;
+      peakWeekIndex = index;
+    }
+  });
+
+  const thisWeek =
+    model.columns[model.columns.length - 1]?.reduce((sum, day) => sum + day.count, 0) ?? 0;
+  const lastWeek =
+    model.columns[model.columns.length - 2]?.reduce((sum, day) => sum + day.count, 0) ?? 0;
+  const velocity =
+    lastWeek > 0 ? ((thisWeek - lastWeek) / lastWeek) * 100 : thisWeek > 0 ? 100 : 0;
+
+  const todayIndex = days.findIndex((day) => day.isToday);
+  const yesterdayCount = todayIndex > 0 ? days[todayIndex - 1].count : 0;
 
   return {
     currentStreak,
     longestStreak,
+    longestStreakRange: {
+      startIndex: longestStart,
+      endIndex: Math.max(longestEnd, longestStart),
+    },
     bestDay,
     activeDays,
     avgPerDay: days.length > 0 ? model.total / days.length : 0,
     busiestWeekday,
+    peakWeekday,
+    peakWeekIndex,
+    yesterdayCount,
+    velocity,
+    consistency: days.length > 0 ? activeDays / days.length : 0,
   };
 }

@@ -1,0 +1,217 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<style>
+  /* Layout budget inside #screen (~764px):
+     fixed content (pad-top, login, date, condition, hero at 140px, hi/lo,
+     spacer, frosted card, pill, sync button+label, pad-bottom) sums to ~612px.
+     The two `.grow` spacers eat the remaining ~150px so the pill and sync
+     button land inside the gradient with room, instead of bunching under the
+     frosted card. Gradient block itself is pinned to the bottom 45% of
+     #screen (absolute, full-bleed, no side padding). */
+  #screen {
+    overflow-y: auto;
+    background: var(--canvas);
+    position: relative;
+    /* Weather-gradient hexes from DESIGN.md ("Weather gradient (pin07)") — the
+       only place in the app allowed to reach outside tokens.css, since pin07's
+       ramp is itself a named design token, not an arbitrary color. */
+    --warm-1: #F5B426;
+    --warm-2: #E8752E;
+    --warm-3: #D23A0E;
+    --cold-1: #7FA8C9;
+    --cold-2: #4A7398;
+    --cold-3: #2C4F78;
+  }
+  .gradient {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 45%;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 36px 24px 28px;
+    height: 100%;
+  }
+  /* Flexible gradient-only gaps so the bottom group (pill, sync button) sits
+     near the bottom edge instead of bunching under the frosted card. */
+  .grow { flex: 1 1 auto; min-height: 16px; }
+  .login-line { font: 600 18px/22px var(--sans); color: var(--ink); }
+  .date-line { font: 400 12px/16px var(--mono); color: var(--ink70); margin-top: 6px; }
+  .condition-line { font: 400 14px/20px var(--sans); color: var(--ink70); margin-top: 16px; }
+  .hero {
+    margin-top: 2px;
+    font: 200 140px/140px var(--sans);
+    color: var(--ink);
+    display: flex;
+    align-items: flex-start;
+    letter-spacing: -4px;
+  }
+  .hero .unit {
+    font: 400 32px/32px var(--sans);
+    margin-top: 14px;
+    color: var(--ink70);
+  }
+  .hilo {
+    margin-top: 4px;
+    font: 400 13px/18px var(--sans);
+    color: var(--ink70);
+    display: flex;
+    gap: 18px;
+  }
+  .hilo b { color: var(--ink); font-weight: 600; }
+
+  .spacer-top { margin-top: 40px; }
+
+  .frosted {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    border-radius: var(--r-card);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 16px 8px;
+  }
+  .frosted .col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .frosted .col svg { width: 20px; height: 20px; color: var(--ink); }
+  .frosted .col .val { font: 600 15px/18px var(--sans); color: var(--ink); }
+  .frosted .col .lbl { font: 500 9px/12px var(--mono); letter-spacing: 0.6px; color: var(--ink70); text-transform: lowercase; }
+  .frosted .rule { width: 1px; background: var(--hair-strong); margin: 2px 0; }
+
+  /* Frosted white (not on-black) — pin07 keeps its pill and button legible on
+     the gradient with translucent white fills and ink content, no border. */
+  .week-pill {
+    margin-top: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--ink);
+    font: 500 12px/1 var(--mono);
+    letter-spacing: 0.4px;
+  }
+  .week-pill svg { width: 13px; height: 13px; }
+
+  .sync-btn {
+    margin-top: 28px;
+    width: 56px; height: 56px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sync-btn svg { width: 22px; height: 22px; color: var(--ink); }
+  .sync-label {
+    margin-top: 10px;
+    font: 500 11px/14px var(--mono);
+    letter-spacing: 0.6px;
+    color: var(--ink);
+  }
+</style>
+</head><body>
+<div class="phone">
+  <div class="screen" id="screen"></div>
+</div>
+<script type="module">
+  import { model, chrome, fmt } from './data.js';
+  const c = chrome('weather');
+  document.querySelector('.phone').insertAdjacentHTML('afterbegin', c.header);
+  document.querySelector('.phone').insertAdjacentHTML('beforeend', c.rail);
+
+  const { insights, days } = model;
+  const today = new Date(days[days.length - 1].date + 'T12:00:00');
+  const now = new Date();
+
+  const alive = insights.currentStreak > 0;
+  const intensity = Math.min(1, insights.currentStreak / 14);
+
+  function conditionLine(streak) {
+    if (streak >= 7) return 'severe shipping expected';
+    if (streak >= 1) return 'steady output';
+    return 'quiet and overcast';
+  }
+
+  function formatDateTime(d, t) {
+    const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
+    const month = d.toLocaleDateString('en-US', { month: 'long' });
+    const day = d.getDate();
+    const time = t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+    return `${weekday}, ${month} ${day}, ${time}`;
+  }
+
+  function iconVelocity() {
+    return `<svg viewBox="0 0 20 20" fill="none"><polyline points="3,15 8,9 12,12 17,4" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/><polyline points="12,4 17,4 17,9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  function iconConsistency() {
+    return `<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.25" stroke="currentColor" stroke-width="1.25"/><polyline points="6.5,10 9,12.5 13.5,7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  function iconPace() {
+    return `<svg viewBox="0 0 20 20" fill="none"><path d="M3,14 A7,7 0 0,1 17,14" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><line x1="10" y1="14" x2="13.5" y2="9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><circle cx="10" cy="14" r="1" fill="currentColor"/></svg>`;
+  }
+  function iconClock() {
+    return `<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.25" stroke="currentColor" stroke-width="1.25"/><polyline points="10,6 10,10 13,12" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  function iconSync() {
+    return `<svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 13.66-5.66M20 12a8 8 0 0 1-13.66 5.66" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><polyline points="17.6,3 17.6,7 13.6,7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><polyline points="6.4,21 6.4,17 10.4,17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  const avgPerDay = Math.round(insights.avgPerDay * 10) / 10;
+  const consistencyPct = Math.round(insights.consistency * 100);
+
+  const html = `
+    <div class="content">
+      <div class="login-line">~${model.login}</div>
+      <div class="date-line">${formatDateTime(today, now)}</div>
+      <div class="condition-line">${conditionLine(insights.currentStreak)}</div>
+      <div class="hero">${fmt(model.todayCount)}<span class="unit">c</span></div>
+      <div class="hilo"><span>High: <b>${fmt(insights.bestDay)}</b></span><span>Low: <b>${fmt(avgPerDay)}</b></span></div>
+      <div class="spacer-top"></div>
+      <div class="frosted">
+        <div class="col">${iconVelocity()}<div class="val">${insights.velocity}%</div><div class="lbl">velocity</div></div>
+        <div class="rule"></div>
+        <div class="col">${iconConsistency()}<div class="val">${consistencyPct}%</div><div class="lbl">consistency</div></div>
+        <div class="rule"></div>
+        <div class="col">${iconPace()}<div class="val">${fmt(avgPerDay)}/d</div><div class="lbl">pace</div></div>
+      </div>
+      <div class="grow"></div>
+      <div class="week-pill">${iconClock()} this week</div>
+      <div class="grow"></div>
+      <div class="sync-btn">${iconSync()}</div>
+      <div class="sync-label">sync widget</div>
+    </div>
+  `;
+  document.getElementById('screen').innerHTML = html;
+
+  // Warm when the current streak is alive, cold otherwise; intensity ~ streak length.
+  // Amber stop sits high and the ramp to the deep tone is gradual (three color
+  // stops) so it never arrives at a flat, saturated color partway down.
+  const gradientDiv = document.createElement('div');
+  gradientDiv.className = 'gradient';
+  const fadeStart = 40 - intensity * 15; // longer streak -> amber begins higher up
+  const midStop = fadeStart + (100 - fadeStart) * 0.65;
+  const [c1, c2, c3] = alive
+    ? ['var(--warm-1)', 'var(--warm-2)', 'var(--warm-3)']
+    : ['var(--cold-1)', 'var(--cold-2)', 'var(--cold-3)'];
+  gradientDiv.style.background = `linear-gradient(to bottom, transparent 0%, ${c1} ${fadeStart}%, ${c2} ${midStop}%, ${c3} 100%)`;
+  document.getElementById('screen').insertAdjacentElement('afterbegin', gradientDiv);
+</script>
+</body></html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<style>
+  .hey-screen {
+    height: 100%;
+    overflow: hidden;
+    padding: 24px 20px 24px;
+    display: flex;
+    flex-direction: column;
+  }
+  .greet {
+    font: 400 44px/46px var(--serif);
+    color: var(--ink);
+  }
+  .greet .login { display: block; }
+
+  .cross-wrap { margin-top: 30px; margin-bottom: 8px; }
+  .cross-wrap svg { display: block; width: 100%; height: auto; color: var(--ink); }
+
+  .sentence {
+    margin-top: 22px;
+    font: 400 17px/26px var(--sans);
+    color: var(--ink);
+  }
+  .sentence .stat { font-weight: 600; }
+  .stat-blue   { color: var(--blue); }
+  .stat-green  { color: var(--green); }
+  .stat-red    { color: var(--red); }
+  .stat-yellow { color: var(--yellow); }
+  .stat-purple { color: var(--purple); }
+
+  .subtitle {
+    margin-top: 12px;
+    font: italic 400 16px/20px var(--serif);
+    color: var(--ink40);
+  }
+
+  .pills { margin-top: 24px; display: flex; gap: 10px; }
+</style>
+</head><body>
+<div class="phone">
+  <div class="screen" id="screen"></div>
+</div>
+<script type="module">
+  import { model, chrome, fmt } from './data.js';
+
+  const c = chrome('hey');
+  document.querySelector('.phone').insertAdjacentHTML('afterbegin', c.header);
+  document.querySelector('.phone').insertAdjacentHTML('beforeend', c.rail);
+
+  // Cross grid: two days per column, so each "+" keeps clear air around it and
+  // reads as a separate mark rather than merging into vertical bars.
+  function crossGrid(days) {
+    const buckets = [];
+    for (let i = 0; i < days.length; i += 2) {
+      buckets.push({ level: Math.max(days[i].level, days[i + 1] ? days[i + 1].level : 0) });
+    }
+    const cols = Math.ceil(buckets.length / 7);
+    const W = 353, H = 196;
+    const cellW = W / cols, cellH = H / 7;
+    const LEVEL = [
+      { op: 0.08, sw: 1.0 },
+      { op: 0.32, sw: 1.3 },
+      { op: 0.55, sw: 1.7 },
+      { op: 0.8,  sw: 2.1 },
+      { op: 1,    sw: 2.6 },
+    ];
+    // Arms stay well short of the cell so neighbours never touch.
+    const ah = Math.min(cellW * 0.30, 4.4);
+    const av = Math.min(cellH * 0.30, 4.4);
+    let lines = '';
+    buckets.forEach((d, i) => {
+      const col = Math.floor(i / 7), row = i % 7;
+      const cx = col * cellW + cellW / 2, cy = row * cellH + cellH / 2;
+      const { op, sw } = LEVEL[d.level];
+      lines += `<line x1="${(cx - ah).toFixed(2)}" y1="${cy.toFixed(2)}" x2="${(cx + ah).toFixed(2)}" y2="${cy.toFixed(2)}" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" opacity="${op}"/>`;
+      lines += `<line x1="${cx.toFixed(2)}" y1="${(cy - av).toFixed(2)}" x2="${cx.toFixed(2)}" y2="${(cy + av).toFixed(2)}" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" opacity="${op}"/>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${lines}</svg>`;
+  }
+
+  // Inline-colored stat sentence, every figure pulled straight from `model`.
+  function sentence(m) {
+    return `You shipped <span class="stat stat-blue">${fmt(m.breakdown.commits)}</span> commits in `
+      + `<span class="stat stat-green">${fmt(m.repoCount)}</span> repos. `
+      + `<span class="stat stat-red">${fmt(m.openPrs)}</span> pull requests are open, `
+      + `<span class="stat stat-yellow">${fmt(m.stars)}</span> stars landed, `
+      + `<span class="stat stat-purple">${fmt(m.followers)}</span> people follow along.`;
+  }
+
+  document.getElementById('screen').innerHTML = `
+    <div class="hey-screen">
+      <div class="greet">Hey,<span class="login">~${model.login}</span></div>
+      <div class="cross-wrap">${crossGrid(model.days)}</div>
+      <p class="sentence">${sentence(model)}</p>
+      <p class="subtitle">since ${model.since} &middot; ${fmt(model.insights.activeDays)} active days</p>
+      <div class="pills">
+        <a class="pill solid" href="${model.repos[0].url}">open github &rarr;</a>
+        <a class="pill" href="#">refresh</a>
+      </div>
+    </div>
+  `;
+</script>
+</body></html>

@@ -1,0 +1,90 @@
+name: build apk
+
+# Tagging `dev-2.0.1` builds the release APK and publishes it as a prerelease.
+# Also runnable by hand from the Actions tab.
+on:
+  push:
+    tags: ['dev-*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. dev-2.0.1)'
+        required: true
+        default: 'dev-2.0.1'
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # `npm install`, not `npm ci`: dependencies were last edited without a
+      # Node toolchain available, so the lockfile is resolved here.
+      - run: npm install
+      - run: npx tsc --noEmit
+      - run: npx expo lint
+
+  apk:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - run: npm install
+
+      - name: Build release APK
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Collect APK
+        id: collect
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-universal-release.apk \
+             "dist/git-huh-${GITHUB_REF_NAME:-dev-2.0.1}.apk"
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: git-huh-apk
+          path: dist/*.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          prerelease: true
+          generate_release_notes: true
+          files: dist/*.apk
+          body: |
+            **git-huh 2.0.1 — board rebuild**
+
+            Ten screens, one per pin on the "nothing github" board. The Nothing
+            design language is gone from the app entirely; it survives only in
+            widget A's Material You background, resolved from the nothing-mtui
+            token map.
+
+            Two home-screen widgets ship in this build:
+            - **git-huh?** — Material You background via nothing-mtui
+            - **git-huh? card** — the board's black halftone card
+
+            Debug-signed dev build. Install with `adb install -r <apk>`.

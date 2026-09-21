@@ -1,0 +1,204 @@
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import Svg, { Circle, Line, Rect, Text as SvgText } from 'react-native-svg';
+
+import { Serif } from '../components/Type';
+import type { GitHubModel, YearSummary } from '../lib/contributions';
+import { colors, fonts } from '../theme';
+import { fmt, Page, ScreenHead } from './shared';
+
+const ROW_HEIGHT = 44;
+
+/**
+ * pin10 — the Valentine's Day rainfall chart. One row per year, circles
+ * sized by monthly volume, a single vertical line carrying today's date back
+ * through every year, and paired before/after bars down the right.
+ */
+export function ArchiveScreen({ model }: { model: GitHubModel }) {
+  const { width } = useWindowDimensions();
+  const chartWidth = width - 40;
+
+  // The pin runs oldest at the top, newest at the bottom.
+  const years = [...model.years].sort((a, b) => a.year - b.year);
+  const monthsWidth = chartWidth * 0.56;
+  const barsX = chartWidth * 0.62;
+  const barsWidth = chartWidth - barsX;
+
+  const peakMonth = Math.max(
+    1,
+    ...years.flatMap((year) => year.months),
+  );
+  const peakSplit = Math.max(
+    1,
+    ...years.map((year) => Math.max(year.beforeToday, year.afterToday)),
+  );
+
+  // Top three years get the saturated treatment the pin gives its wettest.
+  const ranked = [...years].sort((a, b) => b.total - a.total);
+  const highlighted = new Set(ranked.slice(0, 3).map((year) => year.year));
+
+  const now = new Date();
+  const todayX = 28 + ((now.getMonth() + now.getDate() / 31) / 12) * (monthsWidth - 34);
+  const chartHeight = years.length * ROW_HEIGHT + 12;
+
+  return (
+    <Page background={colors.canvasCream}>
+      <ScreenHead left="every year" right={`${years.length} on record`} />
+
+      <View style={styles.heads}>
+        <Serif style={styles.headYear}>Contribution Year</Serif>
+        <Serif style={styles.headToday}>Today</Serif>
+        <Serif style={styles.headSplit}>before · after</Serif>
+      </View>
+
+      <Svg height={chartHeight} width={chartWidth}>
+        {/* Today, carried across every year — the pin's centre line. */}
+        <Line
+          stroke={colors.ink}
+          strokeWidth={0.75}
+          x1={todayX}
+          x2={todayX}
+          y1={0}
+          y2={years.length * ROW_HEIGHT}
+        />
+
+        {years.map((year, index) => (
+          <Row
+            barsWidth={barsWidth}
+            barsX={barsX}
+            highlighted={highlighted.has(year.year)}
+            key={year.year}
+            monthsWidth={monthsWidth}
+            peakMonth={peakMonth}
+            peakSplit={peakSplit}
+            y={index * ROW_HEIGHT}
+            year={year}
+          />
+        ))}
+      </Svg>
+    </Page>
+  );
+}
+
+function Row({
+  year,
+  y,
+  monthsWidth,
+  barsX,
+  barsWidth,
+  peakMonth,
+  peakSplit,
+  highlighted,
+}: {
+  year: YearSummary;
+  y: number;
+  monthsWidth: number;
+  barsX: number;
+  barsWidth: number;
+  peakMonth: number;
+  peakSplit: number;
+  highlighted: boolean;
+}) {
+  const mid = y + ROW_HEIGHT / 2;
+  const median = [...year.months].sort((a, b) => a - b)[6] ?? 0;
+  const step = (monthsWidth - 34) / 12;
+
+  const beforeW = (year.beforeToday / peakSplit) * (barsWidth * 0.46);
+  const afterW = (year.afterToday / peakSplit) * (barsWidth * 0.46);
+
+  return (
+    <>
+      <Line
+        opacity={0.5}
+        stroke={colors.hair}
+        strokeWidth={1}
+        x1={0}
+        x2={barsX + barsWidth}
+        y1={y + ROW_HEIGHT}
+        y2={y + ROW_HEIGHT}
+      />
+
+      <SvgText
+        fill={colors.ink70}
+        fontFamily={fonts.serifItalic}
+        fontSize={11}
+        x={0}
+        y={mid + 3}
+      >
+        {year.year}
+      </SvgText>
+
+      {year.months.map((value, month) => {
+        if (value === 0) return null;
+        const r = 2 + (value / peakMonth) * 11;
+        // Quiet months take the pin's olive; busy ones its saturated blue.
+        const quiet = value < median;
+        return (
+          <Circle
+            cx={28 + month * step + step / 2}
+            cy={mid}
+            fill={quiet ? colors.olive : colors.rain}
+            key={month}
+            opacity={quiet ? 0.5 : 0.35 + (value / peakMonth) * 0.5}
+            r={r}
+          />
+        );
+      })}
+
+      <Rect
+        fill={highlighted ? colors.rain : colors.steel}
+        height={11}
+        width={Math.max(beforeW, 2)}
+        x={barsX + barsWidth * 0.46 - Math.max(beforeW, 2)}
+        y={mid - 5.5}
+      />
+      <Rect
+        fill={colors.olive}
+        height={11}
+        width={Math.max(afterW, 2)}
+        x={barsX + barsWidth * 0.5}
+        y={mid - 5.5}
+      />
+      <SvgText
+        fill={highlighted ? colors.onBlack : colors.ink70}
+        fontFamily={fonts.mono}
+        fontSize={8}
+        textAnchor="end"
+        x={barsX + barsWidth * 0.46 - 3}
+        y={mid + 3}
+      >
+        {fmt(year.beforeToday)}
+      </SvgText>
+      <SvgText
+        fill={colors.ink70}
+        fontFamily={fonts.mono}
+        fontSize={8}
+        x={barsX + barsWidth * 0.5 + Math.max(afterW, 2) + 3}
+        y={mid + 3}
+      >
+        {fmt(year.afterToday)}
+      </SvgText>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  heads: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+  },
+  headYear: {
+    color: colors.ink70,
+    fontFamily: fonts.serifItalic,
+    fontSize: 12,
+  },
+  headToday: {
+    color: colors.ink70,
+    fontSize: 12,
+  },
+  headSplit: {
+    color: colors.ink70,
+    fontFamily: fonts.serifItalic,
+    fontSize: 12,
+  },
+});
