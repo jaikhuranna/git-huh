@@ -27,6 +27,7 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.size
 import androidx.glance.layout.width
@@ -50,8 +51,9 @@ private const val ROWS = 7
 private val PADDING = 14.dp
 private val GAP = 3.dp
 private val TARGET_CELL = 9.dp
-private val MIN_CELL = 5.dp
-private val MAX_CELL = 11.dp
+
+/** Sigil row + footer + the spacers around the field. */
+private val CHROME_HEIGHT = 74.dp
 
 class GitHuhBoardWidget : GlanceAppWidget() {
 
@@ -105,11 +107,14 @@ private fun Content(state: WidgetState?) {
 @androidx.compose.runtime.Composable
 private fun Filled(context: Context, state: WidgetState, size: DpSize) {
     val innerWidth = size.width - (PADDING * 2)
+    // A hint only — the columns are weighted below so the field fills the
+    // card even when the launcher under-reports the widget's real width.
     val columns = ((innerWidth + GAP) / (TARGET_CELL + GAP))
         .toInt()
-        .coerceIn(8, 24)
-    val cell = ((innerWidth - GAP * (columns - 1)) / columns)
-        .coerceIn(MIN_CELL, MAX_CELL)
+        .coerceIn(10, 22)
+    // Same reasoning as widget A: the halftone has to fit what is left.
+    val cell = ((size.height - CHROME_HEIGHT - GAP * (ROWS - 1)) / ROWS)
+        .coerceIn(4.dp, 11.dp)
 
     Column(
         modifier = GlanceModifier.fillMaxSize(),
@@ -174,28 +179,35 @@ private fun sigilSeed(login: String): Int {
  */
 @androidx.compose.runtime.Composable
 private fun Halftone(state: WidgetState, columns: Int, cell: Dp) {
-    val scales = floatArrayOf(0.18f, 0.40f, 0.60f, 0.82f, 1.0f)
+    val scales = floatArrayOf(0.22f, 0.44f, 0.64f, 0.84f, 1.0f)
     val alphas = floatArrayOf(0.12f, 0.35f, 0.58f, 0.80f, 1.0f)
 
     val visible = state.days.takeLast(columns * ROWS)
 
-    Column {
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
         for (row in 0 until ROWS) {
-            Row {
+            Row(modifier = GlanceModifier.fillMaxWidth()) {
                 for (col in 0 until columns) {
                     val day = visible.getOrNull(col * ROWS + row)
                     val level = day?.level ?: 0
-                    val diameter = cell * scales[level]
+                    val dot = cell * scales[level]
                     Box(
-                        modifier = GlanceModifier
-                            .size(cell)
-                            .cornerRadius(if (level >= 4) 2.dp else diameter)
-                            .background(INK.copy(alpha = if (day == null) 0.08f else alphas[level])),
-                    ) {}
-                    if (col < columns - 1) Spacer(GlanceModifier.width(GAP))
+                        modifier = GlanceModifier.defaultWeight().height(cell),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = GlanceModifier
+                                .size(dot)
+                                .cornerRadius(if (level >= 4) 2.dp else dot)
+                                .background(
+                                    INK.copy(alpha = if (day == null) 0.06f else alphas[level]),
+                                ),
+                        ) {}
+                    }
                 }
             }
             if (row < ROWS - 1) Spacer(GlanceModifier.height(GAP))
         }
     }
 }
+

@@ -1,6 +1,6 @@
 {
   "name": "git-huh",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",

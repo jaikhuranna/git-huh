@@ -38,3 +38,34 @@ object MaterialYouPalette {
 
     private fun hex(color: Int) = String.format(Locale.US, "#%06x", color and 0xffffff)
 }
+
+/**
+ * The nothing-mtui token map, resolved against this device at the moment the
+ * widget is drawn.
+ *
+ * The palette also travels in the sync payload, but that is a snapshot taken
+ * when the app last ran: change the system colour and the widget would keep
+ * the old background until you reopened the app. `widgetBg` is a dynamic
+ * Android system colour, so the only correct time to read it is at
+ * composition.
+ */
+object NothingMtui {
+
+    /** widgetBg: neutral1/50 in light, neutral1/900 in dark. */
+    fun widgetBg(context: Context, dark: Boolean, payload: String?): Int {
+        live(context, if (dark) "system_neutral1_900" else "system_neutral1_50")
+            ?.let { return it }
+        parseHex(payload)?.let { return it }
+        return parseHex(if (dark) "#1b1b1b" else "#e5e5e5") ?: android.graphics.Color.BLACK
+    }
+
+    private fun live(context: Context, name: String): Int? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
+        val id = context.resources.getIdentifier(name, "color", "android")
+        return if (id == 0) null else runCatching { context.getColor(id) }.getOrNull()
+    }
+
+    private fun parseHex(hex: String?): Int? =
+        hex?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { android.graphics.Color.parseColor(it) }.getOrNull() }
+}
