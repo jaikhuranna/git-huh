@@ -66,7 +66,10 @@ radius: card 20, tile 14, pill 999, sheet 28. grid gutter 20. card padding 18.
 
 ## Screens — pin by pin
 
-Pager order = nav order. `hey` is the entry screen.
+Screens are numbered by the pin they come from, **not** by where they sit in
+the app — the sections and their order are under "Navigation" below, and
+`STORIES.md` is the argument for that grouping. `hey` is still the entry
+screen: `today · you`.
 
 ### 1. `hey` — pin04 (Pantom)
 Warm canvas. Top-left `git-huh?` in Instrument Serif + mono `2.0`; top-right pill `disconnect`.
@@ -79,12 +82,12 @@ Below: the colored sentence, Inter 400 17/26, each stat inline-colored:
 Then italic serif subtitle `since {year} · {activeDays} active days`.
 Two pills: filled black `open github →`, outlined `refresh`.
 
-Below the fold, the **activity feed** (`SocialFeed`): who commented on your pull requests, who
-reviewed them, who asked for your review, who mentioned you, and your own open pull requests.
-One coloured rule per category (comment blue, approval green, changes-requested red, review
-yellow, review-request purple, mention pink, yours ink), the category also written out in words,
-the comment text quoted, and a wrapped chip filter (`all · comments · reviews · mentions · yours`)
-with counts. The chips wrap rather than scroll — a nested horizontal scroller fights the pager.
+The activity feed used to sit below the fold here. It is now its own section
+(`inbox`, screen 14): a feed under a greeting is a feed nobody scrolls to
+twice, and triage is the first thing anyone opens a GitHub app for. What is
+left on this screen is the person — the greeting, the year, the sentence, the
+link out and `disconnect`, which is the only destructive action in the app and
+the reason this screen is not behind anything.
 
 ### 2. `now` — pin02 (Ai OS)
 `canvasCool` background, dotted 4px grid behind the hero.
@@ -342,11 +345,65 @@ talk, REST for the files, because GraphQL's `files` connection has paths and cou
 text. The REST half is optional — a token that can read the object but not the contents still
 gets a readable conversation.
 
+### 14. `inbox` — the feed, given a section
+
+pin04's feed, lifted out of the greeting and given the page. `ScreenHead`
+`what wants you` · `{n} events`, the wrapped chip filter
+(`all · comments · reviews · mentions · yours`) with counts, and up to forty
+rows. One coloured rule per category (comment blue, approval green,
+changes-requested red, review yellow, review-request purple, mention pink,
+yours ink) with the category written out in words as well, the comment text
+quoted, and the repository and number under each row.
+
+**A row opens the thing.** Where the event is a pull request it opens `pull`
+inside the app; a mention on an *issue* still leaves for the browser, because
+`pull` can only read a pull request and pretending otherwise would be an
+error screen. The url is what decides — the mentions search returns both.
+
+There is no read state. The app holds no `notifications` scope, so it cannot
+write to an inbox; the feed is rebuilt from search on every visit and the
+filters are what triage looks like here.
+
 ## Navigation
 
-Horizontal pager, 10 pages. Bottom rail: a horizontally scrolling mono label strip
-(`hey  now  flow  poster  orbit  weather  cards  index  dots  archive`), active label ink +
-2px underline, inactive ink40. No anonymous dots. Rail sits on canvas with a top hairline.
+**Five sections, a bar that is always visible, and a segmented control for
+the views inside a section.** No drawer, no hamburger, nothing behind a menu,
+and no scrolling list of thirteen names — which is a hamburger lying down.
+The shape follows Apple's Human Interface Guidelines: three to five
+persistent, labelled destinations that are *content* and not actions, with
+the second level as a segmented control at the top of the section it belongs
+to. `STORIES.md` is why the grouping is this grouping.
+
+| section | views (segmented control) | the question it answers |
+|---|---|---|
+| `today` | `you` · `now` · `weather` · `hours` | how am I doing |
+| `inbox` | `recent` | what wants me |
+| `work` | `pulls` · `brief` · `cycle` · `repos` | what am I shipping |
+| `year` | `weeks` · `split` · `languages` · `years` | what was the year |
+| `lab` | `join the dots` | not finished yet |
+
+- **Bar** (`TabBar`): five equal fifths on canvas with a top hairline, mono
+  labels, selected is a filled black pill — which is what filled black means
+  everywhere else. The whole fifth is the tap target; the pill only hugs the
+  word. `inbox` carries a count of the events addressed to you (review
+  requests, mentions, changes requested), which is the honest version of a
+  badge: it is computed from the rows that are actually there.
+- **Segments** (`Segments`): mono labels with a 2px ink rule under the
+  selected one — pin03's tab, kept from the old rail. Hidden when a section
+  has one view. The row **wraps, it never scrolls**.
+- **Swiping** moves between views *within* a section and stops at its edges.
+  A drag can no longer carry you three destinations away.
+- **Sections keep their place.** Each remembers which view you left it on,
+  and mounts the first time it is opened rather than on launch — the old
+  pager built all thirteen screens before the first one was looked at.
+- `pull` is not in any section; it is a full-screen overlay over everything
+  (see 13).
+
+*(Superseded: a single horizontal pager of thirteen pages under a
+horizontally scrolling name rail. Everything was one swipe from its
+neighbours and nothing was one tap from anywhere, the rail's contents
+depended on where you already were, and `dots` — a puzzle — sat in the same
+rank as the pull request drawer.)*
 
 ## Sign-in (`PatForm`)
 

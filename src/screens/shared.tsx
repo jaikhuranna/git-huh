@@ -23,15 +23,23 @@ export function Page({
   children,
   background,
   gutter = true,
+  fill = false,
 }: {
   children: ReactNode;
   background?: string;
   gutter?: boolean;
+  /**
+   * Let the content claim the whole page rather than stacking at the top.
+   * A screen that runs short then pushes its last block (`marginTop: 'auto'`)
+   * down to the bottom edge, which reads as laid out rather than unfinished.
+   */
+  fill?: boolean;
 }) {
   return (
     <ScrollView
       contentContainerStyle={[
         styles.page,
+        fill && styles.fill,
         gutter && { paddingHorizontal: space.gutter },
       ]}
       showsVerticalScrollIndicator={false}
@@ -88,5 +96,8 @@ const styles = StyleSheet.create({
   page: {
     paddingBottom: 28,
     paddingTop: 4,
+  },
+  fill: {
+    flexGrow: 1,
   },
 });

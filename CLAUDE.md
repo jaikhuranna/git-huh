@@ -5,20 +5,25 @@
 **Make your own GitHub history worth looking at.** The numbers GitHub already
 has about you — a year of contributions, the languages, the repos, the pull
 requests and the arguments in them — rendered as a set of printed artefacts
-rather than as a dashboard. Thirteen screens, each one a pin from the
-"nothing github" Pinterest board (`design/board/`), plus one Android
-home-screen widget.
+rather than as a dashboard. Fourteen screens, each one a pin from the
+"nothing github" Pinterest board (`design/board/`), grouped into five
+sections, plus one Android home-screen widget.
 
 It is a personal app for one account at a time: you paste a token, it reads
 your year, and nothing leaves the device except requests to GitHub.
 
-Two documents govern the work and both are part of it:
+Three documents govern the work and all three are part of it:
 
 - **`design/LANGUAGE.md`** — the design language: colour, type, space,
   motion, patterns, the prohibitions. Read this before designing anything.
-- **`design/DESIGN.md`** — the per-screen spec, pin by pin.
+- **`design/DESIGN.md`** — the per-screen spec, pin by pin, and the
+  navigation.
+- **`design/STORIES.md`** — who is holding the phone, the flows, and the two
+  lists (what people want from a GitHub app, what they hate about GitHub's
+  own). It is the argument behind the five sections; read it before moving a
+  screen or adding one.
 
-Keep both current in the same change that makes them wrong.
+Keep all three current in the same change that makes them wrong.
 
 ## Shipping — build the APK and upload it, every time
 
@@ -59,18 +64,33 @@ on-device from the last one.
 
 ## Layout
 
-- `src/screens/` — one file per screen: `Hey`, `Now`, `Clock`, `Flow`,
-  `Poster`, `Orbit`, `Weather`, `Cards`, `Index`, `Brief`, `Review`, `Dots`,
-  `Archive`, plus `Loading` (pin11, shown while the first request is in
-  flight) and `Pull`. Order and navigation live in `app/index.tsx`.
-- **`Pull` is not in the rail.** It is a full-screen overlay rendered *over*
-  the pager from `app/index.tsx`, opened by tapping a row on `index` or the
-  link on `brief`. It has horizontal scrollers of its own (the diff), and a
-  horizontal scroller nested inside the pager loses every drag to the page
-  swipe — which is also why the poster's year chips wrap instead of scrolling.
+- `src/screens/` — one file per screen: `Hey`, `Now`, `Weather`, `Clock`,
+  `Inbox`, `Index`, `Brief`, `Review`, `Cards`, `Poster`, `Flow`, `Orbit`,
+  `Archive`, `Dots`, plus `Loading` (pin11, shown while the first request is
+  in flight) and `Pull`.
+- **Navigation is five sections, and it lives in `app/index.tsx`.**
+  `SECTIONS` is the whole map: `today` (you · now · weather · hours),
+  `inbox` (recent), `work` (pulls · brief · cycle · repos), `year` (weeks ·
+  split · languages · years) and `lab` (join the dots), which is where an
+  unfinished artefact lives until it earns a place in one of the other four.
+  The bar is `src/components/TabBar.tsx`, the in-section switcher is
+  `src/components/Segments.tsx`, and the thirteen-name scrolling `Rail` they
+  replaced is gone. Apple's HIG is the reference: three to five persistent
+  labelled destinations, no drawer, no hamburger, segmented control for views
+  of one subject. **Do not add a sixth section**, and do not put an action in
+  the bar.
+- A section mounts the first time it is opened and keeps its own page after
+  that, so the fetches are gated on the *section* (and, for the heavy
+  activity request, on the view one step before the one that needs it).
+- **`Pull` is not a section.** It is a full-screen overlay rendered *over*
+  everything from `app/index.tsx`, opened from a row on `index`, `inbox` or
+  the link on `brief`. It has horizontal scrollers of its own (the diff), and
+  a horizontal scroller nested inside a pager loses every drag to the page
+  swipe — which is also why the poster's year chips wrap instead of
+  scrolling.
 - `src/lib/activity.ts` — the second-tier data layer: sampled commit history
-  and pull request detail. `src/lib/social.ts` — the home screen's activity
-  feed, built from search plus each PR's comment and review connections
+  and pull request detail. `src/lib/social.ts` — the `inbox` section's feed,
+  built from search plus each PR's comment and review connections
   **deliberately not** from the notifications API, which would need a
   `notifications` scope the app never asks for.
 - `src/lib/messageCache.ts` — the pool of commit messages the loading screen
@@ -152,7 +172,7 @@ JVM `SIGBUS` in `PerfLongVariant::sample`, delete the offending
 `node_modules/*/android/.cxx` directory and pass
 `-Dorg.gradle.jvmargs="… -XX:-UsePerfData"`.
 
-## Four traps
+## Five traps
 
 ### A token without `repo` returns a smaller, valid, wrong year
 
@@ -205,6 +225,20 @@ because of the font, and their width is set with `setViewLayoutWidth` (API 31) s
 that `toXDelta="-100%"` means the width of *the message* rather than the width of
 the card — without it the line can never leave the screen.
 
+### A background colour that changes loses its corner radius
+
+On Android a view whose **only** changing style property is `backgroundColor`
+is repainted without its `borderRadius`. The first paint after mount is
+correct, so it looks fine until something re-renders: the tab bar's selected
+pill came back as a hard black rectangle the moment you switched sections,
+and only the tab that happened to be selected at launch stayed round.
+
+Every chip in the app was already immune by accident — a chip toggles its
+`borderColor` as well as its fill, and sending a border property alongside
+the background makes the radius survive. So a toggled surface here carries a
+1px border (transparent when off) whether or not it needs one. Do not
+"simplify" that border away.
+
 ### Animating from JavaScript
 
 Do not. The loading wave went through a `setInterval` stepping a counter
@@ -219,9 +253,10 @@ response*, which is the entire point of that screen. Measure with
 ## Checks
 
 There are no tests. Before shipping, run `npx tsc --noEmit` (it should be
-clean) and `npx eslint app src` (warnings only — `NowScreen` imports an unused
-`G`, `IndexScreen` has an exhaustive-deps note, and `app/index.tsx` imports
-`react-native` twice). **Zero errors; do not add more warnings.** Note that
+clean) and `npx eslint app src` (four warnings, all pre-existing — `NowScreen`
+imports an unused `G`, `IndexScreen` has an exhaustive-deps note, and
+`Wordmark` imports `react-native` twice). **Zero errors; do not add more
+warnings.** Note that
 eslint here errors on `setState` called synchronously in an effect body, so a
 hook that resets state on a prop change has to derive it during render instead
 — `useContributions` and `useTokenScopes` both stamp their result with the

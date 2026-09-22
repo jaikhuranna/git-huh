@@ -13,18 +13,29 @@ import {
 import { ago } from '../screens/shared';
 import { colors, radii } from '../theme';
 
-const MAX_ROWS = 12;
+// The feed has a section to itself now, so it lists what it has rather than
+// the dozen rows that fitted under the greeting.
+const MAX_ROWS = 40;
 
 /**
- * The social side of GitHub on the front door: who commented on your pull
- * requests, who reviewed them, who asked for your review, who pulled you into
- * a thread — and your own open pull requests underneath it all.
+ * The social side of GitHub, which is the whole of the `inbox` section: who
+ * commented on your pull requests, who reviewed them, who asked for your
+ * review, who pulled you into a thread — and your own open pull requests
+ * underneath it all.
  *
  * Every row is a real event with the text attached, and every row opens the
- * thread it came from. The filter is the point: on a busy week the feed is
- * mostly review noise and you want the two comments that were meant for you.
+ * thread it came from — inside the app where that is a pull request, in the
+ * browser where it is an issue. The filter is the point: on a busy week the
+ * feed is mostly review noise and you want the two comments that were meant
+ * for you.
  */
-export function SocialFeed({ state }: { state: SocialState }) {
+export function SocialFeed({
+  state,
+  onOpen,
+}: {
+  state: SocialState;
+  onOpen?: (target: { repo: string; number: number }) => void;
+}) {
   const [filter, setFilter] = useState<SocialFilter>('all');
 
   const events = state.status === 'ready' ? state.events : [];
@@ -33,11 +44,6 @@ export function SocialFeed({ state }: { state: SocialState }) {
 
   return (
     <View style={styles.section}>
-      <View style={styles.head}>
-        <Label style={styles.headLeft}>recent</Label>
-        {state.status === 'ready' && <Label>{events.length} events</Label>}
-      </View>
-
       <View style={styles.chips}>
         {SOCIAL_FILTERS.map((value) => {
           const on = value === filter;
@@ -78,7 +84,7 @@ export function SocialFeed({ state }: { state: SocialState }) {
       )}
 
       {rows.map((event) => (
-        <FeedRow event={event} key={event.id} />
+        <FeedRow event={event} key={event.id} onOpen={onOpen} />
       ))}
     </View>
   );
@@ -111,8 +117,18 @@ function markOf(event: SocialEvent): Mark {
   }
 }
 
-function FeedRow({ event }: { event: SocialEvent }) {
+function FeedRow({
+  event,
+  onOpen,
+}: {
+  event: SocialEvent;
+  onOpen?: (target: { repo: string; number: number }) => void;
+}) {
   const mark = markOf(event);
+  // Mentions come out of a search that returns issues as well, and the pull
+  // request screen can only read a pull request; the url is the only thing
+  // that says which one this is.
+  const inApp = onOpen != null && event.url.includes('/pull/');
   // On the canned kinds the excerpt only repeats the phrase; on a comment or
   // a review it is the thing you actually came to read.
   const quote =
@@ -123,8 +139,12 @@ function FeedRow({ event }: { event: SocialEvent }) {
 
   return (
     <Pressable
-      accessibilityRole="link"
-      onPress={() => Linking.openURL(event.url).catch(() => {})}
+      accessibilityRole={inApp ? 'button' : 'link'}
+      onPress={() =>
+        inApp
+          ? onOpen?.({ repo: event.repo, number: event.number })
+          : void Linking.openURL(event.url).catch(() => {})
+      }
       style={styles.row}
     >
       <View style={[styles.rule, { backgroundColor: mark.color }]} />
@@ -164,22 +184,11 @@ function FeedRow({ event }: { event: SocialEvent }) {
 
 const styles = StyleSheet.create({
   section: {
-    marginTop: 30,
-  },
-  head: {
-    alignItems: 'baseline',
-    borderTopColor: colors.ink,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 10,
-  },
-  headLeft: {
-    color: colors.ink,
+    marginTop: 2,
   },
   chips: {
-    // Wrapped rather than scrolled: the feed sits inside the app's horizontal
-    // pager, and a nested horizontal scroller there fights the page swipe.
+    // Wrapped rather than scrolled: the feed sits inside a horizontal pager,
+    // and a nested horizontal scroller there fights the page swipe.
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,

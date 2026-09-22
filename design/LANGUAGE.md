@@ -149,9 +149,11 @@ Three rules, all of them learned the hard way:
    the JS thread is busy parsing the first GitHub response. Two earlier
    versions animated from JS (a `setInterval` stepping a counter, then
    `requestAnimationFrame`) and both visibly stuttered.
-2. **Park what is off screen.** Thirteen screens are mounted at once in the
-   pager. An animation takes an `active` prop and stops when its page is not
-   the one being looked at.
+2. **Park what is off screen.** A section mounts the first time it is opened
+   and stays mounted after that, so several screens are always live at once.
+   An animation takes an `active` prop and stops when its view is not the one
+   being looked at — which now means *its section is current and its page is
+   the visible one*.
 3. **Arrive, don't appear.** Anything full-page fades in over ~500 ms. A hard
    cut to a full page of type reads as a crash.
 
@@ -159,6 +161,15 @@ Everything else is still. There are no hover states, no spinners, no
 skeletons — a screen that is loading says so in words.
 
 ## 7. Patterns
+
+**Navigation is two levels and both are visible.** A bar of five sections at
+the bottom (`TabBar`, filled black pill = the section you are in) and a
+segmented control at the top for the views inside one section (`Segments`,
+2px ink rule = the view you are in). Nothing lives behind a menu, a drawer or
+a scrolling list of names; if a screen exists, one tap and at most one swipe
+reaches it. Sections are content — never actions — and there are never more
+than five. `DESIGN.md` § Navigation has the table; `STORIES.md` has the
+argument.
 
 **Screen head.** Every scrolling screen opens with the same two-part caption:
 a mono name on the left, a mono figure on the right (`ScreenHead`). It is the

@@ -11,19 +11,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
-import { Rail } from '../src/components/Rail';
+import { Segments } from '../src/components/Segments';
+import { TabBar } from '../src/components/TabBar';
 import { Body, Label } from '../src/components/Type';
 import { Wordmark } from '../src/components/Wordmark';
 import { PatForm } from '../src/components/PatForm';
 import { useActivity } from '../src/hooks/useActivity';
 import { useContributions } from '../src/hooks/useContributions';
-import { useOpenPrs, type PrsState } from '../src/hooks/useOpenPrs';
+import { useOpenPrs } from '../src/hooks/useOpenPrs';
 import { useSocial, type SocialState } from '../src/hooks/useSocial';
 import { useTokenScopes } from '../src/hooks/useTokenScopes';
 import type { GitHubModel } from '../src/lib/contributions';
 import { DEMO_TOKEN, tokenStore } from '../src/lib/token';
 import { clearWidget, syncWidget } from '../src/lib/widgetBridge';
-import type { Activity } from '../src/lib/activity';
 import { EMPTY_ACTIVITY, spreadMessages } from '../src/lib/activity';
 import { fetchCommitLines } from '../src/lib/commitLines';
 import {
@@ -42,6 +42,7 @@ import { DotsScreen } from '../src/screens/DotsScreen';
 import { FlowScreen } from '../src/screens/FlowScreen';
 import { HeyScreen } from '../src/screens/HeyScreen';
 import { IndexScreen } from '../src/screens/IndexScreen';
+import { InboxScreen } from '../src/screens/InboxScreen';
 import { LoadingScreen } from '../src/screens/LoadingScreen';
 import { NowScreen } from '../src/screens/NowScreen';
 import { OrbitScreen } from '../src/screens/OrbitScreen';
@@ -60,36 +61,84 @@ interface OpenPull {
   number: number;
 }
 
-/** One screen per pin on the board, in reading order. */
-const SCREENS = [
-  'hey',
-  'now',
-  'clock',
-  'flow',
-  'poster',
-  'orbit',
-  'weather',
-  'cards',
-  'index',
-  'brief',
-  'review',
-  'dots',
-  'archive',
-] as const;
+type ScreenName =
+  | 'hey'
+  | 'now'
+  | 'weather'
+  | 'clock'
+  | 'inbox'
+  | 'index'
+  | 'brief'
+  | 'review'
+  | 'cards'
+  | 'poster'
+  | 'flow'
+  | 'orbit'
+  | 'archive'
+  | 'dots';
 
-/** The `index` screen is the only one that needs the PR list. */
-const PRS_PAGE = SCREENS.indexOf('index');
+interface SectionView {
+  name: ScreenName;
+  /** What the segmented control calls it — one word wherever possible. */
+  label: string;
+}
+
+interface Section {
+  key: string;
+  views: readonly SectionView[];
+}
 
 /**
- * Commit timestamps and PR bodies are a second, heavier request, so they are
- * only fetched once one of the screens that needs them is within reach.
+ * Five sections, and every screen belongs to exactly one.
+ *
+ * The app used to be thirteen equal pages behind a scrolling rail, which
+ * meant the answer to "where is the thing I want" was "swipe until it turns
+ * up". These are the four questions the screens actually answer — what today
+ * looks like, what wants me, what I am shipping, what the year was — plus
+ * `lab`, which is where an artefact lives until it has earned a place in one
+ * of the other four.
+ *
+ * The grouping, the count and the shape all follow Apple's guidance: a flat
+ * bar of persistent, labelled destinations (three to five), content and not
+ * actions, no drawer, nothing behind a menu. Views *inside* a section are a
+ * segmented control at the top, because they are views of one subject.
  */
-const ACTIVITY_PAGES = [
-  SCREENS.indexOf('clock'),
-  SCREENS.indexOf('cards'),
-  SCREENS.indexOf('brief'),
-  SCREENS.indexOf('review'),
+const SECTIONS: readonly Section[] = [
+  {
+    key: 'today',
+    views: [
+      { name: 'hey', label: 'you' },
+      { name: 'now', label: 'now' },
+      { name: 'weather', label: 'weather' },
+      { name: 'clock', label: 'hours' },
+    ],
+  },
+  { key: 'inbox', views: [{ name: 'inbox', label: 'recent' }] },
+  {
+    key: 'work',
+    views: [
+      { name: 'index', label: 'pulls' },
+      { name: 'brief', label: 'brief' },
+      { name: 'review', label: 'cycle' },
+      { name: 'cards', label: 'repos' },
+    ],
+  },
+  {
+    key: 'year',
+    views: [
+      { name: 'poster', label: 'weeks' },
+      { name: 'flow', label: 'split' },
+      { name: 'orbit', label: 'languages' },
+      { name: 'archive', label: 'years' },
+    ],
+  },
+  { key: 'lab', views: [{ name: 'dots', label: 'join the dots' }] },
 ];
+
+/** Every view in reading order — used by the `#demo/n` web shortcut. */
+const FLAT = SECTIONS.flatMap((section, tab) =>
+  section.views.map((_, page) => ({ tab, page })),
+);
 
 /** Lines kept for the loading screen — it draws about 26 at a time. */
 const POOL_SIZE = 40;
@@ -121,86 +170,116 @@ function ScopeNotice() {
   );
 }
 
-function Page({
-  index,
+/**
+ * One section: its segmented control and the pager holding its views.
+ *
+ * The pager stops at the section's own edges. A swipe never crosses into
+ * another section — sections are chosen from the bar, deliberately, and a
+ * horizontal drag that can land you three destinations away is the fault the
+ * old thirteen-page rail had.
+ */
+function SectionPager({
+  views,
+  page,
+  onPage,
   active,
-  model,
-  prs,
-  social,
-  activity,
-  activityLoading,
-  onDisconnect,
-  onOpenPull,
   width,
+  render,
 }: {
-  index: number;
-  /** True only for the page currently on screen — gates animation. */
+  views: readonly SectionView[];
+  page: number;
+  onPage: (index: number) => void;
   active: boolean;
-  model: GitHubModel;
-  prs: PrsState;
-  social: SocialState;
-  activity: Activity;
-  activityLoading: boolean;
-  onDisconnect: () => void;
-  onOpenPull: (pull: OpenPull) => void;
   width: number;
+  render: (name: ScreenName, live: boolean) => React.ReactNode;
 }) {
-  const name = SCREENS[index];
+  const pager = useRef<ScrollView>(null);
+  const shown = useRef(page);
+
+  // Also runs when the section comes back into view: a pager that has been
+  // `display: none` cannot be trusted to have kept its offset, and landing
+  // on view one while the control says view three is worse than a jump.
+  useEffect(() => {
+    if (!active) return;
+    pager.current?.scrollTo({ animated: shown.current !== page, x: page * width });
+    shown.current = page;
+  }, [active, page, width]);
+
   return (
-    <View style={{ width }}>
-      {name === 'hey' && (
-        <HeyScreen model={model} onDisconnect={onDisconnect} social={social} />
-      )}
-      {name === 'now' && <NowScreen model={model} />}
-      {name === 'clock' && (
-        <ClockScreen activity={activity} loading={activityLoading} />
-      )}
-      {name === 'flow' && <FlowScreen model={model} />}
-      {name === 'poster' && <PosterScreen model={model} />}
-      {name === 'orbit' && <OrbitScreen active={active} model={model} />}
-      {name === 'weather' && <WeatherScreen model={model} />}
-      {name === 'cards' && <CardsScreen activity={activity} model={model} />}
-      {name === 'index' && (
-        <IndexScreen
-          onOpen={(pr) => onOpenPull({ repo: pr.repo, number: pr.number })}
-          state={prs}
+    <>
+      {views.length > 1 && (
+        <Segments
+          current={page}
+          items={views.map((view) => view.label)}
+          onSelect={onPage}
         />
       )}
-      {name === 'brief' && (
-        <BriefScreen
-          activity={activity}
-          loading={activityLoading}
-          onOpen={(pr) => onOpenPull({ repo: pr.repo, number: pr.number })}
-        />
-      )}
-      {name === 'review' && (
-        <ReviewScreen activity={activity} loading={activityLoading} />
-      )}
-      {name === 'dots' && <DotsScreen model={model} />}
-      {name === 'archive' && <ArchiveScreen model={model} />}
-    </View>
+      <ScrollView
+        horizontal
+        keyboardDismissMode="on-drag"
+        onMomentumScrollEnd={(event) => {
+          const next = Math.round(event.nativeEvent.contentOffset.x / width);
+          shown.current = next;
+          onPage(next);
+        }}
+        pagingEnabled
+        ref={pager}
+        showsHorizontalScrollIndicator={false}
+        style={styles.pager}
+      >
+        {views.map((view, index) => (
+          <View key={view.name} style={{ width }}>
+            {render(view.name, active && index === page)}
+          </View>
+        ))}
+      </ScrollView>
+    </>
   );
+}
+
+/** Events that are addressed to you rather than about you — the tab count. */
+function wantsYou(social: SocialState): number {
+  if (social.status !== 'ready') return 0;
+  return social.events.filter(
+    (event) =>
+      event.kind === 'review-request' ||
+      event.kind === 'mention' ||
+      (event.kind === 'review' && event.state === 'CHANGES_REQUESTED'),
+  ).length;
 }
 
 export default function Home() {
   const [token, setToken] = useState<TokenState>(undefined);
-  const [page, setPage] = useState(0);
+  const [tab, setTab] = useState(0);
+  // One page per section, so a section is where you left it when you come
+  // back to it — which is what a tab bar promises.
+  const [pages, setPages] = useState<number[]>(() => SECTIONS.map(() => 0));
+  const [visited, setVisited] = useState<number[]>([0]);
   const [openPull, setOpenPull] = useState<OpenPull | null>(null);
-  const pager = useRef<ScrollView>(null);
   const { width } = useWindowDimensions();
+
+  const section = SECTIONS[tab].key;
+  const view = SECTIONS[tab].views[pages[tab]]?.name ?? SECTIONS[tab].views[0].name;
 
   const contributions = useContributions(token ?? null);
   const scopes = useTokenScopes(token ?? null);
   const model = contributions.status === 'ready' ? contributions.model : null;
   const login = model?.login ?? null;
-  const prs = useOpenPrs(token ?? null, login, page === PRS_PAGE);
-  // The feed lives on the front door, so it starts the moment we know who you
-  // are rather than waiting for a page to come into view.
-  const social = useSocial(token ?? null, login, page <= 1);
+  const prs = useOpenPrs(token ?? null, login, section === 'work');
+  // The inbox is the reason to open the app, so it is fetched from the first
+  // section rather than waiting for its own tab: the count on the bar has to
+  // be true before you tap it.
+  const social = useSocial(
+    token ?? null,
+    login,
+    section === 'inbox' || section === 'today',
+  );
+  // Commit timestamps and PR bodies are a second, heavier request — asked
+  // for one view before anything needs them, never on launch.
   const activityState = useActivity(
     token ?? null,
     login,
-    ACTIVITY_PAGES.some((target) => Math.abs(page - target) <= 1),
+    section === 'work' || view === 'weather' || view === 'clock',
   );
   const activity =
     activityState.status === 'ready' ? activityState.activity : EMPTY_ACTIVITY;
@@ -277,12 +356,22 @@ export default function Home() {
 
   useEffect(() => {
     tokenStore.get().then((stored) => {
-      // Web preview shortcut: #demo or #demo/4 boots fake data on a screen.
+      // Web preview shortcut: #demo or #demo/4 boots fake data on a view,
+      // numbered in reading order across every section.
       if (stored == null && Platform.OS === 'web') {
         const hash = window.location.hash;
         if (hash.startsWith('#demo')) {
           const pin = Number(hash.split('/')[1]);
-          if (pin >= 1 && pin <= SCREENS.length) setPage(pin - 1);
+          const target = FLAT[pin - 1];
+          if (target) {
+            setTab(target.tab);
+            setVisited([target.tab]);
+            setPages((current) =>
+              current.map((page, index) =>
+                index === target.tab ? target.page : page,
+              ),
+            );
+          }
           tokenStore.set(DEMO_TOKEN).then(() => setToken(DEMO_TOKEN));
           return;
         }
@@ -297,10 +386,20 @@ export default function Home() {
     }
   }, [model, token, words]);
 
-  const goTo = (index: number) => {
-    setPage(index);
-    pager.current?.scrollTo({ animated: true, x: index * width });
+  const goToTab = (index: number) => {
+    setTab(index);
+    // Sections mount the first time they are opened and stay mounted after
+    // that: paying for all fourteen views on launch is what the old pager
+    // did, and paying again on every tap is what a fresh mount would cost.
+    setVisited((current) =>
+      current.includes(index) ? current : [...current, index],
+    );
   };
+
+  const goToPage = (index: number, page: number) =>
+    setPages((current) =>
+      current.map((value, position) => (position === index ? page : value)),
+    );
 
   const disconnect = async () => {
     if (token !== DEMO_TOKEN) await clearWidget().catch(() => {});
@@ -309,9 +408,72 @@ export default function Home() {
     setRefreshWords(true);
     await tokenStore.clear();
     setToken(null);
-    setPage(0);
+    setTab(0);
+    setPages(SECTIONS.map(() => 0));
+    setVisited([0]);
     setOpenPull(null);
   };
+
+  const screen = (model: GitHubModel) =>
+    function render(name: ScreenName, live: boolean) {
+      switch (name) {
+        case 'hey':
+          return (
+            <HeyScreen
+              demo={token === DEMO_TOKEN}
+              model={model}
+              onDisconnect={disconnect}
+            />
+          );
+        case 'now':
+          return <NowScreen model={model} />;
+        case 'weather':
+          return <WeatherScreen model={model} />;
+        case 'clock':
+          return (
+            <ClockScreen
+              activity={activity}
+              loading={activityState.status === 'loading'}
+            />
+          );
+        case 'inbox':
+          return <InboxScreen onOpen={setOpenPull} state={social} />;
+        case 'index':
+          return (
+            <IndexScreen
+              onOpen={(pr) => setOpenPull({ repo: pr.repo, number: pr.number })}
+              state={prs}
+            />
+          );
+        case 'brief':
+          return (
+            <BriefScreen
+              activity={activity}
+              loading={activityState.status === 'loading'}
+              onOpen={(pr) => setOpenPull({ repo: pr.repo, number: pr.number })}
+            />
+          );
+        case 'review':
+          return (
+            <ReviewScreen
+              activity={activity}
+              loading={activityState.status === 'loading'}
+            />
+          );
+        case 'cards':
+          return <CardsScreen activity={activity} model={model} />;
+        case 'poster':
+          return <PosterScreen model={model} />;
+        case 'flow':
+          return <FlowScreen model={model} />;
+        case 'orbit':
+          return <OrbitScreen active={live} model={model} />;
+        case 'archive':
+          return <ArchiveScreen model={model} />;
+        case 'dots':
+          return <DotsScreen model={model} />;
+      }
+    };
 
   if (token === undefined) {
     return (
@@ -342,51 +504,44 @@ export default function Home() {
     );
   }
 
+  const tabs = SECTIONS.map((item) => ({
+    key: item.key,
+    label: item.key,
+    badge: item.key === 'inbox' ? wantsYou(social) : undefined,
+  }));
+
   return (
     <>
       <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
         <StatusBar style="dark" />
         <View style={styles.chrome}>
           <Wordmark size={20} />
-          <View style={styles.chromeRight}>
-            <Label>{SCREENS[page]}</Label>
-            <Pressable accessibilityRole="button" onPress={disconnect}>
-              <Label>{token === DEMO_TOKEN ? 'demo · exit' : 'disconnect'}</Label>
-            </Pressable>
-          </View>
+          <Label style={styles.handle}>
+            {model ? `~${model.login.toLowerCase()}` : ''}
+          </Label>
         </View>
 
         {scopes === 'limited' && <ScopeNotice />}
 
         <View style={styles.body}>
-          {model && (
-            <ScrollView
-              horizontal
-              keyboardDismissMode="on-drag"
-              onMomentumScrollEnd={(event) =>
-                setPage(Math.round(event.nativeEvent.contentOffset.x / width))
-              }
-              pagingEnabled
-              ref={pager}
-              showsHorizontalScrollIndicator={false}
-            >
-              {SCREENS.map((name, index) => (
-                <Page
-                  activity={activity}
-                  activityLoading={activityState.status === 'loading'}
-                  active={index === page && openPull === null}
-                  index={index}
-                  key={name}
-                  model={model}
-                  onDisconnect={disconnect}
-                  onOpenPull={setOpenPull}
-                  prs={prs}
-                  social={social}
-                  width={width}
-                />
-              ))}
-            </ScrollView>
-          )}
+          {model &&
+            SECTIONS.map((item, index) =>
+              visited.includes(index) ? (
+                <View
+                  key={item.key}
+                  style={index === tab ? styles.section : styles.hidden}
+                >
+                  <SectionPager
+                    active={index === tab && openPull === null}
+                    onPage={(page) => goToPage(index, page)}
+                    page={pages[index]}
+                    render={screen(model)}
+                    views={item.views}
+                    width={width}
+                  />
+                </View>
+              ) : null,
+            )}
 
           {contributions.status === 'error' && (
             <View style={styles.errorStack}>
@@ -402,11 +557,11 @@ export default function Home() {
           )}
         </View>
 
-        {model && <Rail names={SCREENS} onSelect={goTo} page={page} />}
+        {model && <TabBar current={tab} onSelect={goToTab} tabs={tabs} />}
       </SafeAreaView>
 
-      {/* Over the pager rather than inside it: the detail page has its own
-          horizontal scrollers, and nested inside the pager every one of them
+      {/* Over the sections rather than inside one: the detail page has its
+          own horizontal scrollers, and nested in a pager every one of them
           would lose its drag to the page swipe. */}
       {openPull && (
         <View style={styles.overlay}>
@@ -443,10 +598,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.gutter,
     paddingTop: 14,
   },
-  chromeRight: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    gap: 12,
+  handle: {
+    color: colors.ink40,
   },
   notice: {
     alignItems: 'center',
@@ -471,6 +624,17 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     justifyContent: 'center',
+  },
+  section: {
+    flex: 1,
+  },
+  // Kept mounted and off screen: React Native honours `display: none`, so a
+  // section that has been opened once keeps its state without drawing.
+  hidden: {
+    display: 'none',
+  },
+  pager: {
+    flex: 1,
   },
   errorStack: {
     alignItems: 'center',

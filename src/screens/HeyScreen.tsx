@@ -1,9 +1,7 @@
 import { Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { CrossField } from '../components/CrossField';
-import { SocialFeed } from '../components/SocialFeed';
 import { Body, Display, Label, Serif } from '../components/Type';
-import type { SocialState } from '../hooks/useSocial';
 import { insights, type GitHubModel } from '../lib/contributions';
 import { colors, fonts, radii } from '../theme';
 import { fmt, Page } from './shared';
@@ -11,17 +9,22 @@ import { fmt, Page } from './shared';
 /**
  * pin04 — Pantom's landing page. A serif greeting, a field of plus glyphs
  * standing in for the contribution year, and one sentence that carries five
- * statistics in five colours. This is the app's front door, so the activity
- * feed lives here too: the numbers are what you did, the feed is what other
- * people did about it.
+ * statistics in five colours.
+ *
+ * This is also where the account lives: the handle, the link out, and the
+ * one destructive action in the app. The activity feed used to sit under all
+ * of it and is now the `inbox` section — a feed below the fold of a greeting
+ * is a feed nobody reads twice, and the account is not something to hide
+ * behind a menu either.
  */
 export function HeyScreen({
   model,
-  social,
+  demo,
   onDisconnect,
 }: {
   model: GitHubModel;
-  social: SocialState;
+  /** Demo data is not a connection, so the button says what it undoes. */
+  demo: boolean;
   onDisconnect: () => void;
 }) {
   const { width } = useWindowDimensions();
@@ -32,7 +35,7 @@ export function HeyScreen({
   const levels = bucket(model.columns.flat().map((day) => day.level), 2);
 
   return (
-    <Page>
+    <Page fill>
       <Display>Hey,</Display>
       <Display style={styles.handle}>~{model.login.toLowerCase()}</Display>
 
@@ -74,11 +77,11 @@ export function HeyScreen({
           onPress={onDisconnect}
           style={styles.pill}
         >
-          <Label style={styles.pillLabel}>disconnect</Label>
+          <Label style={styles.pillLabel}>
+            {demo ? 'exit demo' : 'disconnect'}
+          </Label>
         </Pressable>
       </View>
-
-      <SocialFeed state={social} />
     </Page>
   );
 }
@@ -119,7 +122,11 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 26,
+    // Pushed to the foot of the page: with the feed gone this screen is a
+    // title page, and a title page's buttons sit on the bottom margin
+    // rather than halfway up an empty sheet.
+    marginTop: 'auto',
+    paddingTop: 26,
   },
   pill: {
     alignItems: 'center',
