@@ -402,6 +402,11 @@ invisible. As many of your lines as the cycle holds go into it, spaced so the la
 ends exactly on the cycle boundary, so the strip runs several messages rather than the
 same one over and over.
 
+**The space between two messages is a rule, not a hole.** It carries the same wave the
+pull request screens separate written things with — `Squiggle.tsx`'s amplitude 2.6,
+wavelength 13, 1.25 stroke at half ink — painted into the gap by `TextRenderer`. A strip
+of commit messages is writing rather than data, and the wave is how this app says so.
+
 Two things that must not come back: `fillAfter` on the animation (an interrupted turn
 parks the line off the left of the card until the next flip), and `setDisplayedChild` to
 kick the first turn off (asking for an animated show while the view is still being

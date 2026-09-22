@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
@@ -11,7 +12,9 @@ import androidx.annotation.FontRes
 import androidx.core.content.res.ResourcesCompat
 import androidx.glance.ImageProvider
 import app.githuh.R
+import kotlin.math.PI
 import kotlin.math.ceil
+import kotlin.math.sin
 
 /**
  * RemoteViews cannot be *handed* a Typeface, so widget text is painted onto a
@@ -34,6 +37,14 @@ object TextRenderer {
      * `-CYCLE_UNITS / (CYCLE_UNITS + 1)` of the bitmap's own width.
      */
     const val CYCLE_UNITS = 3
+
+    /** The app's wave, from `Squiggle.tsx`, in the same units. */
+    private const val AMPLITUDE_DP = 2.6f
+    private const val WAVELENGTH_DP = 13f
+    private const val STROKE_DP = 1.25f
+
+    /** How much of a gap is left clear at each end of the wave. */
+    private const val SQUIGGLE_INSET = 0.12f
 
     private val cache = HashMap<Int, Typeface>()
 
@@ -115,19 +126,70 @@ object TextRenderer {
         val canvas = Canvas(bitmap)
         val baseline = -metrics.ascent
 
+        val wave = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = faint
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeWidth = STROKE_DP * context.resources.displayMetrics.density
+        }
+        val middle = height / 2f
+
         // Drawn twice: the second run is clipped by the canvas and is only
         // there to fill the repeat at the end.
         var x = 0f
         while (x < bitmap.width) {
             for ((line, width) in taken) {
                 draw(canvas, line, x, baseline, inkPaint, faintPaint)
-                x += width + gap
+                x += width
+                // The space between two messages is a rule, not a hole: the
+                // same wave the pull request screens separate written things
+                // with, at the same amplitude and wavelength.
+                squiggle(
+                    canvas = canvas,
+                    paint = wave,
+                    from = x + gap * SQUIGGLE_INSET,
+                    to = x + gap * (1f - SQUIGGLE_INSET),
+                    middle = middle,
+                    density = context.resources.displayMetrics.density,
+                )
+                x += gap
             }
             // A cycle shorter than it should be would drift; hold the start of
             // each run on the cycle boundary.
             x = (x - span) + maxOf(span, cycle.toFloat())
         }
         return bitmap
+    }
+
+    /**
+     * `Squiggle.tsx`, painted: the app's hand-drawn rule, same amplitude and
+     * wavelength, sampled every couple of pixels so the curve never shows its
+     * facets. It is what fills the space between one commit message and the
+     * next, so the strip reads as a line of writing rather than as two
+     * messages with a hole between them.
+     */
+    private fun squiggle(
+        canvas: Canvas,
+        paint: Paint,
+        from: Float,
+        to: Float,
+        middle: Float,
+        density: Float,
+    ) {
+        val length = to - from
+        if (length <= 0f) return
+
+        val amplitude = AMPLITUDE_DP * density
+        val wavelength = WAVELENGTH_DP * density
+        val steps = ceil(length / (2f * density)).toInt().coerceAtLeast(2)
+
+        val path = Path()
+        for (step in 0..steps) {
+            val along = length * step / steps
+            val across = middle + sin(along / wavelength * 2.0 * PI).toFloat() * amplitude
+            if (step == 0) path.moveTo(from, across) else path.lineTo(from + along, across)
+        }
+        canvas.drawPath(path, paint)
     }
 
     private fun clip(
