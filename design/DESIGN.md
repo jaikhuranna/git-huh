@@ -353,7 +353,7 @@ Horizontal pager, 10 pages. Bottom rail: a horizontally scrolling mono label str
 Pin04 treatment: serif `Hey,` / `paste a token`, cross-grid texture behind, mono input with a
 hairline underline, filled black pill `connect`, ghost pill `try the demo`. Error text in `red`.
 
-## Widgets — two variants, both required
+## The widget
 
 ### Widget A — `GitHuhWidget` (nothing-mtui background)
 Background **must** come from the `nothing-mtui` token mapping:
@@ -363,8 +363,14 @@ Resolution order:
     `android.R.color.system_neutral1_50` / `system_neutral1_900`. This is what Nothing OS does.
  2. Otherwise → the static fallback the package ships, passed in the sync payload from JS
     (`nothingWidgetColors(null, mode)`), so JS stays the owner of the package.
-Elements use `widgetElements` (`#000` light / `#fff` dark) and the accent uses `widgetFood`
-(`#d71921`) — the only Nothing red in the whole project.
+Elements use `widgetElements` (`#000` light / `#fff` dark). **There is no accent.**
+`widgetFood` (`#d71921`) used to mark today and was the only Nothing red in the project;
+it is gone, and today is a plus instead — the field reads through shape, which is what
+the rest of the app does.
+
+**One padding, every side.** Glance's `Scaffold` pads the sides and the top and bottom by
+different amounts, so the card's border was never the same width twice; the card draws
+its own background, its own corner radius and a single `padding(14.dp)` instead.
 
 Layout, top to bottom — **two elements, and nothing else**:
  1. **A commit message of your own, travelling.** Mono 11, right to left, with the
@@ -375,7 +381,8 @@ Layout, top to bottom — **two elements, and nothing else**:
     absent or a different one every hour: a sync that carries no pool keeps the stored
     one rather than erasing it, and the pick hashes the day against each message instead
     of indexing a list the app reshuffles on every launch.
- 2. **The dot field** (below), which has the rest of the card.
+ 2. **The dot field** (below), which has the rest of the card. Today is a **plus**;
+    a peak day is a rounded square; everything else is a dot sized by level.
 
 The counts that used to sit between them — `N today` at 22sp, and the footer
 `{calendar total} this year · {openPrs} prs` — are **gone**. They are on every screen
@@ -425,13 +432,14 @@ Three rules, and all three exist because breaking one was visible on a real phon
    block of dead grid to the right of today on any card wider than the payload — which
    was every 4×2 card, because the payload used to carry eighteen weeks.
 
-### Widget B — `GitHuhBoardWidget` (pin08 board style)
-The urbit card: `#0B0B0A` card, `#F4F2ED` ink, **no Material You, no red**.
-Sigil + `~{login}` in IBM Plex Mono (ship `ibmplexmono.ttf` in `res/font`) — the handle
-stays here, because on this card the sigil *is* the design. Then the same equal-pitch dot
-field (white dots, radius by level, peak days squared off, **no accent**: the pin has none,
-so today reads through size alone), and a mono footer `{calendar total} this year ·
-{openPrs} prs`. Replaces the old "paper" widget.
+### There is no widget B
+
+`GitHuhBoardWidget` — the pin08 urbit card, sigil + `~handle` + halftone field — has
+been **deleted**. Two widgets of the same data, differing mostly in their surface, was
+one more than the home screen wanted, and the board card was the one still printing the
+handle back at its owner. The provider, its receiver, its `xml` and its string are gone;
+`GlyphRenderer` stays, because widget A's empty state is drawn with it.
+
 
 ## Data coverage
 

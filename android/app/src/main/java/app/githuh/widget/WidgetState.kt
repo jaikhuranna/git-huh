@@ -21,8 +21,6 @@ data class WidgetState(
      *  system theme without a second round trip to JS. */
     val bgLight: String,
     val bgDark: String,
-    /** nothing-mtui widgetFood — the accent, and the only red in the app. */
-    val food: String,
     val days: List<DayCell>,
     /**
      * A pool of the account's own commit subjects, shared with the loading
@@ -128,9 +126,6 @@ data class WidgetState(
                 ?.takeIf { it.isNotBlank() } ?: legacyBg
             val bgDark = mtui?.optJSONObject("dark")?.optString("bg")
                 ?.takeIf { it.isNotBlank() } ?: legacyBg
-            val food = mtui?.optJSONObject("dark")?.optString("food")
-                ?.takeIf { it.isNotBlank() } ?: "#d71921"
-
             return WidgetState(
                 login = json.getString("login"),
                 total = json.getInt("total"),
@@ -140,7 +135,6 @@ data class WidgetState(
                 openPrs = json.optInt("openPrs", 0),
                 bgLight = bgLight,
                 bgDark = bgDark,
-                food = food,
                 days = days,
                 // Absent in payloads written before 2.5; the card then goes
                 // without a masthead until the app syncs again.

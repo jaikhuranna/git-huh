@@ -1,5 +1,4 @@
 <resources>
   <string name="app_name">git-huh?</string>
-  <string name="widget_description">Contribution dots, Material You surface</string>
-  <string name="widget_board_description">Contribution card, board style</string>
+  <string name="widget_description">A commit of yours, and the year under it</string>
 </resources>

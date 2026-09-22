@@ -77,14 +77,8 @@ object DotFieldRenderer {
         heightPx: Int,
         rows: Int,
         ink: Int,
-        accent: Int,
         /** Alpha for a cell with no day behind it — the grid's own ghost. */
         emptyAlpha: Float,
-        /**
-         * Widget B's source pin has no accent colour at all, so there today
-         * reads through size alone and this is false.
-         */
-        markToday: Boolean = true,
     ): ImageProvider {
         val width = widthPx.coerceAtLeast(1)
         val height = heightPx.coerceAtLeast(1)
@@ -116,25 +110,30 @@ object DotFieldRenderer {
             for (row in 0 until rows) {
                 val day = if (week < 0) null else visible.getOrNull(week * rows + row)
                 val level = day?.level ?: 0
-                val today = markToday && day?.isToday == true
-
-                paint.color = when {
-                    today -> accent
-                    day == null -> withAlpha(ink, emptyAlpha)
-                    else -> withAlpha(ink, ALPHAS[level])
-                }
-
-                val size = cell * if (today) 1f else SCALES[level]
                 val cx = left + col * pitch + pitch / 2f
                 val cy = top + row * pitch + pitch / 2f
-                val box = RectF(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
+
+                // Today is a plus. It used to be the one red mark in the whole
+                // project, and a single accent colour is the one thing this
+                // app's language does not do — so today reads through shape
+                // now, in the same ink as every other day.
+                if (day?.isToday == true) {
+                    paint.color = withAlpha(ink, 1f)
+                    plus(canvas, paint, cx, cy, cell)
+                    continue
+                }
+
+                paint.color =
+                    if (day == null) withAlpha(ink, emptyAlpha) else withAlpha(ink, ALPHAS[level])
+
+                val size = cell * SCALES[level]
 
                 // A peak day squares off, so intensity is legible in the mark's
                 // shape as well as in its size — the widget is often looked at
                 // from across a room.
-                if (today || level >= 4) {
-                    val radius = size * 0.22f
-                    canvas.drawRoundRect(box, radius, radius, paint)
+                if (level >= 4) {
+                    val box = RectF(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
+                    canvas.drawRoundRect(box, size * 0.22f, size * 0.22f, paint)
                 } else {
                     canvas.drawCircle(cx, cy, size / 2f, paint)
                 }
@@ -142,6 +141,18 @@ object DotFieldRenderer {
         }
 
         return ImageProvider(bitmap)
+    }
+
+    /**
+     * Two bars on the cell's centre — the app's own mark, not a brand's. It
+     * fills its cell exactly, like the square a peak day gets, so the grid's
+     * pitch still reads through it.
+     */
+    private fun plus(canvas: Canvas, paint: Paint, cx: Float, cy: Float, cell: Float) {
+        val arm = cell * 0.5f
+        val bar = cell * 0.22f
+        canvas.drawRect(cx - arm, cy - bar / 2f, cx + arm, cy + bar / 2f, paint)
+        canvas.drawRect(cx - bar / 2f, cy - arm, cx + bar / 2f, cy + arm, paint)
     }
 
     private fun withAlpha(color: Int, alpha: Float): Int =

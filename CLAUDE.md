@@ -6,8 +6,8 @@
 has about you — a year of contributions, the languages, the repos, the pull
 requests and the arguments in them — rendered as a set of printed artefacts
 rather than as a dashboard. Thirteen screens, each one a pin from the
-"nothing github" Pinterest board (`design/board/`), plus two Android
-home-screen widgets.
+"nothing github" Pinterest board (`design/board/`), plus one Android
+home-screen widget.
 
 It is a personal app for one account at a time: you paste a token, it reads
 your year, and nothing leaves the device except requests to GitHub.
@@ -91,10 +91,11 @@ on-device from the last one.
 - `src/lib/` — GitHub GraphQL, the `GitHubModel` view model, seeded demo data.
 - `src/theme/index.ts` — every colour, font and radius. Use these tokens; do
   not invent values in screens.
-- `android/app/src/main/java/app/githuh/widget/` — both Glance widgets, plus
-  the three bitmap renderers they are built from (`TextRenderer`,
-  `GlyphRenderer`, `DotFieldRenderer`). Widget A is a travelling commit
-  message and the dot field, nothing else; the strip lives in
+- `android/app/src/main/java/app/githuh/widget/` — the Glance widget, plus
+  the three bitmap renderers it is built from (`TextRenderer`,
+  `GlyphRenderer`, `DotFieldRenderer`). It is a travelling commit message and
+  the dot field, nothing else: no counts, no accent, a plus for today, and one
+  14dp padding on every side. The strip lives in
   `res/layout/widget_strip.xml` and is the one view here that is not painted
   by Glance. See the widget trap below before touching it.
 - `preview/` — ten of the screens as HTML at 393×852, used to iterate on
@@ -108,18 +109,19 @@ and do not run `expo prebuild` without checking what it would overwrite.
 ## Design rules
 
 The app deliberately does **not** use the Nothing design language. No
-dot-matrix typeface, no Nothing red (`#D71921`), no grey-paper-plus-dot-grid
-combination. Type is Instrument Serif (display) + Inter (body) + IBM Plex
+dot-matrix typeface, no Nothing red (`#D71921`) **anywhere** — it was the
+widget's today mark until 2.8, and today is a plus now — no
+grey-paper-plus-dot-grid combination. Type is Instrument Serif (display) + Inter (body) + IBM Plex
 Mono (labels and data). Colour is six categorical brights used to distinguish
 categories, never a single brand accent.
 
-Nothing survives in exactly one place: **widget A's background**, which
+Nothing survives in exactly one place: **the widget's background**, which
 resolves `nothing-mtui`'s `widgetBg` token against the device's live Material
 You palette. That palette is read natively from
 `android.R.color.system_neutral1_*` and handed to JS over the widget bridge —
 calling `nothingWidgetColors(null, …)` returns the package's static fallback
-and silently stops tracking the wallpaper. Widget B (the board card) uses no
-Material You and no red at all.
+and silently stops tracking the wallpaper. The second widget (the pin08 board
+card) was deleted in 2.8; there is one widget now.
 
 Dots as texture are allowed only where the source pin is built from them:
 `now` (LED numerals), `dots` (the puzzle), `archive` (circle rows). Everywhere else use that pin's own device — crosses, ribbons,

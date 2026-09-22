@@ -37,11 +37,5 @@
       </intent-filter>
       <meta-data android:name="android.appwidget.provider" android:resource="@xml/git_huh_widget_info"/>
     </receiver>
-    <receiver android:name=".widget.GitHuhBoardWidgetReceiver" android:exported="false">
-      <intent-filter>
-        <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
-      </intent-filter>
-      <meta-data android:name="android.appwidget.provider" android:resource="@xml/git_huh_board_widget_info"/>
-    </receiver>
   </application>
 </manifest>

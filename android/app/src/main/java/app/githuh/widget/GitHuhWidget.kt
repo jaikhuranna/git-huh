@@ -21,8 +21,10 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.components.Scaffold
+import androidx.glance.appwidget.appWidgetBackground
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
@@ -31,6 +33,7 @@ import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
+import androidx.glance.layout.padding
 import app.githuh.MainActivity
 import app.githuh.R
 
@@ -43,8 +46,9 @@ import app.githuh.R
  * modes in the sync payload. So the card tracks the user's wallpaper the way
  * com.nothing.communitywidgets does.
  *
- * This is the only file in the project where Nothing red is allowed: it is
- * the package's own widgetFood token.
+ * Nothing's red is **not** here any more, and now sits nowhere in the project:
+ * today is a plus rather than a coloured square, so the field reads through
+ * shape like every other mark on it. Only the surface is still the package's.
  *
  * The card is **one of your own commit messages, travelling**, and the field
  * of the days under it. Nothing else: the counts that used to sit between
@@ -63,17 +67,13 @@ import app.githuh.R
  */
 private const val ROWS = 7
 
+/** One border, every side. */
 private val WIDGET_PADDING = 14.dp
 
 /** The strip, the size it is painted at, and the space under it. */
 private const val STRIP_SP = 11f
 private val STRIP_HEIGHT = 18.dp
-private val CHROME_HEIGHT = 26.dp
-
-private fun parse(hex: String?, fallback: Color): Color =
-    hex?.takeIf { it.isNotBlank() }
-        ?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
-        ?: fallback
+private val STRIP_GAP = 8.dp
 
 /**
  * Bitmap text cannot be swapped by a ColorProvider, so the ink colour has to
@@ -115,12 +115,19 @@ private fun Content(state: WidgetState?) {
     val ink = if (night) Color(0xFFFFFFFF) else Color(0xFF000000)
     val faint = if (night) Color(0x8CFFFFFF) else Color(0x8C000000)
 
-    Scaffold(
-        backgroundColor = ColorProvider(day = light, night = dark),
-        horizontalPadding = WIDGET_PADDING,
+    // Not Scaffold: it pads the sides and the top and bottom by different
+    // amounts, so the card's border was never the same width twice. One
+    // padding, all four sides, and the background drawn here rather than
+    // under someone else's insets.
+    Column(
         modifier = GlanceModifier
             .fillMaxSize()
+            .appWidgetBackground()
+            .background(ColorProvider(day = light, night = dark))
+            .cornerRadius(android.R.dimen.system_app_widget_background_radius)
+            .padding(WIDGET_PADDING)
             .clickable(actionStartActivity(MainActivity::class.java)),
+        verticalAlignment = Alignment.Top,
     ) {
         if (state == null) {
             EmptyContent(context, ink, faint)
@@ -131,7 +138,11 @@ private fun Content(state: WidgetState?) {
 }
 
 @androidx.compose.runtime.Composable
-private fun EmptyContent(context: Context, ink: Color, faint: Color) {
+private fun androidx.glance.layout.ColumnScope.EmptyContent(
+    context: Context,
+    ink: Color,
+    faint: Color,
+) {
     Column(
         modifier = GlanceModifier.fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically,
@@ -155,47 +166,40 @@ private fun EmptyContent(context: Context, ink: Color, faint: Color) {
 }
 
 @androidx.compose.runtime.Composable
-private fun FilledContent(
+private fun androidx.glance.layout.ColumnScope.FilledContent(
     context: Context,
     state: WidgetState,
     size: DpSize,
     ink: Color,
     faint: Color,
 ) {
+    // The card's own padding is already taken off by the Column above; these
+    // are the box the content actually has, and the field is whatever the
+    // strip leaves of it.
     val innerWidth = size.width - (WIDGET_PADDING * 2)
-    // Whatever the strip leaves. Now that the numbers are gone the field is
-    // the rest of the card, and the dots come up to a size that reads from
-    // across a room — DotFieldRenderer caps the pitch, not this.
-    val fieldHeight = (size.height - CHROME_HEIGHT).coerceAtLeast(28.dp)
+    val line = state.lineOfTheDay()
+    val chrome = if (line == null) 0.dp else STRIP_HEIGHT + STRIP_GAP
+    val fieldHeight = (size.height - (WIDGET_PADDING * 2) - chrome).coerceAtLeast(28.dp)
 
-    val red = parse(state.food, Color(0xFFD71921))
-
-    Column(
-        modifier = GlanceModifier.fillMaxSize(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val line = state.lineOfTheDay()
-        if (line != null) {
-            Strip(context, line, innerWidth, ink, faint)
-            Spacer(GlanceModifier.height(8.dp))
-        }
-
-        Image(
-            provider = DotFieldRenderer.render(
-                context = context,
-                days = state.days,
-                widthPx = innerWidth.toPx(context),
-                heightPx = fieldHeight.toPx(context),
-                rows = ROWS,
-                ink = ink.toArgb(),
-                accent = red.toArgb(),
-                emptyAlpha = 0.07f,
-            ),
-            contentDescription = "${state.todayCount} contributions today",
-            contentScale = ContentScale.Fit,
-            modifier = GlanceModifier.fillMaxWidth().height(fieldHeight),
-        )
+    if (line != null) {
+        Strip(context, line, innerWidth, ink, faint)
+        Spacer(GlanceModifier.height(STRIP_GAP))
     }
+
+    Image(
+        provider = DotFieldRenderer.render(
+            context = context,
+            days = state.days,
+            widthPx = innerWidth.toPx(context),
+            heightPx = fieldHeight.toPx(context),
+            rows = ROWS,
+            ink = ink.toArgb(),
+            emptyAlpha = 0.07f,
+        ),
+        contentDescription = "${state.todayCount} contributions today",
+        contentScale = ContentScale.Fit,
+        modifier = GlanceModifier.fillMaxWidth().height(fieldHeight),
+    )
 }
 
 /**

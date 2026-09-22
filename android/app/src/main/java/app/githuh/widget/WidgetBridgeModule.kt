@@ -32,7 +32,6 @@ class WidgetBridgeModule(
             WidgetState.write(reactContext, payload)
             CoroutineScope(Dispatchers.Default).launch {
                 GitHuhWidget().updateAll(reactContext)
-                GitHuhBoardWidget().updateAll(reactContext)
             }
             promise.resolve(null)
         } catch (error: Exception) {
@@ -67,7 +66,6 @@ class WidgetBridgeModule(
             WidgetState.clear(reactContext)
             CoroutineScope(Dispatchers.Default).launch {
                 GitHuhWidget().updateAll(reactContext)
-                GitHuhBoardWidget().updateAll(reactContext)
             }
             promise.resolve(null)
         } catch (error: Exception) {
