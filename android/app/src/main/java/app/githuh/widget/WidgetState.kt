@@ -52,6 +52,17 @@ data class WidgetState(
     fun lineOfTheDay(now: Long = System.currentTimeMillis()): Line? =
         lines.maxByOrNull { seed(now / 86_400_000L, it.message) }
 
+    /**
+     * The whole pool, turned so that today's line comes first. The strip runs
+     * several of them in a loop rather than the same one over and over, and
+     * which ones they are still moves with the date.
+     */
+    fun linesFromToday(now: Long = System.currentTimeMillis()): List<Line> {
+        val first = lineOfTheDay(now) ?: return emptyList()
+        val at = lines.indexOf(first).coerceAtLeast(0)
+        return lines.drop(at) + lines.take(at)
+    }
+
     companion object {
         private const val PREFS = "git_huh_widget"
         private const val KEY_PAYLOAD = "payload"

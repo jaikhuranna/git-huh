@@ -55,10 +55,11 @@ import app.githuh.R
  * them — `7 today`, `448 this year · 6 prs` — are on every screen in the app
  * and were the least interesting thing on the home screen.
  *
- * The strip travels right to left and carries the repository it was written
- * in at its end, in the faint ink, so a line says where the work was as well
- * as what it was. It is the one view on either widget that is not a bitmap —
- * a bitmap cannot move; see `res/layout/widget_strip.xml` for what it took.
+ * The strip travels right to left and carries the repository each line was
+ * written in after it, in the faint ink, so a line says where the work was as
+ * well as what it was. It runs several of your messages in a loop that starts
+ * on screen and never empties; see `res/layout/widget_strip.xml` and
+ * `TextRenderer.strip` for what that took.
  *
  * The handle is not a fallback for any of it. A card that printed the pool
  * when it had one and the handle when it did not was showing the handle far
@@ -177,12 +178,12 @@ private fun androidx.glance.layout.ColumnScope.FilledContent(
     // are the box the content actually has, and the field is whatever the
     // strip leaves of it.
     val innerWidth = size.width - (WIDGET_PADDING * 2)
-    val line = state.lineOfTheDay()
-    val chrome = if (line == null) 0.dp else STRIP_HEIGHT + STRIP_GAP
+    val lines = state.linesFromToday()
+    val chrome = if (lines.isEmpty()) 0.dp else STRIP_HEIGHT + STRIP_GAP
     val fieldHeight = (size.height - (WIDGET_PADDING * 2) - chrome).coerceAtLeast(28.dp)
 
-    if (line != null) {
-        Strip(context, line, innerWidth, ink, faint)
+    if (lines.isNotEmpty()) {
+        Strip(context, lines, innerWidth, ink, faint)
         Spacer(GlanceModifier.height(STRIP_GAP))
     }
 
@@ -205,12 +206,18 @@ private fun androidx.glance.layout.ColumnScope.FilledContent(
 /**
  * The travelling line.
  *
- * Both children of the flipper carry the same painted line, so the pass that
- * arrives is the pass that just left and the strip reads as continuous.
- * Nothing here starts the animation — the layout does, which is the only way
- * a widget can have one. `setDisplayedChild` is only to bring the first pass
- * forward: a ViewFlipper shows its first child without animating it, which
- * would leave the line sitting still for a whole interval after every sync.
+ * Both children of the flipper carry the same bitmap — a whole turn of the
+ * strip, with its own beginning repeated at the end — so the hand-over from
+ * one turn to the next lands on identical pixels, and the line the flipper
+ * shows at rest is the line the previous turn ended on.
+ *
+ * Nothing here starts the animation; the layout does, which is the only way a
+ * widget can have one at all. It is deliberately *not* kicked off with
+ * `setDisplayedChild` either: asking for an animated show while the view is
+ * still being applied, off the window, leaves the card blank until the first
+ * flip rescues it — a quarter of a minute of nothing. Shown plainly, the first
+ * child rests at the start of the cycle, so the line is on the card from the
+ * first frame and starts travelling at the first flip.
  *
  * Before API 31 a widget cannot be told the width of one of its own views, so
  * the strip cannot be carried past its own length and it is printed still,
@@ -219,29 +226,31 @@ private fun androidx.glance.layout.ColumnScope.FilledContent(
 @androidx.compose.runtime.Composable
 private fun Strip(
     context: Context,
-    line: WidgetState.Line,
+    lines: List<WidgetState.Line>,
     innerWidth: Dp,
     ink: Color,
     faint: Color,
 ) {
+    val first = lines.firstOrNull() ?: return
+
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
         Image(
             provider = TextRenderer.render(
                 context,
-                if (line.repo.isBlank()) line.message else "${line.message}   ${line.repo}",
+                if (first.repo.isBlank()) first.message else "${first.message}   ${first.repo}",
                 STRIP_SP,
                 ink.toArgb(),
                 maxWidthDp = innerWidth.value,
             ),
-            contentDescription = line.message,
+            contentDescription = first.message,
         )
         return
     }
 
     val bitmap = TextRenderer.strip(
         context = context,
-        message = line.message,
-        repo = line.repo,
+        lines = lines,
+        unitPx = innerWidth.toPx(context),
         ink = ink.toArgb(),
         faint = faint.toArgb(),
         sizeSp = STRIP_SP,
@@ -252,7 +261,6 @@ private fun Strip(
             setImageViewBitmap(id, bitmap)
             setViewLayoutWidth(id, bitmap.width.toFloat(), TypedValue.COMPLEX_UNIT_PX)
         }
-        setDisplayedChild(R.id.strip, 1)
     }
 
     AndroidRemoteViews(views, GlanceModifier.fillMaxWidth().height(STRIP_HEIGHT))

@@ -1,13 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  One pass of the strip: in from beyond the right edge of the card
-  (`100%p` — the parent's width) until the line's own width has carried it
-  off the left (`-100%` — its own). Linear, because a commit message is being
-  read rather than presented.
+  One turn of the strip.
+
+  It starts where the line already is — at the card's left edge, readable the
+  moment the widget is drawn — and carries it left by exactly the cycle, which
+  is three quarters of the bitmap's own width (`TextRenderer.CYCLE_UNITS`, 3 of
+  4). The last quarter of the bitmap is a repeat of its first quarter, so when
+  the flipper starts the next turn from zero the pixels do not change: no seam,
+  and no gap.
+
+  It used to start at `100%p`, beyond the right edge of the card, which meant
+  five seconds of empty card at the top of every pass before the first letter
+  arrived. Do not put it back.
+
+  `fillAfter` is deliberately absent. A turn that is interrupted — and the one
+  started at bind time, before the view is attached, often is — would otherwise
+  leave the line parked off the left of the card until the next flip, which is
+  a quarter of a minute of empty card. Without it the line falls back to its
+  resting position, which is the start of the cycle: the same pixels the turn
+  would have ended on, so nothing jumps and the card is never empty.
 -->
 <translate xmlns:android="http://schemas.android.com/apk/res/android"
-    android:fromXDelta="100%p"
-    android:toXDelta="-100%"
-    android:duration="12000"
-    android:fillAfter="true"
+    android:fromXDelta="0%"
+    android:toXDelta="-75%"
+    android:duration="16000"
     android:interpolator="@android:anim/linear_interpolator" />

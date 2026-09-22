@@ -17,15 +17,16 @@
   width at bind time (`setViewLayoutWidth`), which is what lets the animation
   carry the whole message off the left-hand edge.
 
-  Two children holding the same line, flipped at exactly the length of one
-  pass: as one finishes crossing, the next begins.
+  Two children holding the same bitmap, flipped at exactly the length of one
+  turn. The turn ends on pixels identical to the ones it started on, so the
+  hand-over is invisible and the strip never stops or empties.
 -->
 <ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/strip"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:autoStart="true"
-    android:flipInterval="12000"
+    android:flipInterval="16000"
     android:inAnimation="@anim/strip_in"
     android:outAnimation="@anim/strip_out">
 

@@ -389,7 +389,27 @@ The counts that used to sit between them — `N today` at 22sp, and the footer
 in the app, and a home screen is not where they were wanted. `widgetFood` survives as
 today's mark in the field, which is still the only Nothing red in the project.
 
-**How the strip moves, and why it is built the way it is.** A widget cannot animate
+**The strip is a loop, and it starts on the card.** It used to enter from beyond the
+right edge (`fromXDelta="100%p"`), which meant five seconds of empty card at the top of
+every pass — you sat waiting for a message to arrive. It now starts where it rests, at
+the card's left edge, and travels left.
+
+The bitmap is one whole turn plus a repeat of its own beginning: `CYCLE_UNITS` (3) card
+widths of messages, then a fourth card width that duplicates the first. The animation
+carries the view left by exactly the cycle — `-75%` of the bitmap's own width — so the
+pixels it ends on are the pixels it started on and the flip to the next turn is
+invisible. As many of your lines as the cycle holds go into it, spaced so the last one
+ends exactly on the cycle boundary, so the strip runs several messages rather than the
+same one over and over.
+
+Two things that must not come back: `fillAfter` on the animation (an interrupted turn
+parks the line off the left of the card until the next flip), and `setDisplayedChild` to
+kick the first turn off (asking for an animated show while the view is still being
+applied leaves the card blank for a quarter of a minute). Shown plainly, the first child
+rests at the start of the cycle: the line is on the card from the first frame and starts
+travelling at the first flip.
+
+**Why it is built the way it is.** A widget cannot animate
 anything from Kotlin, and the marquee everyone reaches for is not available either: a
 TextView only marquees while it is selected, `View.setSelected` is not a
 `@RemotableViewMethod`, and asking for it through `RemoteViews.setBoolean` takes the

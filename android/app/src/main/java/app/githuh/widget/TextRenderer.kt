@@ -28,6 +28,13 @@ import kotlin.math.ceil
  */
 object TextRenderer {
 
+    /**
+     * Card-widths in one turn of the strip. The bitmap is one wider than this;
+     * see `strip`. Keep it in step with `R.anim.strip_in`, whose `toXDelta` is
+     * `-CYCLE_UNITS / (CYCLE_UNITS + 1)` of the bitmap's own width.
+     */
+    const val CYCLE_UNITS = 3
+
     private val cache = HashMap<Int, Typeface>()
 
     @Synchronized
@@ -50,19 +57,24 @@ object TextRenderer {
     }
 
     /**
-     * The travelling line as one bitmap: the message in the ink, the
-     * repository after it in the faint ink.
+     * The strip's whole loop, painted as one bitmap.
      *
-     * A Bitmap rather than an ImageProvider, because the view that carries it
-     * has to be laid out to exactly this width — the animation that takes the
-     * strip off the left of the card is expressed as "its own width", so a
-     * view any wider or narrower than the line either cuts the message short
-     * or leaves a long wait after it.
+     * It is `CYCLE_UNITS + 1` card-widths across: the cycle itself, and then
+     * the beginning of the cycle repeated once more. The animation carries the
+     * view left by exactly the cycle — three quarters of this bitmap — so the
+     * moment it wraps, the pixels in the card are the pixels that were already
+     * there. There is no seam and there is no gap, which a strip that entered
+     * from beyond the right edge had five seconds of at the top of every pass.
+     *
+     * As many of the account's lines as the cycle holds go into it, and the
+     * space between them is stretched so the last one ends exactly where the
+     * cycle does. A Bitmap rather than an ImageProvider because the view that
+     * carries it has to be laid out to exactly this width.
      */
     fun strip(
         context: Context,
-        message: String,
-        repo: String,
+        lines: List<WidgetState.Line>,
+        unitPx: Int,
         ink: Int,
         faint: Int,
         sizeSp: Float,
@@ -70,20 +82,87 @@ object TextRenderer {
     ): Bitmap {
         val inkPaint = paint(context, sizeSp, ink, font, 0f)
         val faintPaint = paint(context, sizeSp, faint, font, 0f)
-
-        val head = if (repo.isBlank()) message else "$message   "
-        val headWidth = inkPaint.measureText(head)
-        val tailWidth = if (repo.isBlank()) 0f else faintPaint.measureText(repo)
-
         val metrics = inkPaint.fontMetrics
-        val width = ceil(headWidth + tailWidth).toInt().coerceAtLeast(1)
         val height = ceil(metrics.descent - metrics.ascent).toInt().coerceAtLeast(1)
 
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val unit = unitPx.coerceAtLeast(1)
+        val cycle = unit * CYCLE_UNITS
+        val minGap = inkPaint.measureText("      ")
+
+        val taken = ArrayList<Pair<WidgetState.Line, Float>>()
+        var used = 0f
+        for (line in lines) {
+            val width = measure(line, inkPaint, faintPaint)
+            if (taken.isEmpty()) {
+                // The first line goes in whatever it costs, but not at the
+                // price of a loop longer than the animation travels: a message
+                // wider than the whole cycle is cut to fit it.
+                val fitted = if (width <= cycle - minGap) line else clip(line, cycle - minGap, inkPaint, faintPaint)
+                taken.add(fitted to measure(fitted, inkPaint, faintPaint))
+                used += taken.last().second
+                continue
+            }
+            if (used + width + minGap * (taken.size + 1) > cycle) break
+            taken.add(line to width)
+            used += width
+        }
+        if (taken.isEmpty()) return Bitmap.createBitmap(1, height, Bitmap.Config.ARGB_8888)
+
+        val gap = ((cycle - used) / taken.size).coerceAtLeast(minGap)
+        val span = used + gap * taken.size
+
+        val bitmap = Bitmap.createBitmap(cycle + unit, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        canvas.drawText(head, 0f, -metrics.ascent, inkPaint)
-        if (repo.isNotBlank()) canvas.drawText(repo, headWidth, -metrics.ascent, faintPaint)
+        val baseline = -metrics.ascent
+
+        // Drawn twice: the second run is clipped by the canvas and is only
+        // there to fill the repeat at the end.
+        var x = 0f
+        while (x < bitmap.width) {
+            for ((line, width) in taken) {
+                draw(canvas, line, x, baseline, inkPaint, faintPaint)
+                x += width + gap
+            }
+            // A cycle shorter than it should be would drift; hold the start of
+            // each run on the cycle boundary.
+            x = (x - span) + maxOf(span, cycle.toFloat())
+        }
         return bitmap
+    }
+
+    private fun clip(
+        line: WidgetState.Line,
+        limit: Float,
+        ink: TextPaint,
+        faint: TextPaint,
+    ): WidgetState.Line {
+        val room = limit - if (line.repo.isBlank()) 0f else faint.measureText(line.repo) + ink.measureText("   ")
+        val message = TextUtils.ellipsize(line.message, ink, room.coerceAtLeast(0f), TextUtils.TruncateAt.END)
+        return line.copy(message = message.toString())
+    }
+
+    private fun measure(line: WidgetState.Line, ink: TextPaint, faint: TextPaint): Float =
+        if (line.repo.isBlank()) {
+            ink.measureText(line.message)
+        } else {
+            ink.measureText("${line.message}   ") + faint.measureText(line.repo)
+        }
+
+    private fun draw(
+        canvas: Canvas,
+        line: WidgetState.Line,
+        x: Float,
+        baseline: Float,
+        ink: TextPaint,
+        faint: TextPaint,
+    ) {
+        if (line.repo.isBlank()) {
+            canvas.drawText(line.message, x, baseline, ink)
+            return
+        }
+        val head = "${line.message}   "
+        canvas.drawText(head, x, baseline, ink)
+        canvas.drawText(line.repo, x + ink.measureText(head), baseline, faint)
     }
 
     /**
