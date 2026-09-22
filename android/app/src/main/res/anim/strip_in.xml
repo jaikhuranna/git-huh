@@ -3,11 +3,10 @@
   One turn of the strip.
 
   It starts where the line already is — at the card's left edge, readable the
-  moment the widget is drawn — and carries it left by exactly the cycle, which
-  is three quarters of the bitmap's own width (`TextRenderer.CYCLE_UNITS`, 3 of
-  4). The last quarter of the bitmap is a repeat of its first quarter, so when
-  the flipper starts the next turn from zero the pixels do not change: no seam,
-  and no gap.
+  moment the widget is drawn — and carries the frame left by exactly one card
+  width, which is half of a frame's own width. The next frame begins one width
+  further along the loop, so when it is shown at rest the pixels do not change:
+  no seam, and no gap.
 
   It used to start at `100%p`, beyond the right edge of the card, which meant
   five seconds of empty card at the top of every pass before the first letter
@@ -22,6 +21,6 @@
 -->
 <translate xmlns:android="http://schemas.android.com/apk/res/android"
     android:fromXDelta="0%"
-    android:toXDelta="-75%"
-    android:duration="16000"
+    android:toXDelta="-50%"
+    android:duration="6000"
     android:interpolator="@android:anim/linear_interpolator" />

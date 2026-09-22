@@ -32,9 +32,10 @@ import kotlin.math.sin
 object TextRenderer {
 
     /**
-     * Card-widths in one turn of the strip. The bitmap is one wider than this;
-     * see `strip`. Keep it in step with `R.anim.strip_in`, whose `toXDelta` is
-     * `-CYCLE_UNITS / (CYCLE_UNITS + 1)` of the bitmap's own width.
+     * Card-widths in one turn of the loop, and so the number of frames the
+     * flipper holds. Each frame is two widths; a turn carries it one, which is
+     * why `R.anim.strip_in` translates by `-50%` of a frame's own width and
+     * why `widget_strip.xml` has exactly this many children.
      */
     const val CYCLE_UNITS = 3
 
@@ -68,19 +69,20 @@ object TextRenderer {
     }
 
     /**
-     * The strip's whole loop, painted as one bitmap.
+     * The strip's loop, painted as one frame per card-width of it.
      *
-     * It is `CYCLE_UNITS + 1` card-widths across: the cycle itself, and then
-     * the beginning of the cycle repeated once more. The animation carries the
-     * view left by exactly the cycle — three quarters of this bitmap — so the
-     * moment it wraps, the pixels in the card are the pixels that were already
-     * there. There is no seam and there is no gap, which a strip that entered
-     * from beyond the right edge had five seconds of at the top of every pass.
+     * Each frame is two card widths of the cycle, starting one width further
+     * along than the last, and the flipper shows them in turn. That buys two
+     * things at once. With animations, a frame slides exactly one width during
+     * its turn and hands over to the next frame on identical pixels — a
+     * continuous scroll with no seam. **Without** them — and some launchers
+     * simply do not run a widget's animations — the frames still change every
+     * turn, so the strip advances a card width at a time instead of freezing
+     * on the same sentence forever.
      *
-     * As many of the account's lines as the cycle holds go into it, and the
-     * space between them is stretched so the last one ends exactly where the
-     * cycle does. A Bitmap rather than an ImageProvider because the view that
-     * carries it has to be laid out to exactly this width.
+     * It also means a turn is one width rather than the whole cycle, so motion
+     * resumes within seconds of anything that resets the flipper, rather than
+     * within a quarter of a minute.
      */
     fun strip(
         context: Context,
@@ -90,7 +92,7 @@ object TextRenderer {
         faint: Int,
         sizeSp: Float,
         @FontRes font: Int = R.font.ibmplexmono,
-    ): Bitmap {
+    ): List<Bitmap> {
         val inkPaint = paint(context, sizeSp, ink, font, 0f)
         val faintPaint = paint(context, sizeSp, faint, font, 0f)
         val metrics = inkPaint.fontMetrics
@@ -108,7 +110,9 @@ object TextRenderer {
                 // The first line goes in whatever it costs, but not at the
                 // price of a loop longer than the animation travels: a message
                 // wider than the whole cycle is cut to fit it.
-                val fitted = if (width <= cycle - minGap) line else clip(line, cycle - minGap, inkPaint, faintPaint)
+                val fitted =
+                    if (width <= cycle - minGap) line
+                    else clip(line, cycle - minGap, inkPaint, faintPaint)
                 taken.add(fitted to measure(fitted, inkPaint, faintPaint))
                 used += taken.last().second
                 continue
@@ -117,48 +121,50 @@ object TextRenderer {
             taken.add(line to width)
             used += width
         }
-        if (taken.isEmpty()) return Bitmap.createBitmap(1, height, Bitmap.Config.ARGB_8888)
+        if (taken.isEmpty()) {
+            return listOf(Bitmap.createBitmap(1, height, Bitmap.Config.ARGB_8888))
+        }
 
         val gap = ((cycle - used) / taken.size).coerceAtLeast(minGap)
-        val span = used + gap * taken.size
-
-        val bitmap = Bitmap.createBitmap(cycle + unit, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val baseline = -metrics.ascent
-
-        val wave = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val density = context.resources.displayMetrics.density
+        val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = faint
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
-            strokeWidth = STROKE_DP * context.resources.displayMetrics.density
+            strokeWidth = STROKE_DP * density
         }
+        val baseline = -metrics.ascent
         val middle = height / 2f
 
-        // Drawn twice: the second run is clipped by the canvas and is only
-        // there to fill the repeat at the end.
-        var x = 0f
-        while (x < bitmap.width) {
-            for ((line, width) in taken) {
-                draw(canvas, line, x, baseline, inkPaint, faintPaint)
-                x += width
-                // The space between two messages is a rule, not a hole: the
-                // same wave the pull request screens separate written things
-                // with, at the same amplitude and wavelength.
-                squiggle(
-                    canvas = canvas,
-                    paint = wave,
-                    from = x + gap * SQUIGGLE_INSET,
-                    to = x + gap * (1f - SQUIGGLE_INSET),
-                    middle = middle,
-                    density = context.resources.displayMetrics.density,
-                )
-                x += gap
+        return List(CYCLE_UNITS) { frame ->
+            val bitmap = Bitmap.createBitmap(unit * 2, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            canvas.translate(-(frame * unit).toFloat(), 0f)
+
+            // Two turns of the cycle, which is always enough to cover the two
+            // widths this frame shows, wherever in the cycle it starts.
+            var x = 0f
+            repeat(2) { run ->
+                x = (run * cycle).toFloat()
+                for ((line, width) in taken) {
+                    draw(canvas, line, x, baseline, inkPaint, faintPaint)
+                    x += width
+                    // The space between two messages is a rule, not a hole: the
+                    // same wave the pull request screens separate written things
+                    // with, at the same amplitude and wavelength.
+                    squiggle(
+                        canvas = canvas,
+                        paint = wavePaint,
+                        from = x + gap * SQUIGGLE_INSET,
+                        to = x + gap * (1f - SQUIGGLE_INSET),
+                        middle = middle,
+                        density = density,
+                    )
+                    x += gap
+                }
             }
-            // A cycle shorter than it should be would drift; hold the start of
-            // each run on the cycle boundary.
-            x = (x - span) + maxOf(span, cycle.toFloat())
+            bitmap
         }
-        return bitmap
     }
 
     /**

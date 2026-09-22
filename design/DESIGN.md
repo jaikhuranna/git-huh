@@ -394,11 +394,15 @@ right edge (`fromXDelta="100%p"`), which meant five seconds of empty card at the
 every pass — you sat waiting for a message to arrive. It now starts where it rests, at
 the card's left edge, and travels left.
 
-The bitmap is one whole turn plus a repeat of its own beginning: `CYCLE_UNITS` (3) card
-widths of messages, then a fourth card width that duplicates the first. The animation
-carries the view left by exactly the cycle — `-75%` of the bitmap's own width — so the
-pixels it ends on are the pixels it started on and the flip to the next turn is
-invisible. As many of your lines as the cycle holds go into it, spaced so the last one
+The loop is painted as one frame per card width — `CYCLE_UNITS` (3) of them, each two
+widths long and starting one width further along than the last — and the flipper shows
+them in turn. A turn slides a frame exactly one width (`-50%` of its own width) and hands
+over to the next frame on identical pixels, so the scroll is continuous and the flip is
+invisible. **Frames rather than one long bitmap for two reasons**: a turn is then six
+seconds rather than a quarter of a minute, so motion resumes quickly after anything that
+resets the flipper; and a launcher that declines to run a widget's animations still gets
+a strip that advances a card width every turn instead of one frozen on a single
+sentence. As many of your lines as the cycle holds go into it, spaced so the last one
 ends exactly on the cycle boundary, so the strip runs several messages rather than the
 same one over and over.
 

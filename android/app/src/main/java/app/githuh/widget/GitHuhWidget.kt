@@ -206,10 +206,10 @@ private fun androidx.glance.layout.ColumnScope.FilledContent(
 /**
  * The travelling line.
  *
- * Both children of the flipper carry the same bitmap — a whole turn of the
- * strip, with its own beginning repeated at the end — so the hand-over from
- * one turn to the next lands on identical pixels, and the line the flipper
- * shows at rest is the line the previous turn ended on.
+ * Each child of the flipper holds the next card-width of the loop, so the
+ * hand-over from one turn to the next lands on identical pixels — and a
+ * launcher that declines to run the animation still gets a strip that advances
+ * a width every turn rather than one that never moves at all.
  *
  * Nothing here starts the animation; the layout does, which is the only way a
  * widget can have one at all. It is deliberately *not* kicked off with
@@ -247,7 +247,7 @@ private fun Strip(
         return
     }
 
-    val bitmap = TextRenderer.strip(
+    val frames = TextRenderer.strip(
         context = context,
         lines = lines,
         unitPx = innerWidth.toPx(context),
@@ -256,10 +256,12 @@ private fun Strip(
         sizeSp = STRIP_SP,
     )
 
+    val ids = intArrayOf(R.id.strip_a, R.id.strip_b, R.id.strip_c)
     val views = RemoteViews(context.packageName, R.layout.widget_strip).apply {
-        for (id in intArrayOf(R.id.strip_a, R.id.strip_b)) {
-            setImageViewBitmap(id, bitmap)
-            setViewLayoutWidth(id, bitmap.width.toFloat(), TypedValue.COMPLEX_UNIT_PX)
+        for ((index, id) in ids.withIndex()) {
+            val frame = frames[index % frames.size]
+            setImageViewBitmap(id, frame)
+            setViewLayoutWidth(id, frame.width.toFloat(), TypedValue.COMPLEX_UNIT_PX)
         }
     }
 

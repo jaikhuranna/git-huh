@@ -17,16 +17,19 @@
   width at bind time (`setViewLayoutWidth`), which is what lets the animation
   carry the whole message off the left-hand edge.
 
-  Two children holding the same bitmap, flipped at exactly the length of one
-  turn. The turn ends on pixels identical to the ones it started on, so the
-  hand-over is invisible and the strip never stops or empties.
+  One child per card-width of the loop (`TextRenderer.CYCLE_UNITS`), each
+  holding the next two widths of it. A turn slides a frame exactly one width
+  and hands over to the next frame on identical pixels, so the scroll is
+  continuous and seamless — and if the launcher declines to run the animation
+  at all, the frames still change every turn and the strip advances a width at
+  a time rather than sitting on one sentence for ever.
 -->
 <ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/strip"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:autoStart="true"
-    android:flipInterval="16000"
+    android:flipInterval="6000"
     android:inAnimation="@anim/strip_in"
     android:outAnimation="@anim/strip_out">
 
@@ -39,6 +42,13 @@
 
     <ImageView
         android:id="@+id/strip_b"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:scaleType="center"
+        android:contentDescription="@null" />
+
+    <ImageView
+        android:id="@+id/strip_c"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:scaleType="center"
