@@ -396,6 +396,35 @@ export function repoMonths(
   }));
 }
 
+/**
+ * When the newest sampled commit in a repository landed, as epoch ms, or
+ * null when the sample never reached that repo.
+ *
+ * This is not `pushedAt`. GitHub bumps `pushedAt` for a tag, a branch
+ * deletion or a fork sync — anything that moves a ref — so sorting a deck of
+ * repositories by it puts repos you have not written a line in at the top.
+ *
+ * The sample keeps a local day and a local hour rather than a timestamp, so
+ * this resolves to the hour. That is enough to order a day's work; without
+ * the hour, every repo touched today ties and the deck falls back to
+ * whatever order GitHub happened to return.
+ */
+export function lastCommitAt(
+  commits: CommitSample[],
+  repo: string,
+): number | null {
+  let latest: number | null = null;
+  for (const commit of commits) {
+    if (commit.repo !== repo) continue;
+    const at = Date.parse(
+      `${commit.date}T${String(commit.hour).padStart(2, '0')}:00:00`,
+    );
+    if (Number.isNaN(at)) continue;
+    if (latest === null || at > latest) latest = at;
+  }
+  return latest;
+}
+
 /** Every commit message, newest first — the loading screen reads these. */
 export function commitMessages(commits: CommitSample[]): string[] {
   return commits.map((commit) => commit.message).filter((m) => m.trim().length > 0);

@@ -5,9 +5,11 @@ import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg
 import { LanguageChip } from '../components/LanguageChip';
 import { Data, Label } from '../components/Type';
 import {
+  lastCommitAt,
   monthWindow,
   repoMonths,
   type Activity,
+  type CommitSample,
   type MonthBar,
 } from '../lib/activity';
 import type { GitHubModel, RepoSummary } from '../lib/contributions';
@@ -46,18 +48,30 @@ export function CardsScreen({
   // one card sits over the same month as the bar above it.
   const axis = useMemo(() => monthWindow(MONTHS), []);
 
+  // Newest work on top. GitHub hands the list back in `pushedAt` order and
+  // that is not the same question — see `lastTouched`.
+  const deck = useMemo(
+    () =>
+      model.repos
+        .map((repo) => ({ repo, at: lastTouched(repo, activity.commits) }))
+        .sort((a, b) => b.at - a.at)
+        .slice(0, 12),
+    [activity.commits, model.repos],
+  );
+
   return (
     <Page>
       <ScreenHead left="repositories" right={`${fmt(model.repoCount)} owned`} />
 
       <View style={styles.deck}>
-        {model.repos.slice(0, 12).map((repo, index) => (
+        {deck.map(({ repo, at }, index) => (
           <RepoCard
             axis={axis}
             index={index}
             key={repo.nameWithOwner}
             months={repoMonths(activity.commits, repo.nameWithOwner, MONTHS)}
             repo={repo}
+            touched={at}
             width={cardWidth}
           />
         ))}
@@ -67,18 +81,36 @@ export function CardsScreen({
   );
 }
 
+/**
+ * When a repository last had a commit written in it, as epoch ms.
+ *
+ * Not `pushedAt`: GitHub bumps that for anything that moves a ref — a tag, a
+ * branch deletion, a fork sync — so a deck sorted by it can open on a
+ * repository nobody has written a line in for a year. The sampled history
+ * has the real answer wherever it reaches, and `pushedAt` is the fallback for
+ * the repos below the sample.
+ */
+function lastTouched(repo: RepoSummary, commits: CommitSample[]): number {
+  const sampled = lastCommitAt(commits, repo.nameWithOwner);
+  if (sampled !== null) return sampled;
+  return repo.pushedAt ? Date.parse(repo.pushedAt) : 0;
+}
+
 function RepoCard({
   repo,
   index,
   width,
   months,
   axis,
+  touched,
 }: {
   repo: RepoSummary;
   index: number;
   width: number;
   months: MonthBar[];
   axis: MonthBar[];
+  /** Epoch ms of the last commit — the same value the deck is sorted by. */
+  touched: number;
 }) {
   const seed = hash(repo.nameWithOwner);
   // A small, stable tilt per card — the pin's deck is never square.
@@ -130,7 +162,9 @@ function RepoCard({
             <Data style={styles.metaText}>{repo.language.name}</Data>
           </View>
         )}
-        <Data style={styles.metaText}>{ago(repo.pushedAt)}</Data>
+        <Data style={styles.metaText}>
+          {touched > 0 ? ago(new Date(touched).toISOString()) : '—'}
+        </Data>
         {repo.isPrivate && <Data style={styles.metaText}>private</Data>}
       </View>
     </Pressable>

@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Text as SvgText } from 'react-native-svg';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { Label } from '../components/Type';
-import { useTicker } from '../hooks/useTicker';
-import { colors, fonts } from '../theme';
+import { colors, fallbacks, fonts } from '../theme';
 
 const PITCH = 26;
 const FONT = 13;
@@ -19,10 +23,8 @@ const BOTTOM = 58;
 const AMPLITUDE = 0.38;
 /** How far the wave slips between one row and the next. */
 const ROW_SLIP = 0.05;
-/** Cycles of the wave per second — one slow breath rather than a flicker. */
-const WAVE_HZ = 0.2;
-/** Rows the field drifts upward per second. */
-const DRIFT = 0.28;
+/** Seconds for the wave to travel one full cycle. */
+const CYCLE_MS = 5000;
 const MAX_GLYPHS = 20;
 /**
  * Rows per message. pin11 reads as a wave because it is one phrase over and
@@ -31,10 +33,14 @@ const MAX_GLYPHS = 20;
  * message holds for a band of rows before the next one takes over.
  */
 const BAND = 5;
-/** Rows drawn past each edge so text enters and leaves mid-glyph. */
-const OVERSCAN = 2;
-/** Depth of the soft edge at the top and bottom of the field. */
-const FADE = PITCH * 1.6;
+/**
+ * Phases the wave is sampled at before it is handed to the native animation
+ * driver, which interpolates linearly between them. Sixteen samples of a sine
+ * are accurate to about a sixth of a pixel at this amplitude — far below the
+ * point where a letter looks like it is in the wrong place.
+ */
+const SAMPLES = 16;
+const PHASES = Array.from({ length: SAMPLES + 1 }, (_, i) => i / SAMPLES);
 
 /**
  * pin11 — one phrase set again and again, its tracking warped line by line
@@ -44,11 +50,19 @@ const FADE = PITCH * 1.6;
  * messages, taken from across your whole history. Loading is the only moment
  * in the app with nothing to show, so it shows what you have already written.
  *
- * Two motions, both driven off the same clock: the wave travels across the
- * rows, and the whole block drifts upward so messages you have not seen keep
- * arriving from the bottom. Both are functions of elapsed seconds rather than
- * of frame count, so the speed holds steady when a frame is late — a timer
- * stepping a counter, which is what this used to be, visibly stutters.
+ * **Nothing about this animation runs in JavaScript.** Every glyph is its own
+ * `Animated.Text`, and the whole track it will travel — its x at sixteen
+ * phases of the wave — is computed once at mount and handed to the native
+ * driver as an interpolation. One looping value drives all of them, on the
+ * UI thread, so the letters keep sliding at the display's refresh rate even
+ * while the first GitHub request is parsing on the JS thread.
+ *
+ * The two versions before this one both animated from JS: a timer stepping a
+ * counter (visibly steppy at ~16 fps), then `requestAnimationFrame` (correct
+ * timing, still slow). Both re-rendered the whole field every frame and made
+ * react-native-svg re-shape thirty rows of text with it, which no amount of
+ * scheduling makes cheap. Plain text views and a transform each cost nothing
+ * per frame, because per frame there is nothing left to do.
  */
 export function LoadingScreen({
   lines,
@@ -62,11 +76,25 @@ export function LoadingScreen({
   // is dropped ("instanceHandle is null, event of type topLayout"), which left
   // the field blank with only the caption drawn.
   const { width, height } = useWindowDimensions();
-  const seconds = useTicker();
+
+  const [wave] = useState(() => new Animated.Value(0));
+  const [enter] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(wave, {
+        duration: CYCLE_MS,
+        easing: Easing.linear,
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [wave]);
 
   // The field arrives rather than appearing — a hard cut to a full page of
   // type is the one moment this screen looks like a crash.
-  const [enter] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(enter, {
       duration: 520,
@@ -76,52 +104,36 @@ export function LoadingScreen({
   }, [enter]);
 
   const source = lines.length > 0 ? lines : PLACEHOLDER;
-  const visible = Math.max(1, Math.ceil((height - TOP - BOTTOM) / PITCH));
-  const rows = visible + OVERSCAN * 2;
-
-  const scroll = seconds * DRIFT;
-  const shift = Math.floor(scroll);
-  const frac = scroll - shift;
-  const phase = seconds * WAVE_HZ;
-
-  // Glyph strings are pure text work and change only when the pool does.
-  const texts = useMemo(() => source.map(glyphs), [source]);
+  const rows = Math.max(1, Math.floor((height - TOP - BOTTOM) / PITCH));
+  const field = useMemo(() => build(source, rows, width), [rows, source, width]);
 
   return (
     <View style={styles.field}>
-      <Animated.View style={{ opacity: enter }}>
-        {/* The sub-row part of the drift is one transform on the stack
-            rather than a fresh offset on every row. */}
-        <View
-          style={[styles.stack, { transform: [{ translateY: -frac * PITCH }] }]}
-        >
-          {Array.from({ length: rows }, (_, row) => {
-            // Which line of the endless scroll this slot is showing.
-            const line = row + shift - OVERSCAN;
-            const text = texts[mod(Math.floor(line / BAND), texts.length)];
-            const y = TOP + (row - OVERSCAN - frac) * PITCH;
-            return (
-              // One canvas per row rather than one for the whole field.
-              // Inside a single <Svg>, react-native-svg shapes every row in
-              // one pass, and at a full page of text in a downloaded font
-              // that pass corrupts the heap: the app dies with a SIGSEGV
-              // inside Fabric's mounting coordinator before it has drawn a
-              // frame. Per-row canvases keep each pass small. Same picture.
-              <Svg height={PITCH} key={row} width={width}>
-                <SvgText
-                  fill={colors.onBlack}
-                  fontFamily={fonts.sansBold}
-                  fontSize={FONT}
-                  opacity={edgeFade(y, height)}
-                  x={positions(text.length, width, phase + line * ROW_SLIP)}
-                  y={FONT}
-                >
-                  {text}
-                </SvgText>
-              </Svg>
-            );
-          })}
-        </View>
+      <Animated.View style={[styles.block, { opacity: enter }]}>
+        {field.map((glyph) => (
+          <Animated.Text
+            key={glyph.key}
+            style={[
+              // A font-load failure must still draw readable type, the way
+              // every primitive in Type.tsx does.
+              { fontFamily: fallbacks.sans },
+              styles.glyph,
+              {
+                top: glyph.top,
+                transform: [
+                  {
+                    translateX: wave.interpolate({
+                      inputRange: PHASES,
+                      outputRange: glyph.track,
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            {glyph.char}
+          </Animated.Text>
+        ))}
       </Animated.View>
 
       <View style={styles.caption}>
@@ -132,58 +144,80 @@ export function LoadingScreen({
   );
 }
 
-/**
- * Positive remainder. Negative lines exist — the field scrolls up, so the
- * slot above the top edge is line −1 — and `%` in JavaScript keeps the sign,
- * which would index off the front of the pool.
- */
-function mod(value: number, size: number): number {
-  return ((value % size) + size) % size;
+interface Glyph {
+  key: string;
+  char: string;
+  top: number;
+  /** x at each phase in `PHASES`, which is the whole animation. */
+  track: number[];
 }
 
 /**
- * Rows soften out rather than clipping. The field drifts upward, so a line
- * fades up out of the caption at the bottom and dissolves under the status
- * bar at the top; a hard edge at either end turns the drift into a jump.
+ * Every glyph on screen, with the path it will follow.
+ *
+ * Spaces are dropped rather than laid out: they are a third of some commit
+ * messages and a view that draws nothing is still a view to mount.
  */
-function edgeFade(y: number, height: number): number {
-  const leaving = (y - (TOP - FADE)) / FADE;
-  const entering = (height - BOTTOM - y) / FADE;
-  return Math.max(0, Math.min(1, leaving, entering));
+function build(source: string[], rows: number, width: number): Glyph[] {
+  const out: Glyph[] = [];
+
+  for (let row = 0; row < rows; row++) {
+    const text = clipped(source[Math.floor(row / BAND) % source.length]);
+    const top = TOP + row * PITCH - FONT;
+
+    for (let index = 0; index < text.length; index++) {
+      const char = text[index];
+      if (char === ' ') continue;
+      out.push({
+        key: `${row}:${index}`,
+        char,
+        top,
+        // Each row's own phase offset is baked in here, which is what makes
+        // the wave travel down the block instead of every row moving as one.
+        track: PHASES.map((phase) =>
+          positionAt(index, text.length, width, phase + row * ROW_SLIP),
+        ),
+      });
+    }
+  }
+
+  return out;
 }
 
 /**
- * The glyphs of one line, upper case and clipped. Every glyph gets its own x
- * below, so a long message would squeeze the tracking flat and lose the wave.
+ * The glyphs of one line, upper case and clipped. Every glyph is placed
+ * individually below, so a long message would squeeze the tracking flat and
+ * lose the wave.
  */
-function glyphs(message: string): string {
+function clipped(message: string): string {
   const upper = message.toUpperCase().trim();
   return upper.length > MAX_GLYPHS ? upper.slice(0, MAX_GLYPHS) : upper;
 }
 
 /**
- * Where each glyph of a row sits.
+ * Where one glyph of a row sits at one phase of the wave.
  *
- * Both ends are pinned to the margins and the letters between them are pushed
- * around by one cycle of a sine, so a row is bunched where the previous row is
- * spread. Slipping the phase row by row turns that into a wave travelling down
- * the block — which is the whole of pin11.
+ * Both ends of the row are pinned to the margins and the letters between them
+ * are pushed around by one cycle of a sine, so a row is bunched where the
+ * previous row is spread. Slipping the phase row by row turns that into a
+ * wave travelling down the block — which is the whole of pin11.
  */
-function positions(count: number, width: number, phase: number): number[] {
+function positionAt(
+  index: number,
+  count: number,
+  width: number,
+  phase: number,
+): number {
   // The last glyph is drawn *from* its x, so the track stops a glyph short of
   // the right margin — otherwise wide rows run off the edge.
   const span = width - MARGIN * 2 - FONT * 0.72;
-  if (count <= 1) return [MARGIN];
+  if (count <= 1) return MARGIN;
 
+  const t = index / (count - 1);
   const base = Math.sin(-2 * Math.PI * phase);
-  return Array.from({ length: count }, (_, index) => {
-    const t = index / (count - 1);
-    const warped =
-      t +
-      (AMPLITUDE / (2 * Math.PI)) *
-        (Math.sin(2 * Math.PI * (t - phase)) - base);
-    return MARGIN + warped * span;
-  });
+  const warped =
+    t + (AMPLITUDE / (2 * Math.PI)) * (Math.sin(2 * Math.PI * (t - phase)) - base);
+  return MARGIN + warped * span;
 }
 
 /**
@@ -208,12 +242,24 @@ const styles = StyleSheet.create({
   field: {
     backgroundColor: colors.klein,
     flex: 1,
-    justifyContent: 'flex-start',
   },
-  stack: {
-    // Puts the first visible row's baseline on TOP, with the overscan rows
-    // sitting above the screen edge.
-    marginTop: TOP - FONT - OVERSCAN * PITCH,
+  block: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  glyph: {
+    color: colors.onBlack,
+    fontFamily: fonts.sansBold,
+    fontSize: FONT,
+    // Android pads text views by the font's own ascent, which would put every
+    // row a few points below where the wave says it is.
+    includeFontPadding: false,
+    left: 0,
+    lineHeight: FONT * 1.3,
+    position: 'absolute',
   },
   caption: {
     bottom: 0,

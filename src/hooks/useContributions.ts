@@ -33,6 +33,7 @@ interface SettledResult {
 const EMPTY_STATS: ContributionStats = {
   todayCommits: 0,
   totalCommits: 0,
+  totalPrivate: 0,
   openPrs: 0,
   followers: 0,
   following: 0,

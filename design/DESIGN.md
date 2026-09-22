@@ -3,6 +3,10 @@
 Source of truth: the Pinterest board **"nothing github"** (10 pins), saved at `design/board/pin01..pin10`.
 Every app screen is one pin, rendered with real GitHub data.
 
+This file is the **per-screen spec**. The rules that hold across every screen —
+colour, type, space, motion, patterns, the prohibitions — live in
+**`design/LANGUAGE.md`**, and that is the one to read first.
+
 ## Hard rules
 
 1. **No Nothing design language in the app.** No DotGothic16 anywhere in `src/` or `app/`.
@@ -165,30 +169,54 @@ bar above it. Sizing each card's axis to its own commits instead produced a card
 bar labelled `s` above a card showing twelve — two charts that look comparable and are not.
 A repo the commit sample never reached draws the same axis and says `outside the commit sample`
 across it rather than implying a year of silence.
-Bottom row of the card: mono `★ {stars}  ⑂ {forks}  {language mark + name}  {pushed}`.
+Bottom row of the card: mono `★ {stars}  ⑂ {forks}  {language mark + name}  {last commit}`.
 Tap opens the repo.
+
+The deck is ordered by **when the repository last had a commit written in it**,
+newest on top — not by `pushedAt`, which GitHub bumps for anything that moves a
+ref (a tag, a branch deletion, a fork sync) and which therefore opens the deck
+on repos nobody has touched in months. The sampled history answers it to the
+hour wherever it reaches; `pushedAt` is the fallback below the sample, and the
+age printed on the card is the same value the deck sorted by.
 
 *(Superseded: the body used to be a halftone field keyed off `hash(repo, col, row)` — a texture
 that looked like data and encoded none. Every mark on the card is now a real month.)*
 
 ### 8. `index` — pin03 (correspondence storage)
-Canvas, **edge to edge**: masthead at the top, the drawer lip and its plate pinned to the
-bottom, cards filed between them. Header centered mono caps `PULL REQUESTS`, left `Ch. 3 /`,
-right `/ {count}`.
-A stack of filing cards: each PR is a white row with a hairline border, offset left by
-`min(rank,6) * 9px`, so the rows step like the pin's index.
-A **black tab** rides the left of each row carrying `#{number}` in mono onBlack.
-Row content: repo in mono ink70, title in Inter 400 14 ink (2 lines max), and on the right a
-black-filled date block `{MON}–{MON}` style age (`3d` / `SEP` / `AUG–SEP`).
-Draft PRs get the fully-inverted treatment (black row, onBlack text) like the pin's black cards.
-Filter tabs `open {n} / draft {n}` in the pin's tab style.
 
-Under the last card the drawer keeps going in **empty slots** down to the lip — the pin is a
-*full* drawer, and an empty slot is part of that picture in a way that half a page of blank
-canvas is not. How many is measured, not guessed: a card is one or two lines deep depending on
-its title, so the slot count comes from the drawer's height minus the stack's.
+Canvas, **edge to edge**: masthead at the top, the drawer lip and its plate
+pinned to the bottom, and the drawer itself between them. Header centered mono
+caps `PULL REQUESTS`, left `Ch. 3 /`, right `/ {count}`. Filter tabs
+`open {n} / draft {n}` in the pin's tab style.
+
+The thing that makes the pin read as a drawer is not the rows — it is the
+**black guide tabs** standing above them, each naming the group of cards filed
+behind it. So this screen **files by repository**:
+
+- one **guide tab** per repo: solid black, mono `owner/name` in `onBlack`, its
+  open-PR count in `onBlack55`, with the tab's 2px baseline carried to the page
+  edge as the top of the folder;
+- the pull requests filed behind it as `card` rows sharing one border, each
+  with a black number tab down its left edge, the title (2 lines max) and a
+  mono `ink40` age on the right;
+- folders step right by `min(rank,4) × 8px`, cards by a further 12px;
+- the repo name appears **once, on the tab** — not repeated down every row,
+  which is what the flat list used to do.
+
+Under the last folder, the rest of the drawer is drawn as the **top edges of
+empty cards**: one hairline per edge at a 15px pitch, stepping right and
+pulling in from the right as it recedes, fading out with depth, with a tab
+notch every fourth edge where the next guide card would stand. How many is
+measured — the drawer's height minus the folders' — because a card is one or
+two lines deep depending on its title.
 
 **Tapping a card opens it** (`pull`, below) rather than leaving for the browser.
+
+*(Superseded twice. The first version was a flat list floating in half a page of
+nothing with the caption riding up under it. The second filled that space with
+grey slot bars and gave every draft the pin's fully-inverted treatment, which
+turned the draft tab into a black wall. Inversion now lives on the guide tabs
+alone — one strong black element per group rather than one per row.)*
 
 ### 9. `dots` — pin01 (connect the dots)
 White canvas, ink only. Title mono `join the dots` + right mono `streak {n}`.
@@ -224,19 +252,20 @@ Glyphs are positioned individually (`<Text x={[…]}>`): both ends pinned to the
 letters between them pushed by one cycle of a sine whose phase slips per row and travels while
 you wait. Amplitude is capped so the tightest gap still clears a capital M.
 
-Two motions, both functions of **elapsed seconds** off one `requestAnimationFrame` ticker
-(`useTicker`): the wave travels at 0.2 Hz, and the whole block drifts upward at 0.28 rows a
-second so unseen messages keep arriving from the bottom. A timer stepping a counter — which is
-what this was — runs at whatever rate the timer fires and stutters visibly. Rows soften out at
-both edges rather than clipping against the status bar and the caption, and the field fades in
-over half a second instead of cutting to a full page of type.
+**Nothing about the animation runs in JavaScript.** Every glyph is its own `Animated.Text`, and
+the whole track it will travel — its x at sixteen phases of the wave — is computed once at mount
+and handed to the native driver as an interpolation. One looping value drives all of them, on
+the UI thread, so the letters keep sliding at the display's refresh rate while the first GitHub
+response is being parsed on the JS thread. Measured: 60 fps, under 1% janky frames. The field
+fades in over half a second rather than cutting to a full page of type.
 
-**One `<Svg>` per row, not one for the field.** Inside a single canvas, react-native-svg shapes
-every row's glyphs in one pass, and at a full page of text in a downloaded font that pass
-corrupts the heap: the app dies with a `SIGSEGV` inside Fabric's `MountingCoordinator` before it
-draws a frame. Reproducible on an x86_64 emulator; the trigger is total glyph count, and it goes
-away with either the custom font or the shared canvas removed. Per-row canvases keep each pass
-small and draw exactly the same picture.
+*(Two superseded versions, both animating from JS. A `setInterval` stepping a counter every
+60 ms was visibly steppy at ~16 fps. A `requestAnimationFrame` ticker fixed the timing but not
+the cost: both re-rendered the whole field every frame and made react-native-svg re-shape thirty
+rows of text with it. The rAF version also had to draw one `<Svg>` per row to dodge a heap
+corruption in react-native-svg's text pass — a page of glyphs in a downloaded font inside one
+canvas kills the process with a `SIGSEGV` in Fabric's mounting coordinator. Plain text views and
+a native transform removed both problems at once, and per frame there is now nothing to do.)*
 
 #### Where the words come from
 

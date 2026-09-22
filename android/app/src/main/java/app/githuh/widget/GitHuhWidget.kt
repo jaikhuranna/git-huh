@@ -4,9 +4,9 @@ import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.glance.ContentScale
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -18,19 +18,15 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.components.Scaffold
-import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
-import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
-import androidx.glance.layout.size
 import androidx.glance.layout.width
 import app.githuh.MainActivity
 
@@ -45,15 +41,19 @@ import app.githuh.MainActivity
  *
  * This is the only file in the project where Nothing red is allowed: it is
  * the package's own widgetFood token.
+ *
+ * The masthead is **one of your own commit messages**, picked by the date and
+ * held for the day. It replaced the sigil and the `~handle` because those two
+ * elements spent a line of a very small card telling their owner their own
+ * name; a line out of your history is the thing on this card you cannot get
+ * by looking at the phone.
  */
 private const val ROWS = 7
 
 private val WIDGET_PADDING = 14.dp
-private val DOT_GAP = 3.dp
-private val TARGET_DOT = 9.dp
 
-/** Handle row + the hero line + footer + the spacers between them. */
-private val CHROME_HEIGHT = 76.dp
+/** Masthead + the hero line + footer + the spacers between them. */
+private val CHROME_HEIGHT = 84.dp
 
 private fun parse(hex: String?, fallback: Color): Color =
     hex?.takeIf { it.isNotBlank() }
@@ -118,18 +118,11 @@ private fun EmptyContent(context: Context, ink: Color, faint: Color) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                provider = GlyphRenderer.render(context, 16f, ink.toArgb()),
-                contentDescription = null,
-            )
-            Spacer(GlanceModifier.width(8.dp))
-            Image(
-                provider = TextRenderer.render(context, "~githuh", 11f, faint.toArgb()),
-                contentDescription = "git-huh?",
-            )
-        }
-        Spacer(GlanceModifier.height(6.dp))
+        Image(
+            provider = GlyphRenderer.render(context, 16f, ink.toArgb()),
+            contentDescription = null,
+        )
+        Spacer(GlanceModifier.height(8.dp))
         Image(
             provider = TextRenderer.render(
                 context,
@@ -151,19 +144,15 @@ private fun FilledContent(
     faint: Color,
 ) {
     val innerWidth = size.width - (WIDGET_PADDING * 2)
+    val fieldHeight = (size.height - CHROME_HEIGHT).coerceIn(28.dp, 104.dp)
 
-    // The reported size is only a hint for how many week-columns to show.
-    // Launchers under-report it often enough that laying the grid out at a
-    // fixed pitch left it stranded in the left quarter of the card, so the
-    // columns are weighted and fill whatever width actually exists.
-    val columns = ((innerWidth + DOT_GAP) / (TARGET_DOT + DOT_GAP))
-        .toInt()
-        .coerceIn(10, 20)
-    // Derive the row pitch from the height that is actually left after the
-    // handle, the hero number and the footer, or the bottom rows of the week
-    // get clipped off a short widget.
-    val cellHeight = ((size.height - CHROME_HEIGHT - DOT_GAP * (ROWS - 1)) / ROWS)
-        .coerceIn(4.dp, 11.dp)
+    // Only the *shape* of the box is taken from the reported size, never its
+    // absolute value: launchers under-report both dimensions, but they tend to
+    // get the ratio right, and the field is scaled to fit whatever space it
+    // actually lands in. Seven rows of weeks against a wide, short card wants
+    // more columns than a square one.
+    val aspect = (innerWidth / fieldHeight).coerceIn(1.4f, 3.4f)
+    val columns = (ROWS * aspect).toInt().coerceIn(10, 24)
 
     val red = parse(state.food, Color(0xFFD71921))
 
@@ -171,34 +160,28 @@ private fun FilledContent(
         modifier = GlanceModifier.fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                provider = GlyphRenderer.render(context, 18f, ink.toArgb()),
-                contentDescription = null,
-            )
-            Spacer(GlanceModifier.width(8.dp))
-            Image(
-                provider = TextRenderer.render(
-                    context,
-                    "~${state.login.lowercase()}",
-                    10f,
-                    faint.toArgb(),
-                ),
-                contentDescription = state.login,
-            )
-        }
+        Image(
+            provider = TextRenderer.render(
+                context,
+                state.lineOfTheDay() ?: "~${state.login.lowercase()}",
+                10f,
+                ink.toArgb(),
+                maxWidthDp = innerWidth.value,
+            ),
+            contentDescription = state.lineOfTheDay() ?: state.login,
+        )
 
-        Spacer(GlanceModifier.height(6.dp))
+        Spacer(GlanceModifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.Bottom) {
             Image(
                 provider = TextRenderer.render(
                     context,
-                    "%,d".format(state.todayCommits),
+                    "%,d".format(state.todayCount),
                     22f,
-                    if (state.todayCommits > 0) red.toArgb() else ink.toArgb(),
+                    if (state.todayCount > 0) red.toArgb() else ink.toArgb(),
                 ),
-                contentDescription = "${state.todayCommits} commits today",
+                contentDescription = "${state.todayCount} contributions today",
             )
             Spacer(GlanceModifier.width(6.dp))
             Image(
@@ -209,69 +192,35 @@ private fun FilledContent(
 
         Spacer(GlanceModifier.height(8.dp))
 
-        DotMatrix(state, columns, cellHeight, ink, red)
+        Image(
+            provider = DotFieldRenderer.render(
+                context = context,
+                days = state.days,
+                columns = columns,
+                rows = ROWS,
+                ink = ink.toArgb(),
+                accent = red.toArgb(),
+                emptyAlpha = 0.07f,
+            ),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = GlanceModifier.fillMaxWidth().height(fieldHeight),
+        )
 
-        Spacer(GlanceModifier.height(6.dp))
+        Spacer(GlanceModifier.height(8.dp))
 
         Image(
             provider = TextRenderer.render(
                 context,
-                "%,d commits · %,d prs".format(state.totalCommits, state.openPrs),
+                // The calendar total, which counts private work. The old
+                // footer printed the public commit count next to a grid drawn
+                // from the calendar, so the two disagreed on the same card.
+                "%,d this year · %,d prs".format(state.total, state.openPrs),
                 8f,
                 faint.toArgb(),
+                maxWidthDp = innerWidth.value,
             ),
             contentDescription = null,
         )
-    }
-}
-
-@androidx.compose.runtime.Composable
-private fun DotMatrix(
-    state: WidgetState,
-    columns: Int,
-    cellHeight: Dp,
-    ink: Color,
-    red: Color,
-) {
-    // Intensity has to change the size of the mark, not just its colour.
-    // Previously this scale only fed the corner radius while every cell was
-    // drawn at full size, so the whole field rendered as identical squares.
-    val dotScales = floatArrayOf(0.30f, 0.50f, 0.70f, 0.88f, 1.0f)
-    val dotAlphas = floatArrayOf(0.30f, 0.52f, 0.74f, 0.9f, 1.0f)
-
-    val visible = state.days.takeLast(columns * ROWS)
-
-    Column(modifier = GlanceModifier.fillMaxWidth()) {
-        for (row in 0 until ROWS) {
-            Row(modifier = GlanceModifier.fillMaxWidth()) {
-                for (col in 0 until columns) {
-                    val day = visible.getOrNull(col * ROWS + row)
-                    val isToday = day?.isToday == true
-                    val level = day?.level ?: 0
-                    val dot = cellHeight * dotScales[level]
-                    val color = when {
-                        day == null -> ink.copy(alpha = 0.07f)
-                        isToday -> red
-                        else -> ink.copy(alpha = dotAlphas[level])
-                    }
-                    // Each column takes an equal share of the real width, so
-                    // the field spans the card whatever size Glance reports.
-                    Box(
-                        modifier = GlanceModifier
-                            .defaultWeight()
-                            .height(cellHeight),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Box(
-                            modifier = GlanceModifier
-                                .size(dot)
-                                .cornerRadius(if (isToday || level >= 4) 2.dp else dot)
-                                .background(color),
-                        ) {}
-                    }
-                }
-            }
-            if (row < ROWS - 1) Spacer(GlanceModifier.height(DOT_GAP))
-        }
     }
 }

@@ -17,6 +17,7 @@ const CONTRIBUTIONS_QUERY = /* GraphQL */ `
       createdAt
       contributionsCollection {
         contributionYears
+        restrictedContributionsCount
         contributionCalendar {
           totalContributions
           weeks {
@@ -75,6 +76,7 @@ const contributionsSchema = z.object({
     createdAt: z.string(),
     contributionsCollection: z.object({
       contributionYears: z.array(z.number().int()),
+      restrictedContributionsCount: z.number().int().nonnegative(),
       contributionCalendar: calendarSchema,
       totalCommitContributions: z.number().int().nonnegative(),
       totalPullRequestContributions: z.number().int().nonnegative(),
@@ -113,6 +115,7 @@ const repoNodeSchema = z.object({
 const todayBucketSchema = z.object({
   contributionsCollection: z.object({
     totalCommitContributions: z.number().int().nonnegative(),
+    restrictedContributionsCount: z.number().int().nonnegative(),
   }),
 });
 
@@ -120,6 +123,7 @@ const todayBucketSchema = z.object({
 const yearBucketSchema = z.object({
   contributionsCollection: z.object({
     totalCommitContributions: z.number().int().nonnegative(),
+    restrictedContributionsCount: z.number().int().nonnegative(),
     contributionCalendar: calendarSchema,
   }),
 });
@@ -162,6 +166,13 @@ export interface Contributions {
   totalPullRequestContributions: number;
   totalIssueContributions: number;
   totalPullRequestReviewContributions: number;
+  /**
+   * Work in private repositories, which GitHub reports as a single opaque
+   * count rather than as commits/PRs/issues. The calendar already includes
+   * it; the four typed totals above do not, so without this the breakdown
+   * adds up to a small fraction of the year.
+   */
+  restrictedContributions: number;
   /** Top 10 repos by commit count in the default window, for the flow Sankey. */
   commitContributionsByRepository: { nameWithOwner: string; count: number }[];
 }
@@ -182,15 +193,23 @@ export interface RepoNode {
 export interface YearStats {
   year: number;
   totalCommits: number;
+  /** That year's private-repository contributions. */
+  restricted: number;
   totalContributions: number;
   weeks: ContributionWeek[];
 }
 
 export interface ContributionStats {
-  /** Commits made today (UTC day boundary, same rule as the dot grid). */
+  /**
+   * Work done today (UTC day boundary, same rule as the dot grid): public
+   * commits plus the private-repo count, because a day spent in a private
+   * repository is still a day of work.
+   */
   todayCommits: number;
   /** Commits summed across the capped year list below. */
   totalCommits: number;
+  /** Private-repo contributions summed across the same years. */
+  totalPrivate: number;
   openPrs: number;
   followers: number;
   following: number;
@@ -312,6 +331,8 @@ export function fetchContributions(
         viewer.contributionsCollection.totalIssueContributions,
       totalPullRequestReviewContributions:
         viewer.contributionsCollection.totalPullRequestReviewContributions,
+      restrictedContributions:
+        viewer.contributionsCollection.restrictedContributionsCount,
       commitContributionsByRepository:
         viewer.contributionsCollection.commitContributionsByRepository.map(
           (entry) => ({
@@ -344,10 +365,10 @@ export function fetchStats(
   const recentYears = [...years].sort((a, b) => b - a).slice(0, 12);
 
   const parts = [
-    `today: viewer { contributionsCollection(from: "${todayStart}", to: "${now.toISOString()}") { totalCommitContributions } }`,
+    `today: viewer { contributionsCollection(from: "${todayStart}", to: "${now.toISOString()}") { totalCommitContributions restrictedContributionsCount } }`,
     ...recentYears.map(
       (year) =>
-        `y${year}: viewer { contributionsCollection(from: "${year}-01-01T00:00:00Z", to: "${year}-12-31T23:59:59Z") { totalCommitContributions contributionCalendar { totalContributions weeks { contributionDays { date contributionCount } } } } }`,
+        `y${year}: viewer { contributionsCollection(from: "${year}-01-01T00:00:00Z", to: "${year}-12-31T23:59:59Z") { totalCommitContributions restrictedContributionsCount contributionCalendar { totalContributions weeks { contributionDays { date contributionCount } } } } }`,
     ),
     `prs: search(type: ISSUE, query: "is:pr is:open author:${login}", first: 1) { issueCount }`,
     `social: viewer { followers { totalCount } following { totalCount } repositories(ownerAffiliations: OWNER, isFork: false) { totalCount } }`,
@@ -361,18 +382,21 @@ export function fetchStats(
     signal,
   ).then((data) => {
     let totalCommits = 0;
+    let totalPrivate = 0;
     const years: YearStats[] = [];
     for (const [key, bucket] of Object.entries(data)) {
       if (key === 'today' || key === 'prs' || key === 'social' || key === 'repos') {
         continue;
       }
-      const { totalCommitContributions, contributionCalendar } = (
+      const { totalCommitContributions, restrictedContributionsCount, contributionCalendar } = (
         bucket as z.infer<typeof yearBucketSchema>
       ).contributionsCollection;
       totalCommits += totalCommitContributions;
+      totalPrivate += restrictedContributionsCount;
       years.push({
         year: Number(key.slice(1)),
         totalCommits: totalCommitContributions,
+        restricted: restrictedContributionsCount,
         totalContributions: contributionCalendar.totalContributions,
         weeks: contributionCalendar.weeks,
       });
@@ -398,8 +422,11 @@ export function fetchStats(
     const stars = repos.reduce((sum, repo) => sum + repo.stargazerCount, 0);
 
     return {
-      todayCommits: data.today.contributionsCollection.totalCommitContributions,
+      todayCommits:
+        data.today.contributionsCollection.totalCommitContributions +
+        data.today.contributionsCollection.restrictedContributionsCount,
       totalCommits,
+      totalPrivate,
       openPrs: data.prs.issueCount,
       followers: data.social.followers.totalCount,
       following: data.social.following.totalCount,
@@ -409,6 +436,51 @@ export function fetchStats(
       years,
     };
   });
+}
+
+/**
+ * What the token is actually allowed to see.
+ *
+ * This is the difference between a widget full of dots and an empty one.
+ * `contributionsCollection` is scoped to the token, not to the account: a PAT
+ * without `repo` is answered with the *public* half of your year, so an
+ * account whose work lives in private repositories gets a flat grid, a today
+ * count of zero and a breakdown totalling a handful of contributions — with
+ * no error anywhere, because GitHub considers that a complete answer.
+ *
+ * Only classic PATs report their scopes (`x-oauth-scopes`). Fine-grained
+ * tokens send no such header, and there is nothing to infer from that, so
+ * they resolve to null and the app stays quiet rather than guessing.
+ */
+export async function fetchTokenScopes(
+  token: string,
+  signal?: AbortSignal,
+): Promise<string[] | null> {
+  try {
+    const response = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+      },
+      signal,
+    });
+    if (!response.ok) return null;
+    const header = response.headers.get('x-oauth-scopes');
+    if (header == null) return null;
+    return header
+      .split(',')
+      .map((scope) => scope.trim())
+      .filter((scope) => scope.length > 0);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    return null;
+  }
+}
+
+/** True when we know for certain the token cannot see private work. */
+export function seesPrivateWork(scopes: string[] | null): boolean | null {
+  if (scopes == null) return null;
+  return scopes.includes('repo');
 }
 
 /** Cheap liveness check used before persisting a new token. */

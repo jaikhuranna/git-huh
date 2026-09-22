@@ -209,6 +209,7 @@ function demoYears(map: Map<string, number>, startYear: number, now: Date): Year
       // The per-year API bucket only reports commits; ~60% of contributions
       // being commits is a believable split for the demo.
       totalCommits: Math.round(totalContributions * 0.6),
+      restricted: Math.round(totalContributions * 0.22),
       totalContributions,
       weeks: chunkWeeks(days),
     });
@@ -274,11 +275,15 @@ function demoCommitsByRepo(
 }
 
 function splitBreakdown(total: number, random: () => number) {
-  const commits = Math.round(total * (0.54 + random() * 0.06));
-  const pullRequests = Math.round(total * (0.16 + random() * 0.05));
-  const issues = Math.round(total * (0.08 + random() * 0.04));
-  const reviews = Math.max(0, total - commits - pullRequests - issues);
-  return { commits, pullRequests, issues, reviews };
+  // A quarter of the year behind closed doors, which is the shape of most
+  // real accounts and the case the flow screen has to render honestly.
+  const restricted = Math.round(total * (0.22 + random() * 0.08));
+  const open = total - restricted;
+  const commits = Math.round(open * (0.54 + random() * 0.06));
+  const pullRequests = Math.round(open * (0.16 + random() * 0.05));
+  const issues = Math.round(open * (0.08 + random() * 0.04));
+  const reviews = Math.max(0, open - commits - pullRequests - issues);
+  return { commits, pullRequests, issues, reviews, restricted };
 }
 
 function sumDays(weeks: ContributionWeek[]): number {
@@ -312,6 +317,7 @@ export function demoGitHubModel(now: Date = new Date()): GitHubModel {
     totalPullRequestContributions: breakdown.pullRequests,
     totalIssueContributions: breakdown.issues,
     totalPullRequestReviewContributions: breakdown.reviews,
+    restrictedContributions: breakdown.restricted,
     commitContributionsByRepository: commitsByRepo,
   };
 
@@ -319,6 +325,7 @@ export function demoGitHubModel(now: Date = new Date()): GitHubModel {
   const stats: ContributionStats = {
     todayCommits: todayCount > 0 ? Math.max(1, Math.round(todayCount * 0.7)) : 0,
     totalCommits: years.reduce((sum, year) => sum + year.totalCommits, 0),
+    totalPrivate: years.reduce((sum, year) => sum + year.restricted, 0),
     openPrs: demoPullRequests.length,
     followers: 214,
     following: 97,

@@ -26,6 +26,13 @@ export interface Breakdown {
   pullRequests: number;
   issues: number;
   reviews: number;
+  /**
+   * Contributions GitHub will only report as a lump: work in repositories
+   * the profile does not expose. It is already inside the calendar total, so
+   * leaving it out of the breakdown made the two disagree by an order of
+   * magnitude — a year of 441 contributions rendered as a flow of 10.
+   */
+  private: number;
 }
 
 export interface TopRepo {
@@ -82,6 +89,8 @@ export interface GitHubModel {
   todayCount: number;
   todayCommits: number;
   totalCommits: number;
+  /** Lifetime private-repo contributions, summed over the same years. */
+  totalPrivate: number;
   openPrs: number;
   followers: number;
   stars: number;
@@ -292,6 +301,7 @@ export function toGitHubModel(
     todayCount: allDays.find((day) => day.isToday)?.count ?? 0,
     todayCommits: stats.todayCommits,
     totalCommits: stats.totalCommits,
+    totalPrivate: stats.totalPrivate,
     openPrs: stats.openPrs,
     followers: stats.followers,
     stars: stats.stars,
@@ -303,6 +313,7 @@ export function toGitHubModel(
       pullRequests: contributions.totalPullRequestContributions,
       issues: contributions.totalIssueContributions,
       reviews: contributions.totalPullRequestReviewContributions,
+      private: contributions.restrictedContributions,
     },
     topRepos: toTopRepos(contributions.commitContributionsByRepository),
     repos: stats.repos.map(toRepoSummary),

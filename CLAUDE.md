@@ -1,8 +1,24 @@
 # git-huh
 
-An Expo / React Native app that renders your GitHub year, plus two Android
-home-screen widgets. Ten screens, each one a pin from the "nothing github"
-Pinterest board (`design/board/`, described in `design/DESIGN.md`).
+## Goal
+
+**Make your own GitHub history worth looking at.** The numbers GitHub already
+has about you — a year of contributions, the languages, the repos, the pull
+requests and the arguments in them — rendered as a set of printed artefacts
+rather than as a dashboard. Thirteen screens, each one a pin from the
+"nothing github" Pinterest board (`design/board/`), plus two Android
+home-screen widgets.
+
+It is a personal app for one account at a time: you paste a token, it reads
+your year, and nothing leaves the device except requests to GitHub.
+
+Two documents govern the work and both are part of it:
+
+- **`design/LANGUAGE.md`** — the design language: colour, type, space,
+  motion, patterns, the prohibitions. Read this before designing anything.
+- **`design/DESIGN.md`** — the per-screen spec, pin by pin.
+
+Keep both current in the same change that makes them wrong.
 
 ## Shipping — build the APK and upload it, every time
 
@@ -123,17 +139,29 @@ JVM `SIGBUS` in `PerfLongVariant::sample`, delete the offending
 `node_modules/*/android/.cxx` directory and pass
 `-Dorg.gradle.jvmargs="… -XX:-UsePerfData"`.
 
-## A trap: react-native-svg text and a downloaded font
+## Two traps
+
+### react-native-svg text in a downloaded font
 
 A single `<Svg>` holding a page's worth of `<Text>` in one of the Google
 fonts **crashes the app** — `SIGSEGV` in `MountingCoordinator::pullTransaction`,
 before the first frame, with no JS error. The trigger is the total glyph
 count inside one canvas; it goes away if either the custom `fontFamily` or
-the shared canvas is removed. The loading screen therefore draws **one `<Svg>`
-per row**. If a new screen needs a lot of SVG text in a loaded face, split the
-canvases rather than debugging the stack trace again. It reproduces on the
-x86_64 emulator and is easy to mistake for an emulator-only fault — the arm64
-release build happened to survive it.
+the shared canvas is removed. It reproduces on the x86_64 emulator and is
+easy to mistake for an emulator-only fault — the arm64 release build happened
+to survive it. If a screen needs a lot of SVG text in a loaded face, split the
+canvases. (The loading screen no longer uses SVG at all; see below.)
+
+### Animating from JavaScript
+
+Do not. The loading wave went through a `setInterval` stepping a counter
+(~16 fps, visibly steppy) and then a `requestAnimationFrame` loop (right
+timing, still slow) before landing on the only thing that works: precompute
+every glyph's whole track at mount, hand it to one looping `Animated.Value`
+as an interpolation, and let the native driver run it. That holds 60 fps with
+under 1% janky frames *while the JS thread is parsing the first GitHub
+response*, which is the entire point of that screen. Measure with
+`adb shell dumpsys gfxinfo app.githuh`.
 
 ## Checks
 

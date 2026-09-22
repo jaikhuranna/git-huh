@@ -23,8 +23,28 @@ data class WidgetState(
     /** nothing-mtui widgetFood — the accent, and the only red in the app. */
     val food: String,
     val days: List<DayCell>,
+    /**
+     * A pool of the account's own commit subjects, shared with the loading
+     * screen. The widget prints one of them as its masthead instead of a
+     * logo and a handle — the handle is the one thing on a home screen its
+     * owner already knows.
+     */
+    val lines: List<String>,
 ) {
     data class DayCell(val level: Int, val isToday: Boolean)
+
+    /**
+     * Today's line. Stable for the whole day — a widget that reshuffled its
+     * own headline at every recomposition would be a distraction rather than
+     * a thing to glance at — and hashed rather than taken in order, so
+     * consecutive days do not read as consecutive commits.
+     */
+    fun lineOfTheDay(now: Long = System.currentTimeMillis()): String? {
+        if (lines.isEmpty()) return null
+        val day = now / 86_400_000L
+        val index = Math.floorMod(day * 2654435761L, lines.size.toLong()).toInt()
+        return lines[index]
+    }
 
     companion object {
         private const val PREFS = "git_huh_widget"
@@ -74,6 +94,15 @@ data class WidgetState(
             val food = mtui?.optJSONObject("dark")?.optString("food")
                 ?.takeIf { it.isNotBlank() } ?: "#d71921"
 
+            // Absent in payloads written before 2.5 — the widget just falls
+            // back to the handle for a launch, until the app syncs again.
+            val linesJson = json.optJSONArray("lines")
+            val lines = buildList {
+                for (index in 0 until (linesJson?.length() ?: 0)) {
+                    linesJson?.optString(index)?.takeIf { it.isNotBlank() }?.let(::add)
+                }
+            }
+
             return WidgetState(
                 login = json.getString("login"),
                 total = json.getInt("total"),
@@ -85,6 +114,7 @@ data class WidgetState(
                 bgDark = bgDark,
                 food = food,
                 days = days,
+                lines = lines,
             )
         }
     }

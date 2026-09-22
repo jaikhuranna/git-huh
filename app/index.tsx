@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -18,6 +19,7 @@ import { useActivity } from '../src/hooks/useActivity';
 import { useContributions } from '../src/hooks/useContributions';
 import { useOpenPrs, type PrsState } from '../src/hooks/useOpenPrs';
 import { useSocial, type SocialState } from '../src/hooks/useSocial';
+import { useTokenScopes } from '../src/hooks/useTokenScopes';
 import type { GitHubModel } from '../src/lib/contributions';
 import { DEMO_TOKEN, tokenStore } from '../src/lib/token';
 import { clearWidget, syncWidget } from '../src/lib/widgetBridge';
@@ -91,6 +93,33 @@ const ACTIVITY_PAGES = [
 /** Lines kept for the loading screen — it draws about 26 at a time. */
 const POOL_SIZE = 40;
 
+/** Where to mint a token that can actually see the whole account. */
+const TOKEN_SETTINGS_URL =
+  'https://github.com/settings/tokens/new?scopes=read:user,repo&description=git-huh';
+
+/**
+ * The one thing the app cannot fix for you.
+ *
+ * A token without `repo` gets the public half of your year and nothing says
+ * so: the grid comes back flat, today reads zero and the flow diagram adds up
+ * to a handful of contributions. Silence is the worst possible answer, so
+ * this strip names the cause and links to a token that has the scope.
+ */
+function ScopeNotice() {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => Linking.openURL(TOKEN_SETTINGS_URL).catch(() => {})}
+      style={styles.notice}
+    >
+      <View style={styles.noticeDot} />
+      <Label style={styles.noticeText}>
+        this token has no repo scope · private work is invisible to it
+      </Label>
+    </Pressable>
+  );
+}
+
 function Page({
   index,
   active,
@@ -160,6 +189,7 @@ export default function Home() {
   const { width } = useWindowDimensions();
 
   const contributions = useContributions(token ?? null);
+  const scopes = useTokenScopes(token ?? null);
   const model = contributions.status === 'ready' ? contributions.model : null;
   const login = model?.login ?? null;
   const prs = useOpenPrs(token ?? null, login, page === PRS_PAGE);
@@ -322,6 +352,8 @@ export default function Home() {
           </View>
         </View>
 
+        {scopes === 'limited' && <ScopeNotice />}
+
         <View style={styles.body}>
           {model && (
             <ScrollView
@@ -411,6 +443,26 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     flexDirection: 'row',
     gap: 12,
+  },
+  notice: {
+    alignItems: 'center',
+    backgroundColor: colors.recess,
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+    marginHorizontal: space.gutter,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  noticeDot: {
+    backgroundColor: colors.red,
+    borderRadius: 3,
+    height: 6,
+    width: 6,
+  },
+  noticeText: {
+    color: colors.ink70,
+    flex: 1,
   },
   body: {
     flex: 1,
