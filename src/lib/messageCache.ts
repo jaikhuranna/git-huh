@@ -15,17 +15,29 @@ import { Platform } from 'react-native';
  */
 
 const KEY = 'commit_lines';
+/**
+ * Bumped whenever the shape or the limits of a stored line change, because a
+ * pool already on the device is otherwise kept for a week and the change does
+ * not reach the screen. 2.7 shipped a longer subject and a repository beside
+ * it, and every phone carried on printing 34-character lines with nothing
+ * after them: the cap is applied when a line is *written*, not when it is
+ * read. A pool from an older version reads back with no timestamp, so it is
+ * shown once and replaced on the same launch.
+ */
+const VERSION = 2;
 const MAX_LINES = 40;
 /**
  * Longest subject kept. It was 34, which is narrower than the widget's card:
  * every message longer than that arrived on the home screen already clipped
- * mid-word, with an ellipsis the widget had no say in. The loading screen is
- * unaffected — it takes the first twenty glyphs of a line itself.
+ * mid-word, with an ellipsis the widget had no say in. The strip travels now,
+ * so there is no width to fit at all — this is only a guard against a commit
+ * message with an essay in its subject line. The loading screen is unaffected
+ * either way; it takes the first twenty glyphs of a line itself.
  *
  * The byte budget below is the real limit on how many lines are kept, so a
  * longer cap buys fuller messages at the cost of a few of them.
  */
-const MAX_CHARS = 56;
+const MAX_CHARS = 72;
 /** Longest repository name kept beside a message. */
 const MAX_REPO = 24;
 const MAX_BYTES = 1800;
@@ -80,12 +92,15 @@ export async function readCachedLines(): Promise<CachedLines> {
       return { lines: parsed.map(toLine).filter(isLine), at: 0 };
     }
     if (parsed && typeof parsed === 'object' && 'lines' in parsed) {
-      const record = parsed as { lines?: unknown; at?: unknown };
+      const record = parsed as { lines?: unknown; at?: unknown; v?: unknown };
       return {
         lines: Array.isArray(record.lines)
           ? record.lines.map(toLine).filter(isLine)
           : [],
-        at: typeof record.at === 'number' ? record.at : 0,
+        // A pool written by an older version of this file is readable but not
+        // current — it keeps its lines and loses its timestamp, so the screen
+        // has something to show while the replacement is fetched.
+        at: record.v === VERSION && typeof record.at === 'number' ? record.at : 0,
       };
     }
     return EMPTY_CACHE;
@@ -137,7 +152,7 @@ export async function cacheLines(messages: CommitLine[]): Promise<void> {
   }
   if (lines.length === 0) return;
 
-  const raw = JSON.stringify({ at: Date.now(), lines });
+  const raw = JSON.stringify({ v: VERSION, at: Date.now(), lines });
   try {
     if (secure) await SecureStore.setItemAsync(KEY, raw);
     else memory.value = raw;

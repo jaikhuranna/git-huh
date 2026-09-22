@@ -74,9 +74,13 @@ on-device from the last one.
   **deliberately not** from the notifications API, which would need a
   `notifications` scope the app never asks for.
 - `src/lib/messageCache.ts` — the pool of commit messages the loading screen
-  is made of. It has to be on screen before the request that would fetch
-  them, hence the cache; it is refetched only when more than a week old and
-  otherwise just reshuffled. `src/lib/commitLines.ts` fills it, oldest-heavy,
+  and widget A's strip are made of. It has to be on screen before the request
+  that would fetch them, hence the cache; it is refetched only when more than
+  a week old and otherwise just reshuffled. **It carries a `VERSION`: bump it
+  in the same change as any new limit or field, or the change never reaches a
+  phone that already has a pool.** Subjects are trimmed when they are
+  *written*, so raising the cap alone left every device printing the old
+  34-character lines for a week. `src/lib/commitLines.ts` fills it, oldest-heavy,
   from the REST commit-search endpoint — GraphQL has no commit search, and
   `activity.ts` only ever sees the last few days.
 - `src/hooks/useTokenScopes.ts` — reads `x-oauth-scopes` off a REST call and

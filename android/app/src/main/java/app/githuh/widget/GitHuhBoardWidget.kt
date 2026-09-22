@@ -101,15 +101,8 @@ private fun Content(state: WidgetState?) {
 @androidx.compose.runtime.Composable
 private fun Filled(context: Context, state: WidgetState, size: DpSize) {
     val innerWidth = size.width - (PADDING * 2)
-    val fieldHeight = (size.height - CHROME_HEIGHT).coerceIn(28.dp, 104.dp)
-    // Same field rule as widget A, including the cap at the number of weeks
-    // the payload actually carries.
-    val columns = DotFieldRenderer.columns(
-        innerWidthDp = innerWidth.value,
-        fieldHeightDp = fieldHeight.value,
-        days = state.days.size,
-        rows = ROWS,
-    )
+    val fieldHeight = (size.height - CHROME_HEIGHT).coerceAtLeast(28.dp)
+    val density = context.resources.displayMetrics.density
 
     Column(
         modifier = GlanceModifier.fillMaxSize(),
@@ -145,7 +138,8 @@ private fun Filled(context: Context, state: WidgetState, size: DpSize) {
             provider = DotFieldRenderer.render(
                 context = context,
                 days = state.days,
-                columns = columns,
+                widthPx = (innerWidth.value * density).toInt(),
+                heightPx = (fieldHeight.value * density).toInt(),
                 rows = ROWS,
                 ink = INK.toArgb(),
                 // The pin has no accent, so today reads through size alone.

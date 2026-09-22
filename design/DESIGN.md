@@ -399,7 +399,7 @@ the faint ink — and each child's width is set to the bitmap's at bind time wit
 `setViewLayoutWidth`, which is what lets `toXDelta="-100%"` carry the whole message off
 the left-hand edge. That call is API 31; below it the strip is printed still.
 
-### The dot field — one bitmap, equal pitch
+### The dot field — one bitmap, painted at the shape of its box
 
 Both widgets paint the field with `DotFieldRenderer` and hand it to Glance as a single
 `Image` with `ContentScale.Fit`. **Do not go back to a Column of weighted Rows.** That
@@ -409,8 +409,21 @@ one and the field read as stripes. It also lost rows — a launcher that over-re
 height leaves the nested LinearLayouts short and RemoteViews gives the last children no
 height at all, so a seven-row grid arrived on the home screen with five rows in it.
 
-Only the *ratio* of the reported size is trusted, to choose a column count; the bitmap
-then scales uniformly into whatever space the widget really has.
+Three rules, and all three exist because breaking one was visible on a real phone:
+
+1. **The bitmap is painted at the box's own shape**, `innerWidth × fieldHeight`. Any
+   other shape is letterboxed by `ContentScale.Fit`, and then the field floats inside
+   the card with margins that match neither the strip above it nor each other.
+2. **The pitch comes from the height and the columns from the width.** Seven rows as
+   big as the height allows (capped at 22dp a cell), then as many weeks as fill the
+   width at that pitch. Nothing is left over to centre, so the field's edges are the
+   card's padding. Only the *ratio* of the reported size is trusted; a launcher that
+   under-reports just gets a smaller bitmap scaled back up.
+3. **The weeks are laid out from the right.** Today is the last column, always. A
+   payload with less history than the card has room for shows that as empty weeks on
+   the left, where the missing history would be. Indexing from the left instead left a
+   block of dead grid to the right of today on any card wider than the payload — which
+   was every 4×2 card, because the payload used to carry eighteen weeks.
 
 ### Widget B — `GitHuhBoardWidget` (pin08 board style)
 The urbit card: `#0B0B0A` card, `#F4F2ED` ink, **no Material You, no red**.

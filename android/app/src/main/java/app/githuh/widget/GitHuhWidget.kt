@@ -68,7 +68,7 @@ private val WIDGET_PADDING = 14.dp
 /** The strip, the size it is painted at, and the space under it. */
 private const val STRIP_SP = 11f
 private val STRIP_HEIGHT = 18.dp
-private val CHROME_HEIGHT = 30.dp
+private val CHROME_HEIGHT = 26.dp
 
 private fun parse(hex: String?, fallback: Color): Color =
     hex?.takeIf { it.isNotBlank() }
@@ -80,6 +80,10 @@ private fun parse(hex: String?, fallback: Color): Color =
  * be decided while composing. The background still gets a day/night provider
  * so the surface itself flips even without a fresh bitmap.
  */
+/** A reported dp measurement in the pixels the bitmap has to be painted in. */
+private fun Dp.toPx(context: Context): Int =
+    (value * context.resources.displayMetrics.density).toInt()
+
 private fun isNight(context: Context): Boolean =
     (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
         Configuration.UI_MODE_NIGHT_YES
@@ -159,16 +163,10 @@ private fun FilledContent(
     faint: Color,
 ) {
     val innerWidth = size.width - (WIDGET_PADDING * 2)
-    // Room to breathe now that the numbers are gone: the field is most of the
-    // card, so the dots come up to a size that reads from across a room.
-    val fieldHeight = (size.height - CHROME_HEIGHT).coerceIn(28.dp, 140.dp)
-
-    val columns = DotFieldRenderer.columns(
-        innerWidthDp = innerWidth.value,
-        fieldHeightDp = fieldHeight.value,
-        days = state.days.size,
-        rows = ROWS,
-    )
+    // Whatever the strip leaves. Now that the numbers are gone the field is
+    // the rest of the card, and the dots come up to a size that reads from
+    // across a room — DotFieldRenderer caps the pitch, not this.
+    val fieldHeight = (size.height - CHROME_HEIGHT).coerceAtLeast(28.dp)
 
     val red = parse(state.food, Color(0xFFD71921))
 
@@ -179,14 +177,15 @@ private fun FilledContent(
         val line = state.lineOfTheDay()
         if (line != null) {
             Strip(context, line, innerWidth, ink, faint)
-            Spacer(GlanceModifier.height(12.dp))
+            Spacer(GlanceModifier.height(8.dp))
         }
 
         Image(
             provider = DotFieldRenderer.render(
                 context = context,
                 days = state.days,
-                columns = columns,
+                widthPx = innerWidth.toPx(context),
+                heightPx = fieldHeight.toPx(context),
                 rows = ROWS,
                 ink = ink.toArgb(),
                 accent = red.toArgb(),

@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import androidx.glance.ImageProvider
+import kotlin.math.ceil
 
 /**
  * The contribution field, painted as one bitmap.
@@ -27,40 +28,25 @@ import androidx.glance.ImageProvider
  * the widget really has — so it stays square however badly the launcher
  * describes itself. It is also the same technique the type and the sigil on
  * these widgets already use.
+ *
+ * The bitmap is painted **at the shape of the box it is going into**, which is
+ * the only way the field can line up with anything else on the card. A bitmap
+ * of any other shape is letterboxed by `ContentScale.Fit`, and the field then
+ * floats inside the card with margins that match neither the strip above it
+ * nor each other. Only the *ratio* of the reported box is trusted — a launcher
+ * that under-reports its size just gets a smaller bitmap scaled back up.
  */
 object DotFieldRenderer {
 
-    /** Internal pitch. Near enough to the on-screen pitch to stay crisp. */
-    private const val PITCH_DP = 13f
-
     /**
-     * Column bounds. The ceiling is what a 4-cell-wide card on a tall phone
-     * asks for when it is only two cells high — about seven months of weeks.
+     * Column bounds. A very wide card would otherwise ask for a year of weeks
+     * at four pixels each, and a very narrow one for three.
      */
-    private const val MIN_COLUMNS = 10
-    private const val MAX_COLUMNS = 32
+    private const val MIN_COLUMNS = 8
+    private const val MAX_COLUMNS = 40
 
-    /**
-     * How many weeks to draw in a box of this shape — the rule both widgets
-     * size their field by.
-     *
-     * Only the *ratio* of the reported box is trusted, never its absolute
-     * value: launchers under-report both dimensions but tend to get the shape
-     * right. A wide, short card wants more columns than a square one, or the
-     * bitmap fits by its height and sits in a letterbox with a third of the
-     * card empty on either side.
-     *
-     * It is also never more columns than the payload has weeks. The field is
-     * painted oldest-first from the left, so asking for more weeks than the
-     * data holds pushed today out of the last column and hung a block of dead
-     * grid off the right-hand side — which is what every card wider than the
-     * payload's eighteen weeks used to do.
-     */
-    fun columns(innerWidthDp: Float, fieldHeightDp: Float, days: Int, rows: Int): Int {
-        val aspect = (innerWidthDp / fieldHeightDp).coerceIn(1.4f, 4.4f)
-        val weeks = (days / rows).coerceAtLeast(1)
-        return (rows * aspect).toInt().coerceIn(MIN_COLUMNS, MAX_COLUMNS).coerceAtMost(weeks)
-    }
+    /** The biggest a dot's cell is allowed to get, whatever room there is. */
+    private const val MAX_PITCH_DP = 22f
 
     /** Share of a cell the mark occupies at each intensity. */
     private val SCALES = floatArrayOf(0.26f, 0.44f, 0.62f, 0.82f, 1.0f)
@@ -69,10 +55,26 @@ object DotFieldRenderer {
     /** The gap between two marks, as a share of the pitch. */
     private const val GAP_SHARE = 0.30f
 
+    /**
+     * The field, painted to fill a box `widthPx` by `heightPx` exactly.
+     *
+     * The pitch comes from the height — as many rows as there are days in a
+     * week, as big as the box allows — and the column count is then whatever
+     * fills the width at that pitch, so the grid runs from one edge of the
+     * card's padding to the other. There is nothing left over to centre, which
+     * is the point: the field's left edge is the strip's left edge.
+     *
+     * The weeks are laid out **from the right**. Today is always the last
+     * column, and a payload holding less history than the card has room for
+     * shows that as empty weeks on the left, where the missing history would
+     * be — rather than as a block of dead grid to the right of today, which is
+     * what indexing from the left did on any card wider than the payload.
+     */
     fun render(
         context: Context,
         days: List<WidgetState.DayCell>,
-        columns: Int,
+        widthPx: Int,
+        heightPx: Int,
         rows: Int,
         ink: Int,
         accent: Int,
@@ -84,22 +86,35 @@ object DotFieldRenderer {
          */
         markToday: Boolean = true,
     ): ImageProvider {
-        val pitch = PITCH_DP * context.resources.displayMetrics.density
-        val cell = pitch * (1f - GAP_SHARE)
+        val width = widthPx.coerceAtLeast(1)
+        val height = heightPx.coerceAtLeast(1)
 
-        val width = (pitch * columns).toInt().coerceAtLeast(1)
-        val height = (pitch * rows).toInt().coerceAtLeast(1)
+        val room = height.toFloat() / rows
+        val ceiling = MAX_PITCH_DP * context.resources.displayMetrics.density
+        val columns = ceil(width / minOf(room, ceiling))
+            .toInt()
+            .coerceIn(MIN_COLUMNS, MAX_COLUMNS)
+        // `room` is the floor as well as the ceiling: on a card too narrow for
+        // MIN_COLUMNS at this height, the grid keeps its square pitch and the
+        // slack goes to the sides rather than the rows going oval.
+        val pitch = minOf(width.toFloat() / columns, room)
+        val cell = pitch * (1f - GAP_SHARE)
+        val left = (width - pitch * columns) / 2f
+        val top = (height - pitch * rows) / 2f
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        // Column-major, oldest week on the left, same as the payload.
+        // Column-major, seven rows to a week, same as the payload.
         val visible = days.takeLast(columns * rows)
+        val weeks = ceil(visible.size / rows.toFloat()).toInt()
+        val offset = columns - weeks
 
         for (col in 0 until columns) {
+            val week = col - offset
             for (row in 0 until rows) {
-                val day = visible.getOrNull(col * rows + row)
+                val day = if (week < 0) null else visible.getOrNull(week * rows + row)
                 val level = day?.level ?: 0
                 val today = markToday && day?.isToday == true
 
@@ -110,8 +125,8 @@ object DotFieldRenderer {
                 }
 
                 val size = cell * if (today) 1f else SCALES[level]
-                val cx = col * pitch + pitch / 2f
-                val cy = row * pitch + pitch / 2f
+                val cx = left + col * pitch + pitch / 2f
+                val cy = top + row * pitch + pitch / 2f
                 val box = RectF(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
 
                 // A peak day squares off, so intensity is legible in the mark's
