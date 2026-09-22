@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One pass of the strip: in from beyond the right edge of the card
+  (`100%p` — the parent's width) until the line's own width has carried it
+  off the left (`-100%` — its own). Linear, because a commit message is being
+  read rather than presented.
+-->
+<translate xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromXDelta="100%p"
+    android:toXDelta="-100%"
+    android:duration="12000"
+    android:fillAfter="true"
+    android:interpolator="@android:anim/linear_interpolator" />

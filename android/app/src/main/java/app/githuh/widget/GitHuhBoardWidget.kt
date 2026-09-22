@@ -102,11 +102,14 @@ private fun Content(state: WidgetState?) {
 private fun Filled(context: Context, state: WidgetState, size: DpSize) {
     val innerWidth = size.width - (PADDING * 2)
     val fieldHeight = (size.height - CHROME_HEIGHT).coerceIn(28.dp, 104.dp)
-    // Same reasoning as widget A: only the ratio of the reported box is
-    // trusted, and the halftone is painted as one bitmap so its pitch is
-    // equal in both axes whatever the launcher claims.
-    val aspect = (innerWidth / fieldHeight).coerceIn(1.4f, 3.4f)
-    val columns = (ROWS * aspect).toInt().coerceIn(10, 24)
+    // Same field rule as widget A, including the cap at the number of weeks
+    // the payload actually carries.
+    val columns = DotFieldRenderer.columns(
+        innerWidthDp = innerWidth.value,
+        fieldHeightDp = fieldHeight.value,
+        days = state.days.size,
+        rows = ROWS,
+    )
 
     Column(
         modifier = GlanceModifier.fillMaxSize(),

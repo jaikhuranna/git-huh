@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget A's travelling line, and the one piece of either widget that is not
+  laid out by Glance — a bitmap on its own cannot move.
+
+  It is a ViewFlipper rather than a marquee TextView because a marquee cannot
+  be started from a widget: a TextView only marquees while it is selected or
+  focused, and `setSelected` is not a @RemotableViewMethod — asking for it by
+  reflection takes the whole card down with "Can't load widget" on Android 15.
+  A ViewFlipper starts itself (`autoStart`), runs animations out of this
+  package's own resources, and stops when the screen goes off.
+
+  The children are ImageViews rather than TextViews for the same reason every
+  other word on these widgets is a bitmap: a layout inflated into the
+  launcher's process does not resolve `@font`, and a strip in the launcher's
+  own sans is not this app's voice. Their width is set to the painted line's
+  width at bind time (`setViewLayoutWidth`), which is what lets the animation
+  carry the whole message off the left-hand edge.
+
+  Two children holding the same line, flipped at exactly the length of one
+  pass: as one finishes crossing, the next begins.
+-->
+<ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/strip"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:autoStart="true"
+    android:flipInterval="12000"
+    android:inAnimation="@anim/strip_in"
+    android:outAnimation="@anim/strip_out">
+
+    <ImageView
+        android:id="@+id/strip_a"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:scaleType="center"
+        android:contentDescription="@null" />
+
+    <ImageView
+        android:id="@+id/strip_b"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:scaleType="center"
+        android:contentDescription="@null" />
+</ViewFlipper>

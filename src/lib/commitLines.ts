@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import type { CommitLine } from './messageCache';
+
 /**
  * Words for the loading screen, pulled from the whole of your history rather
  * than from this week.
@@ -27,6 +29,9 @@ const searchSchema = z.object({
     z.object({
       sha: z.string(),
       commit: z.object({ message: z.string() }),
+      // The widget prints this after the subject, so a line on the home
+      // screen says where the work was as well as what it was.
+      repository: z.object({ name: z.string() }).optional(),
     }),
   ),
 });
@@ -37,9 +42,9 @@ function subject(message: string): string {
 }
 
 /** Merge commits are GitHub's words, not yours. */
-function authored(line: string): boolean {
-  if (line.length < 3) return false;
-  return !/^merge (branch|pull request|remote|commit)/i.test(line);
+function authored(line: CommitLine): boolean {
+  if (line.message.length < 3) return false;
+  return !/^merge (branch|pull request|remote|commit)/i.test(line.message);
 }
 
 async function page(
@@ -48,7 +53,7 @@ async function page(
   order: 'asc' | 'desc',
   perPage: number,
   signal?: AbortSignal,
-): Promise<string[]> {
+): Promise<CommitLine[]> {
   const query = encodeURIComponent(`author:${login}`);
   const response = await fetch(
     `${SEARCH}?q=${query}&sort=author-date&order=${order}&per_page=${perPage}`,
@@ -65,7 +70,12 @@ async function page(
   if (!response.ok) return [];
   const parsed = searchSchema.safeParse(await response.json());
   if (!parsed.success) return [];
-  return parsed.data.items.map((item) => subject(item.commit.message)).filter(authored);
+  return parsed.data.items
+    .map((item) => ({
+      message: subject(item.commit.message),
+      repo: item.repository?.name ?? '',
+    }))
+    .filter(authored);
 }
 
 /**
@@ -76,18 +86,18 @@ export async function fetchCommitLines(
   token: string,
   login: string,
   signal?: AbortSignal,
-): Promise<string[]> {
+): Promise<CommitLine[]> {
   const [old, recent] = await Promise.all([
     page(token, login, 'asc', OLDEST, signal).catch(rethrowAbort),
     page(token, login, 'desc', NEWEST, signal).catch(rethrowAbort),
   ]);
 
   const seen = new Set<string>();
-  const pool: string[] = [];
+  const pool: CommitLine[] = [];
   // Oldest first, so if the byte budget truncates the pool it is the recent
   // messages that get dropped rather than the archaeology.
   for (const line of [...old, ...recent]) {
-    const key = line.toLowerCase();
+    const key = line.message.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     pool.push(line);
@@ -95,7 +105,7 @@ export async function fetchCommitLines(
   return pool;
 }
 
-function rethrowAbort(error: unknown): string[] {
+function rethrowAbort(error: unknown): CommitLine[] {
   if (error instanceof Error && error.name === 'AbortError') throw error;
   return [];
 }

@@ -16,14 +16,37 @@ import { Platform } from 'react-native';
 
 const KEY = 'commit_lines';
 const MAX_LINES = 40;
-const MAX_CHARS = 34;
+/**
+ * Longest subject kept. It was 34, which is narrower than the widget's card:
+ * every message longer than that arrived on the home screen already clipped
+ * mid-word, with an ellipsis the widget had no say in. The loading screen is
+ * unaffected — it takes the first twenty glyphs of a line itself.
+ *
+ * The byte budget below is the real limit on how many lines are kept, so a
+ * longer cap buys fuller messages at the cost of a few of them.
+ */
+const MAX_CHARS = 56;
+/** Longest repository name kept beside a message. */
+const MAX_REPO = 24;
 const MAX_BYTES = 1800;
 
 /** How long a pool is good for before the next launch refetches it. */
 export const STALE_AFTER_MS = 7 * 86_400_000;
 
+/**
+ * One line of the pool: a commit subject and the repository it was written
+ * in. The widget prints the repo after the message in a fainter ink, which
+ * is the difference between a sentence on your home screen and a sentence
+ * you can place.
+ */
+export interface CommitLine {
+  message: string;
+  /** Repository name without the owner — "git-huh", not "you/git-huh". */
+  repo: string;
+}
+
 export interface CachedLines {
-  lines: string[];
+  lines: CommitLine[];
   /** Epoch ms the pool was written. 0 for a pre-2.4 cache with no stamp. */
   at: number;
 }
@@ -39,6 +62,12 @@ function tidy(message: string): string {
   return line.length > MAX_CHARS ? `${line.slice(0, MAX_CHARS - 1)}…` : line;
 }
 
+/** Owner and any trailing whitespace off; "you/git-huh" reads as "git-huh". */
+function shortRepo(repo: string): string {
+  const name = repo.trim().split('/').pop() ?? '';
+  return name.length > MAX_REPO ? name.slice(0, MAX_REPO) : name;
+}
+
 export async function readCachedLines(): Promise<CachedLines> {
   try {
     const raw = secure ? await SecureStore.getItemAsync(KEY) : memory.value;
@@ -48,12 +77,14 @@ export async function readCachedLines(): Promise<CachedLines> {
     // v1 wrote a bare array. It has no timestamp, so it reads as stale and
     // gets replaced on this launch — but it still has something to show now.
     if (Array.isArray(parsed)) {
-      return { lines: parsed.filter(isLine), at: 0 };
+      return { lines: parsed.map(toLine).filter(isLine), at: 0 };
     }
     if (parsed && typeof parsed === 'object' && 'lines' in parsed) {
       const record = parsed as { lines?: unknown; at?: unknown };
       return {
-        lines: Array.isArray(record.lines) ? record.lines.filter(isLine) : [],
+        lines: Array.isArray(record.lines)
+          ? record.lines.map(toLine).filter(isLine)
+          : [],
         at: typeof record.at === 'number' ? record.at : 0,
       };
     }
@@ -64,8 +95,23 @@ export async function readCachedLines(): Promise<CachedLines> {
   }
 }
 
-function isLine(line: unknown): line is string {
-  return typeof line === 'string';
+/**
+ * One stored entry, whichever shape it was written in. Caches written before
+ * 2.7 hold bare strings and have no repository to give, so they read back
+ * with an empty one and the widget simply prints nothing after the message.
+ */
+function toLine(entry: unknown): CommitLine | null {
+  if (typeof entry === 'string') return { message: entry, repo: '' };
+  if (entry && typeof entry === 'object' && 'm' in entry) {
+    const record = entry as { m?: unknown; r?: unknown };
+    if (typeof record.m !== 'string') return null;
+    return { message: record.m, repo: typeof record.r === 'string' ? record.r : '' };
+  }
+  return null;
+}
+
+function isLine(line: CommitLine | null): line is CommitLine {
+  return line !== null && line.message.length > 0;
 }
 
 /** True when the pool is empty or older than a week. */
@@ -73,20 +119,21 @@ export function isStale(cache: CachedLines, now: number = Date.now()): boolean {
   return cache.lines.length === 0 || now - cache.at >= STALE_AFTER_MS;
 }
 
-export async function cacheLines(messages: string[]): Promise<void> {
-  const lines: string[] = [];
+export async function cacheLines(messages: CommitLine[]): Promise<void> {
+  const lines: { m: string; r: string }[] = [];
   const seen = new Set<string>();
   let bytes = 32;
-  for (const message of messages) {
+  for (const entry of messages) {
     if (lines.length >= MAX_LINES) break;
-    const line = tidy(message);
+    const line = tidy(entry.message);
     if (!line) continue;
     const key = line.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    bytes += line.length + 3;
+    const repo = shortRepo(entry.repo);
+    bytes += line.length + repo.length + 16;
     if (bytes > MAX_BYTES) break;
-    lines.push(line);
+    lines.push({ m: line, r: repo });
   }
   if (lines.length === 0) return;
 

@@ -26,13 +26,16 @@ data class WidgetState(
     val days: List<DayCell>,
     /**
      * A pool of the account's own commit subjects, shared with the loading
-     * screen. The widget prints one of them as its masthead instead of a
-     * logo and a handle — the handle is the one thing on a home screen its
-     * owner already knows.
+     * screen, each with the repository it was written in. The widget runs one
+     * of them across the card instead of a logo and a handle — the handle is
+     * the one thing on a home screen its owner already knows.
      */
-    val lines: List<String>,
+    val lines: List<Line>,
 ) {
     data class DayCell(val level: Int, val isToday: Boolean)
+
+    /** A commit subject and where it was written. */
+    data class Line(val message: String, val repo: String)
 
     /**
      * Today's line. Stable for the whole day — a widget that reshuffled its
@@ -43,9 +46,13 @@ data class WidgetState(
      * rather than indexing the list. The app shuffles the pool on every
      * launch, so an index pointed at a different commit each time the app was
      * opened, which is not what "held for the day" was supposed to mean.
+     *
+     * Length is no longer part of the pick. The strip travels, so a subject
+     * too long for the card is read rather than clipped — which is the whole
+     * reason it moves.
      */
-    fun lineOfTheDay(now: Long = System.currentTimeMillis()): String? =
-        lines.maxByOrNull { seed(now / 86_400_000L, it) }
+    fun lineOfTheDay(now: Long = System.currentTimeMillis()): Line? =
+        lines.maxByOrNull { seed(now / 86_400_000L, it.message) }
 
     companion object {
         private const val PREFS = "git_huh_widget"
@@ -79,7 +86,17 @@ data class WidgetState(
                     ?.takeIf { it.optString("login") == json.optString("login") }
                     ?.let(::linesOf)
                     .orEmpty()
-                if (kept.isNotEmpty()) json.put("lines", JSONArray(kept))
+                if (kept.isNotEmpty()) {
+                    val array = JSONArray()
+                    for (line in kept) {
+                        array.put(
+                            JSONObject()
+                                .put("m", line.message)
+                                .put("r", line.repo),
+                        )
+                    }
+                    json.put("lines", array)
+                }
             }
 
             prefs.edit().putString(KEY_PAYLOAD, json.toString()).apply()
@@ -131,12 +148,27 @@ data class WidgetState(
             )
         }
 
-        /** The non-blank commit subjects in a payload, if it has any. */
-        private fun linesOf(json: JSONObject): List<String> {
+        /**
+         * The commit subjects in a payload, if it has any.
+         *
+         * Payloads written before 2.7 hold bare strings with no repository to
+         * print; they are still perfectly good lines, so they read back with
+         * an empty one rather than being thrown away.
+         */
+        private fun linesOf(json: JSONObject): List<Line> {
             val array = json.optJSONArray("lines") ?: return emptyList()
             return buildList {
                 for (index in 0 until array.length()) {
-                    array.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+                    val entry = array.opt(index)
+                    val line = when (entry) {
+                        is JSONObject -> Line(
+                            message = entry.optString("m"),
+                            repo = entry.optString("r"),
+                        )
+                        is String -> Line(message = entry, repo = "")
+                        else -> null
+                    }
+                    line?.takeIf { it.message.isNotBlank() }?.let(::add)
                 }
             }
         }

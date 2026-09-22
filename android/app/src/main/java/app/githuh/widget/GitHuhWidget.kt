@@ -2,8 +2,12 @@ package app.githuh.widget
 
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
+import android.util.TypedValue
+import android.widget.RemoteViews
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
@@ -14,6 +18,7 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.components.Scaffold
@@ -22,13 +27,12 @@ import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.ContentScale
-import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
-import androidx.glance.layout.width
 import app.githuh.MainActivity
+import app.githuh.R
 
 /**
  * Widget A — the Material You one.
@@ -42,23 +46,29 @@ import app.githuh.MainActivity
  * This is the only file in the project where Nothing red is allowed: it is
  * the package's own widgetFood token.
  *
- * The masthead is **one of your own commit messages**, picked by the date and
- * held for the day. It replaced the sigil and the `~handle` because those two
- * elements spent a line of a very small card telling their owner their own
- * name; a line out of your history is the thing on this card you cannot get
- * by looking at the phone.
+ * The card is **one of your own commit messages, travelling**, and the field
+ * of the days under it. Nothing else: the counts that used to sit between
+ * them — `7 today`, `448 this year · 6 prs` — are on every screen in the app
+ * and were the least interesting thing on the home screen.
  *
- * The handle is not a fallback for it either. A card that printed the pool
+ * The strip travels right to left and carries the repository it was written
+ * in at its end, in the faint ink, so a line says where the work was as well
+ * as what it was. It is the one view on either widget that is not a bitmap —
+ * a bitmap cannot move; see `res/layout/widget_strip.xml` for what it took.
+ *
+ * The handle is not a fallback for any of it. A card that printed the pool
  * when it had one and the handle when it did not was showing the handle far
  * more often than intended — an empty sync used to erase the pool — so a
- * card with no line to print now simply goes without a masthead.
+ * card with no line to run simply runs none.
  */
 private const val ROWS = 7
 
 private val WIDGET_PADDING = 14.dp
 
-/** Masthead + the hero line + footer + the spacers between them. */
-private val CHROME_HEIGHT = 84.dp
+/** The strip, the size it is painted at, and the space under it. */
+private const val STRIP_SP = 11f
+private val STRIP_HEIGHT = 18.dp
+private val CHROME_HEIGHT = 30.dp
 
 private fun parse(hex: String?, fallback: Color): Color =
     hex?.takeIf { it.isNotBlank() }
@@ -149,15 +159,16 @@ private fun FilledContent(
     faint: Color,
 ) {
     val innerWidth = size.width - (WIDGET_PADDING * 2)
-    val fieldHeight = (size.height - CHROME_HEIGHT).coerceIn(28.dp, 104.dp)
+    // Room to breathe now that the numbers are gone: the field is most of the
+    // card, so the dots come up to a size that reads from across a room.
+    val fieldHeight = (size.height - CHROME_HEIGHT).coerceIn(28.dp, 140.dp)
 
-    // Only the *shape* of the box is taken from the reported size, never its
-    // absolute value: launchers under-report both dimensions, but they tend to
-    // get the ratio right, and the field is scaled to fit whatever space it
-    // actually lands in. Seven rows of weeks against a wide, short card wants
-    // more columns than a square one.
-    val aspect = (innerWidth / fieldHeight).coerceIn(1.4f, 3.4f)
-    val columns = (ROWS * aspect).toInt().coerceIn(10, 24)
+    val columns = DotFieldRenderer.columns(
+        innerWidthDp = innerWidth.value,
+        fieldHeightDp = fieldHeight.value,
+        days = state.days.size,
+        rows = ROWS,
+    )
 
     val red = parse(state.food, Color(0xFFD71921))
 
@@ -167,38 +178,9 @@ private fun FilledContent(
     ) {
         val line = state.lineOfTheDay()
         if (line != null) {
-            Image(
-                provider = TextRenderer.render(
-                    context,
-                    line,
-                    10f,
-                    ink.toArgb(),
-                    maxWidthDp = innerWidth.value,
-                ),
-                contentDescription = line,
-            )
-
-            Spacer(GlanceModifier.height(8.dp))
+            Strip(context, line, innerWidth, ink, faint)
+            Spacer(GlanceModifier.height(12.dp))
         }
-
-        Row(verticalAlignment = Alignment.Bottom) {
-            Image(
-                provider = TextRenderer.render(
-                    context,
-                    "%,d".format(state.todayCount),
-                    22f,
-                    if (state.todayCount > 0) red.toArgb() else ink.toArgb(),
-                ),
-                contentDescription = "${state.todayCount} contributions today",
-            )
-            Spacer(GlanceModifier.width(6.dp))
-            Image(
-                provider = TextRenderer.render(context, "today", 8f, faint.toArgb()),
-                contentDescription = null,
-            )
-        }
-
-        Spacer(GlanceModifier.height(8.dp))
 
         Image(
             provider = DotFieldRenderer.render(
@@ -210,25 +192,65 @@ private fun FilledContent(
                 accent = red.toArgb(),
                 emptyAlpha = 0.07f,
             ),
-            contentDescription = null,
+            contentDescription = "${state.todayCount} contributions today",
             contentScale = ContentScale.Fit,
             modifier = GlanceModifier.fillMaxWidth().height(fieldHeight),
         )
+    }
+}
 
-        Spacer(GlanceModifier.height(8.dp))
-
+/**
+ * The travelling line.
+ *
+ * Both children of the flipper carry the same painted line, so the pass that
+ * arrives is the pass that just left and the strip reads as continuous.
+ * Nothing here starts the animation — the layout does, which is the only way
+ * a widget can have one. `setDisplayedChild` is only to bring the first pass
+ * forward: a ViewFlipper shows its first child without animating it, which
+ * would leave the line sitting still for a whole interval after every sync.
+ *
+ * Before API 31 a widget cannot be told the width of one of its own views, so
+ * the strip cannot be carried past its own length and it is printed still,
+ * clipped to the card. Android 11 and older get a card that does not move.
+ */
+@androidx.compose.runtime.Composable
+private fun Strip(
+    context: Context,
+    line: WidgetState.Line,
+    innerWidth: Dp,
+    ink: Color,
+    faint: Color,
+) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
         Image(
             provider = TextRenderer.render(
                 context,
-                // The calendar total, which counts private work. The old
-                // footer printed the public commit count next to a grid drawn
-                // from the calendar, so the two disagreed on the same card.
-                "%,d this year · %,d prs".format(state.total, state.openPrs),
-                8f,
-                faint.toArgb(),
+                if (line.repo.isBlank()) line.message else "${line.message}   ${line.repo}",
+                STRIP_SP,
+                ink.toArgb(),
                 maxWidthDp = innerWidth.value,
             ),
-            contentDescription = null,
+            contentDescription = line.message,
         )
+        return
     }
+
+    val bitmap = TextRenderer.strip(
+        context = context,
+        message = line.message,
+        repo = line.repo,
+        ink = ink.toArgb(),
+        faint = faint.toArgb(),
+        sizeSp = STRIP_SP,
+    )
+
+    val views = RemoteViews(context.packageName, R.layout.widget_strip).apply {
+        for (id in intArrayOf(R.id.strip_a, R.id.strip_b)) {
+            setImageViewBitmap(id, bitmap)
+            setViewLayoutWidth(id, bitmap.width.toFloat(), TypedValue.COMPLEX_UNIT_PX)
+        }
+        setDisplayedChild(R.id.strip, 1)
+    }
+
+    AndroidRemoteViews(views, GlanceModifier.fillMaxWidth().height(STRIP_HEIGHT))
 }

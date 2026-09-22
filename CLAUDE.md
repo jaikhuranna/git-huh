@@ -89,7 +89,10 @@ on-device from the last one.
   not invent values in screens.
 - `android/app/src/main/java/app/githuh/widget/` — both Glance widgets, plus
   the three bitmap renderers they are built from (`TextRenderer`,
-  `GlyphRenderer`, `DotFieldRenderer`).
+  `GlyphRenderer`, `DotFieldRenderer`). Widget A is a travelling commit
+  message and the dot field, nothing else; the strip lives in
+  `res/layout/widget_strip.xml` and is the one view here that is not painted
+  by Glance. See the widget trap below before touching it.
 - `preview/` — ten of the screens as HTML at 393×852, used to iterate on
   layout in a browser and to build `review.html`. It lags the app.
 - `design/DESIGN.md` — the spec every screen is derived from.
@@ -143,7 +146,7 @@ JVM `SIGBUS` in `PerfLongVariant::sample`, delete the offending
 `node_modules/*/android/.cxx` directory and pass
 `-Dorg.gradle.jvmargs="… -XX:-UsePerfData"`.
 
-## Three traps
+## Four traps
 
 ### A token without `repo` returns a smaller, valid, wrong year
 
@@ -178,6 +181,23 @@ the shared canvas is removed. It reproduces on the x86_64 emulator and is
 easy to mistake for an emulator-only fault — the arm64 release build happened
 to survive it. If a screen needs a lot of SVG text in a loaded face, split the
 canvases. (The loading screen no longer uses SVG at all; see below.)
+
+### Animating a widget
+
+Nothing in Glance or RemoteViews animates, and the two obvious ways out are both
+dead ends. `View.setSelected` — the marquee trick — is not a `@RemotableViewMethod`,
+and a rejected reflection call does not degrade: the launcher throws
+`ActionException` and the card becomes *Can't load widget*. Custom fonts do not
+survive either; a layout inflated into the launcher's process ignores
+`android:fontFamily="@font/…"` and falls back to its own sans.
+
+What works is `ViewFlipper` with `android:autoStart="true"`: it starts itself on
+attach, animates from this package's `res/anim`, and stops when the screen goes
+off. Widget A's strip is two `ImageView` children holding the same painted line,
+flipped at exactly the length of one pass. The children are images rather than text
+because of the font, and their width is set with `setViewLayoutWidth` (API 31) so
+that `toXDelta="-100%"` means the width of *the message* rather than the width of
+the card — without it the line can never leave the screen.
 
 ### Animating from JavaScript
 

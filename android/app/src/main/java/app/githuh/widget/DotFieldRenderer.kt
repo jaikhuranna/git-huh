@@ -33,6 +33,35 @@ object DotFieldRenderer {
     /** Internal pitch. Near enough to the on-screen pitch to stay crisp. */
     private const val PITCH_DP = 13f
 
+    /**
+     * Column bounds. The ceiling is what a 4-cell-wide card on a tall phone
+     * asks for when it is only two cells high — about seven months of weeks.
+     */
+    private const val MIN_COLUMNS = 10
+    private const val MAX_COLUMNS = 32
+
+    /**
+     * How many weeks to draw in a box of this shape — the rule both widgets
+     * size their field by.
+     *
+     * Only the *ratio* of the reported box is trusted, never its absolute
+     * value: launchers under-report both dimensions but tend to get the shape
+     * right. A wide, short card wants more columns than a square one, or the
+     * bitmap fits by its height and sits in a letterbox with a third of the
+     * card empty on either side.
+     *
+     * It is also never more columns than the payload has weeks. The field is
+     * painted oldest-first from the left, so asking for more weeks than the
+     * data holds pushed today out of the last column and hung a block of dead
+     * grid off the right-hand side — which is what every card wider than the
+     * payload's eighteen weeks used to do.
+     */
+    fun columns(innerWidthDp: Float, fieldHeightDp: Float, days: Int, rows: Int): Int {
+        val aspect = (innerWidthDp / fieldHeightDp).coerceIn(1.4f, 4.4f)
+        val weeks = (days / rows).coerceAtLeast(1)
+        return (rows * aspect).toInt().coerceIn(MIN_COLUMNS, MAX_COLUMNS).coerceAtMost(weeks)
+    }
+
     /** Share of a cell the mark occupies at each intensity. */
     private val SCALES = floatArrayOf(0.26f, 0.44f, 0.62f, 0.82f, 1.0f)
     private val ALPHAS = floatArrayOf(0.26f, 0.46f, 0.66f, 0.84f, 1.0f)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The line leaving is the same line arriving, so it has nothing to animate:
+  the flipper only needs it gone before the next pass begins.
+-->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromAlpha="0.0"
+    android:toAlpha="0.0"
+    android:duration="1" />

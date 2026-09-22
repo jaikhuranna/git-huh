@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { executeQuery } from './github';
+import type { CommitLine } from './messageCache';
 
 /**
  * The second tier of GitHub data: the things you only get by opening an
@@ -425,7 +426,7 @@ export function lastCommitAt(
   return latest;
 }
 
-/** Every commit message, newest first — the loading screen reads these. */
+/** Every commit message, newest first. */
 export function commitMessages(commits: CommitSample[]): string[] {
   return commits.map((commit) => commit.message).filter((m) => m.trim().length > 0);
 }
@@ -436,16 +437,20 @@ export function commitMessages(commits: CommitSample[]): string[] {
  * whatever happened to land this week. Merge commits are dropped — they are
  * GitHub's words, not yours.
  */
-export function spreadMessages(commits: CommitSample[], count: number): string[] {
+export function spreadMessages(
+  commits: CommitSample[],
+  count: number,
+): CommitLine[] {
   const seen = new Set<string>();
-  const pool: string[] = [];
-  for (const message of commitMessages(commits)) {
-    const clean = message.trim();
+  const pool: CommitLine[] = [];
+  for (const commit of commits) {
+    const clean = commit.message.trim();
+    if (clean.length === 0) continue;
     if (/^merge (branch|pull request|remote)/i.test(clean)) continue;
     const key = clean.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    pool.push(clean);
+    pool.push({ message: clean, repo: commit.repo });
   }
   if (pool.length <= count) return pool;
 

@@ -32,6 +32,7 @@ import {
   isStale,
   readCachedLines,
   shuffle,
+  type CommitLine,
 } from '../src/lib/messageCache';
 import { ArchiveScreen } from '../src/screens/ArchiveScreen';
 import { BriefScreen } from '../src/screens/BriefScreen';
@@ -211,7 +212,7 @@ export default function Home() {
    * already there and shows it immediately, and only a pool older than a
    * week sends a request to replace it.
    */
-  const [lines, setLines] = useState<string[]>([]);
+  const [lines, setLines] = useState<CommitLine[]>([]);
   const [refreshWords, setRefreshWords] = useState(false);
 
   useEffect(() => {
@@ -270,6 +271,9 @@ export default function Home() {
   // whatever the history sample has, rather than the placeholder.
   const shuffledSample = useMemo(() => shuffle(sampled), [sampled]);
   const words = lines.length > 0 ? lines : shuffledSample;
+  // The loading screen is built from the words alone; the repository only
+  // means something on the widget, where there is room to place a line.
+  const said = useMemo(() => words.map((word) => word.message), [words]);
 
   useEffect(() => {
     tokenStore.get().then((stored) => {
@@ -313,7 +317,7 @@ export default function Home() {
     return (
       <>
         <StatusBar style="light" />
-        <LoadingScreen caption="opening the drawer" lines={words} />
+        <LoadingScreen caption="opening the drawer" lines={said} />
       </>
     );
   }
@@ -333,7 +337,7 @@ export default function Home() {
     return (
       <>
         <StatusBar style="light" />
-        <LoadingScreen caption="reading your year" lines={words} />
+        <LoadingScreen caption="reading your year" lines={said} />
       </>
     );
   }

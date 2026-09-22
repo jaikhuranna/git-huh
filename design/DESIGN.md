@@ -366,21 +366,38 @@ Resolution order:
 Elements use `widgetElements` (`#000` light / `#fff` dark) and the accent uses `widgetFood`
 (`#d71921`) — the only Nothing red in the whole project.
 
-Layout, top to bottom:
- 1. **A commit message of your own**, mono 10, picked by the date and held for the day,
-    ellipsized to the card. It replaced the sigil + `~handle` lockup: a home-screen card
-    has four lines to spend and one of them was telling its owner their own name. **The
-    handle is not a fallback for it** — a card with no pool yet goes without a masthead.
-    Two things keep the line from being either absent or a different one every hour: a
-    sync that carries no pool keeps the stored one rather than erasing it, and the pick
-    hashes the day against each message instead of indexing a list the app reshuffles on
-    every launch.
- 2. Today's contribution count, 22sp, in `widgetFood` when it is not zero. This is the
-    **calendar** day count, not `totalCommitContributions` — the latter counts public
-    commits only, so it printed `0 today` on days spent in a private repository.
- 3. The dot field (below).
- 4. Mono footer `{calendar total} this year · {openPrs} prs`, again the calendar figure,
-    so the number and the field above it are counting the same thing.
+Layout, top to bottom — **two elements, and nothing else**:
+ 1. **A commit message of your own, travelling.** Mono 11, right to left, with the
+    repository it was written in at the end of the line in the faint ink. It replaced
+    the sigil + `~handle` lockup: a home-screen card has four lines to spend and one of
+    them was telling its owner their own name. **The handle is not a fallback for it** —
+    a card with no pool yet runs no strip. Two things keep the line from being either
+    absent or a different one every hour: a sync that carries no pool keeps the stored
+    one rather than erasing it, and the pick hashes the day against each message instead
+    of indexing a list the app reshuffles on every launch.
+ 2. **The dot field** (below), which has the rest of the card.
+
+The counts that used to sit between them — `N today` at 22sp, and the footer
+`{calendar total} this year · {openPrs} prs` — are **gone**. They are on every screen
+in the app, and a home screen is not where they were wanted. `widgetFood` survives as
+today's mark in the field, which is still the only Nothing red in the project.
+
+**How the strip moves, and why it is built the way it is.** A widget cannot animate
+anything from Kotlin, and the marquee everyone reaches for is not available either: a
+TextView only marquees while it is selected, `View.setSelected` is not a
+`@RemotableViewMethod`, and asking for it through `RemoteViews.setBoolean` takes the
+whole card down with *Can't load widget* on Android 15. What does work is a
+`ViewFlipper` with `android:autoStart`, which starts itself on attach and runs
+animations out of this package's resources, in the launcher's process, stopping when
+the screen goes off. Two children hold the same line and the flip interval is exactly
+one pass (12s), so the pass that arrives is the pass that just left.
+
+The children are `ImageView`s, not `TextView`s: a layout inflated into the launcher
+does **not** resolve `@font`, and the strip came out in the launcher's own sans. So the
+line is painted by `TextRenderer.strip` — message in `widgetElements`, repository in
+the faint ink — and each child's width is set to the bitmap's at bind time with
+`setViewLayoutWidth`, which is what lets `toXDelta="-100%"` carry the whole message off
+the left-hand edge. That call is API 31; below it the strip is printed still.
 
 ### The dot field — one bitmap, equal pitch
 

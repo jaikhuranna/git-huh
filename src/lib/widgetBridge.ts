@@ -2,6 +2,7 @@ import { NativeModules, Platform } from 'react-native';
 import { nothingWidgetColors, type MaterialYouPalette } from 'nothing-mtui';
 
 import { GRID_WEEKS, type GitHubModel } from './contributions';
+import type { CommitLine } from './messageCache';
 
 /**
  * Widget A's surface comes from nothing-mtui — the token map lifted from
@@ -42,13 +43,14 @@ const WIDGET_LINES = 40;
  * The widgets render purely from this state; the app owns all API access.
  *
  * `lines` is the same pool of your own commit subjects the loading screen is
- * written in. Widget A prints one of them as its masthead, picked by the date
- * and held for the day, so the card says something you wrote rather than
- * repeating your handle back at you.
+ * written in, each with the repository it was written in. Widget A runs one
+ * of them across the card as a strip, picked by the date and held for the
+ * day, so it says something you wrote rather than repeating your handle back
+ * at you.
  */
 export async function syncWidget(
   model: GitHubModel,
-  lines: readonly string[] = [],
+  lines: readonly CommitLine[] = [],
 ): Promise<void> {
   if (!isAvailable) return;
 
@@ -101,7 +103,9 @@ export async function syncWidget(
       /** Legacy flat key, read by widgets installed before 2.0.1. */
       bg: dark.widgetBg,
       days,
-      lines: lines.slice(0, WIDGET_LINES),
+      lines: lines
+        .slice(0, WIDGET_LINES)
+        .map((line) => ({ m: line.message, r: line.repo })),
     }),
   );
 }
