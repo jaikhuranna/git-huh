@@ -27,8 +27,15 @@ const bridge = NativeModules.GitHuhWidgetBridge as WidgetBridge | undefined;
 
 const isAvailable = Platform.OS === 'android' && bridge != null;
 
-/** How many commit subjects travel to the widget as its masthead pool. */
-const WIDGET_LINES = 16;
+/**
+ * How many commit subjects travel to the widget as its masthead pool — the
+ * whole cache, which is capped at 40 lines and under 2 KB.
+ *
+ * It used to be a slice of a freshly shuffled pool, so every launch sent the
+ * widget a *different sixteen*. The widget holds one line for a whole day, and
+ * it can only do that if it is looking at the same pool each time.
+ */
+const WIDGET_LINES = 40;
 
 /**
  * Push the latest contribution snapshot to any placed home-screen widgets.

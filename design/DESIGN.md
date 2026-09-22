@@ -369,7 +369,12 @@ Elements use `widgetElements` (`#000` light / `#fff` dark) and the accent uses `
 Layout, top to bottom:
  1. **A commit message of your own**, mono 10, picked by the date and held for the day,
     ellipsized to the card. It replaced the sigil + `~handle` lockup: a home-screen card
-    has four lines to spend and one of them was telling its owner their own name.
+    has four lines to spend and one of them was telling its owner their own name. **The
+    handle is not a fallback for it** — a card with no pool yet goes without a masthead.
+    Two things keep the line from being either absent or a different one every hour: a
+    sync that carries no pool keeps the stored one rather than erasing it, and the pick
+    hashes the day against each message instead of indexing a list the app reshuffles on
+    every launch.
  2. Today's contribution count, 22sp, in `widgetFood` when it is not zero. This is the
     **calendar** day count, not `totalCommitContributions` — the latter counts public
     commits only, so it printed `0 today` on days spent in a private repository.

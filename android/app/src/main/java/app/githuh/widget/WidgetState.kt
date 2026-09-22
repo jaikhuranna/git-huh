@@ -1,6 +1,7 @@
 package app.githuh.widget
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -36,15 +37,15 @@ data class WidgetState(
     /**
      * Today's line. Stable for the whole day — a widget that reshuffled its
      * own headline at every recomposition would be a distraction rather than
-     * a thing to glance at — and hashed rather than taken in order, so
-     * consecutive days do not read as consecutive commits.
+     * a thing to glance at.
+     *
+     * The pick hashes the day against each *message* and takes the highest,
+     * rather than indexing the list. The app shuffles the pool on every
+     * launch, so an index pointed at a different commit each time the app was
+     * opened, which is not what "held for the day" was supposed to mean.
      */
-    fun lineOfTheDay(now: Long = System.currentTimeMillis()): String? {
-        if (lines.isEmpty()) return null
-        val day = now / 86_400_000L
-        val index = Math.floorMod(day * 2654435761L, lines.size.toLong()).toInt()
-        return lines[index]
-    }
+    fun lineOfTheDay(now: Long = System.currentTimeMillis()): String? =
+        lines.maxByOrNull { seed(now / 86_400_000L, it) }
 
     companion object {
         private const val PREFS = "git_huh_widget"
@@ -57,12 +58,31 @@ data class WidgetState(
             return runCatching { parse(JSONObject(raw)) }.getOrNull()
         }
 
+        /**
+         * Persist a sync, keeping the message pool when the payload carries
+         * none of its own.
+         *
+         * The pool is read back off the device while the year is still being
+         * fetched, so a sync routinely lands before it — and an account whose
+         * commit search is rate-limited has nothing to send at all. Dropping
+         * the lines in either case left the card with no masthead every time
+         * the app was opened. Only carried across for the same account:
+         * someone else's commits are not your masthead.
+         */
         fun write(context: Context, payload: String) {
-            JSONObject(payload) // throws on malformed input — never persist junk
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putString(KEY_PAYLOAD, payload)
-                .apply()
+            val json = JSONObject(payload) // throws on malformed input — never persist junk
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+            if (linesOf(json).isEmpty()) {
+                val kept = prefs.getString(KEY_PAYLOAD, null)
+                    ?.let { runCatching { JSONObject(it) }.getOrNull() }
+                    ?.takeIf { it.optString("login") == json.optString("login") }
+                    ?.let(::linesOf)
+                    .orEmpty()
+                if (kept.isNotEmpty()) json.put("lines", JSONArray(kept))
+            }
+
+            prefs.edit().putString(KEY_PAYLOAD, json.toString()).apply()
         }
 
         fun clear(context: Context) {
@@ -94,15 +114,6 @@ data class WidgetState(
             val food = mtui?.optJSONObject("dark")?.optString("food")
                 ?.takeIf { it.isNotBlank() } ?: "#d71921"
 
-            // Absent in payloads written before 2.5 — the widget just falls
-            // back to the handle for a launch, until the app syncs again.
-            val linesJson = json.optJSONArray("lines")
-            val lines = buildList {
-                for (index in 0 until (linesJson?.length() ?: 0)) {
-                    linesJson?.optString(index)?.takeIf { it.isNotBlank() }?.let(::add)
-                }
-            }
-
             return WidgetState(
                 login = json.getString("login"),
                 total = json.getInt("total"),
@@ -114,8 +125,33 @@ data class WidgetState(
                 bgDark = bgDark,
                 food = food,
                 days = days,
-                lines = lines,
+                // Absent in payloads written before 2.5; the card then goes
+                // without a masthead until the app syncs again.
+                lines = linesOf(json),
             )
         }
+
+        /** The non-blank commit subjects in a payload, if it has any. */
+        private fun linesOf(json: JSONObject): List<String> {
+            val array = json.optJSONArray("lines") ?: return emptyList()
+            return buildList {
+                for (index in 0 until array.length()) {
+                    array.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+                }
+            }
+        }
     }
+}
+
+/**
+ * FNV-1a 64, started from the day rather than the standard basis: a pick of
+ * one line out of a pool that does not depend on the pool's order.
+ */
+private const val FNV_BASIS = -3750763034362895579L
+private const val FNV_PRIME = 1099511628211L
+
+private fun seed(day: Long, line: String): Long {
+    var hash = FNV_BASIS xor day
+    for (char in line) hash = (hash xor char.code.toLong()) * FNV_PRIME
+    return hash
 }

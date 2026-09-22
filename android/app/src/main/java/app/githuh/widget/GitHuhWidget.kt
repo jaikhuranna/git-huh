@@ -47,6 +47,11 @@ import app.githuh.MainActivity
  * elements spent a line of a very small card telling their owner their own
  * name; a line out of your history is the thing on this card you cannot get
  * by looking at the phone.
+ *
+ * The handle is not a fallback for it either. A card that printed the pool
+ * when it had one and the handle when it did not was showing the handle far
+ * more often than intended — an empty sync used to erase the pool — so a
+ * card with no line to print now simply goes without a masthead.
  */
 private const val ROWS = 7
 
@@ -160,18 +165,21 @@ private fun FilledContent(
         modifier = GlanceModifier.fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            provider = TextRenderer.render(
-                context,
-                state.lineOfTheDay() ?: "~${state.login.lowercase()}",
-                10f,
-                ink.toArgb(),
-                maxWidthDp = innerWidth.value,
-            ),
-            contentDescription = state.lineOfTheDay() ?: state.login,
-        )
+        val line = state.lineOfTheDay()
+        if (line != null) {
+            Image(
+                provider = TextRenderer.render(
+                    context,
+                    line,
+                    10f,
+                    ink.toArgb(),
+                    maxWidthDp = innerWidth.value,
+                ),
+                contentDescription = line,
+            )
 
-        Spacer(GlanceModifier.height(8.dp))
+            Spacer(GlanceModifier.height(8.dp))
+        }
 
         Row(verticalAlignment = Alignment.Bottom) {
             Image(
