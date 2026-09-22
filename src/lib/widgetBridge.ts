@@ -27,16 +27,43 @@ const bridge = NativeModules.GitHuhWidgetBridge as WidgetBridge | undefined;
 
 const isAvailable = Platform.OS === 'android' && bridge != null;
 
+/** How many commit subjects travel to the widget as its masthead pool. */
+const WIDGET_LINES = 16;
+
 /**
  * Push the latest contribution snapshot to any placed home-screen widgets.
  * The widgets render purely from this state; the app owns all API access.
+ *
+ * `lines` is the same pool of your own commit subjects the loading screen is
+ * written in. Widget A prints one of them as its masthead, picked by the date
+ * and held for the day, so the card says something you wrote rather than
+ * repeating your handle back at you.
  */
-export async function syncWidget(model: GitHubModel): Promise<void> {
+export async function syncWidget(
+  model: GitHubModel,
+  lines: readonly string[] = [],
+): Promise<void> {
   if (!isAvailable) return;
 
-  const days = model.columns
-    .flatMap((column) => column.map((day) => ({ l: day.level, t: day.isToday })))
-    .slice(-GRID_WEEKS * 7);
+  /**
+   * Seven cells per week, always.
+   *
+   * GitHub clips the first and last weeks of the window to the days that
+   * exist, so the flat array was not a multiple of seven — and the widget
+   * indexes it column-major as `column * 7 + row`. Every weekday in the grid
+   * was therefore drawn one or two rows away from where it belonged, which is
+   * invisible when it is wrong and quietly wrong when it looks fine. Padding
+   * the two ragged weeks with empty days puts each row back on its own
+   * weekday, and future days read as unfilled, exactly as they do on GitHub.
+   */
+  const cells = model.columns.flatMap((column, index) => {
+    const filled = column.map((day) => ({ l: day.level, t: day.isToday }));
+    const missing = 7 - filled.length;
+    if (missing <= 0) return filled;
+    const blanks = Array.from({ length: missing }, () => ({ l: 0, t: false }));
+    return index === 0 ? [...blanks, ...filled] : [...filled, ...blanks];
+  });
+  const days = cells.slice(-GRID_WEEKS * 7);
 
   // Re-read every sync rather than caching: the palette follows the
   // wallpaper, which the user can change while the app is running.
@@ -67,6 +94,7 @@ export async function syncWidget(model: GitHubModel): Promise<void> {
       /** Legacy flat key, read by widgets installed before 2.0.1. */
       bg: dark.widgetBg,
       days,
+      lines: lines.slice(0, WIDGET_LINES),
     }),
   );
 }

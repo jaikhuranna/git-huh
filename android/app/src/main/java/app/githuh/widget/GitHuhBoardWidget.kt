@@ -3,7 +3,6 @@ package app.githuh.widget
 import android.content.Context
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
@@ -17,19 +16,16 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.components.Scaffold
-import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
-import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
-import androidx.glance.layout.size
 import androidx.glance.layout.width
 import app.githuh.MainActivity
 
@@ -49,8 +45,6 @@ private val FAINT = Color(0x8CF4F2ED)
 private const val ROWS = 7
 
 private val PADDING = 14.dp
-private val GAP = 3.dp
-private val TARGET_CELL = 9.dp
 
 /** Sigil row + footer + the spacers around the field. */
 private val CHROME_HEIGHT = 74.dp
@@ -107,14 +101,12 @@ private fun Content(state: WidgetState?) {
 @androidx.compose.runtime.Composable
 private fun Filled(context: Context, state: WidgetState, size: DpSize) {
     val innerWidth = size.width - (PADDING * 2)
-    // A hint only — the columns are weighted below so the field fills the
-    // card even when the launcher under-reports the widget's real width.
-    val columns = ((innerWidth + GAP) / (TARGET_CELL + GAP))
-        .toInt()
-        .coerceIn(10, 22)
-    // Same reasoning as widget A: the halftone has to fit what is left.
-    val cell = ((size.height - CHROME_HEIGHT - GAP * (ROWS - 1)) / ROWS)
-        .coerceIn(4.dp, 11.dp)
+    val fieldHeight = (size.height - CHROME_HEIGHT).coerceIn(28.dp, 104.dp)
+    // Same reasoning as widget A: only the ratio of the reported box is
+    // trusted, and the halftone is painted as one bitmap so its pitch is
+    // equal in both axes whatever the launcher claims.
+    val aspect = (innerWidth / fieldHeight).coerceIn(1.4f, 3.4f)
+    val columns = (ROWS * aspect).toInt().coerceIn(10, 24)
 
     Column(
         modifier = GlanceModifier.fillMaxSize(),
@@ -146,14 +138,32 @@ private fun Filled(context: Context, state: WidgetState, size: DpSize) {
 
         Spacer(GlanceModifier.height(12.dp))
 
-        Halftone(state, columns, cell)
+        Image(
+            provider = DotFieldRenderer.render(
+                context = context,
+                days = state.days,
+                columns = columns,
+                rows = ROWS,
+                ink = INK.toArgb(),
+                // The pin has no accent, so today reads through size alone.
+                accent = INK.toArgb(),
+                emptyAlpha = 0.06f,
+                markToday = false,
+            ),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = GlanceModifier.fillMaxWidth().height(fieldHeight),
+        )
 
         Spacer(GlanceModifier.height(10.dp))
 
         Image(
             provider = TextRenderer.render(
                 context,
-                "%,d commits · %,d prs".format(state.totalCommits, state.openPrs),
+                // The calendar total rather than the public commit count: the
+                // field above it is drawn from the calendar, and the two used
+                // to disagree by an order of magnitude on the same card.
+                "%,d this year · %,d prs".format(state.total, state.openPrs),
                 8f,
                 FAINT.toArgb(),
             ),
@@ -171,43 +181,3 @@ private fun sigilSeed(login: String): Int {
     }
     return value
 }
-
-/**
- * The pin's halftone field: white dots whose radius grows with the day's
- * intensity, peak days squaring off. No accent colour — the pin has none,
- * so today reads through size alone.
- */
-@androidx.compose.runtime.Composable
-private fun Halftone(state: WidgetState, columns: Int, cell: Dp) {
-    val scales = floatArrayOf(0.22f, 0.44f, 0.64f, 0.84f, 1.0f)
-    val alphas = floatArrayOf(0.12f, 0.35f, 0.58f, 0.80f, 1.0f)
-
-    val visible = state.days.takeLast(columns * ROWS)
-
-    Column(modifier = GlanceModifier.fillMaxWidth()) {
-        for (row in 0 until ROWS) {
-            Row(modifier = GlanceModifier.fillMaxWidth()) {
-                for (col in 0 until columns) {
-                    val day = visible.getOrNull(col * ROWS + row)
-                    val level = day?.level ?: 0
-                    val dot = cell * scales[level]
-                    Box(
-                        modifier = GlanceModifier.defaultWeight().height(cell),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Box(
-                            modifier = GlanceModifier
-                                .size(dot)
-                                .cornerRadius(if (level >= 4) 2.dp else dot)
-                                .background(
-                                    INK.copy(alpha = if (day == null) 0.06f else alphas[level]),
-                                ),
-                        ) {}
-                    }
-                }
-            }
-            if (row < ROWS - 1) Spacer(GlanceModifier.height(GAP))
-        }
-    }
-}
-

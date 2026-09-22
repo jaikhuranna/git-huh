@@ -99,12 +99,25 @@ Footer strip: black pill "ruler" = last 30 days as a tick timeline, taller tick 
 a single red hairline on today. Two circular ghost buttons flank it (`prs`, `repos` — jump links).
 
 ### 3. `flow` — pin05 (Sankey)
-Canvas, all black/grey. Title row: mono `where it went` + mono right `last 12 months`.
-Left node: `100%` Inter 700 32 with grey absolute below = total contributions.
-One black ribbon fans right into 4 nodes: commits / pull requests / issues / reviews —
-each `27.7%` Inter 700 18 + ink40 absolute under it. Ribbon thickness ∝ share.
-Each node fans again into its top repositories (max 4, then `others`), labelled 10px mono on the right.
-Ribbons are filled polygons, greyscale: depth 1 black, depth 2 ink at 55%, `others` at 25%.
+Canvas. Title row: mono `where it went` + mono right `last 12 months`.
+Left node: `100%` Inter 700 32 with grey absolute beside it = total contributions.
+One trunk fans right into **five** nodes: commits / pull requests / issues / reviews /
+**private** — each `27.7%` Inter 700 15 + ink40 absolute in a legend row below the
+chart, never over the ribbons. Ribbon thickness ∝ share.
+
+Each kind of work carries one of the categorical brights and the legend row repeats
+it as a 10×10 swatch: commits `blue`, pull requests `purple`, issues `yellow`,
+reviews `green`. **Private is `ink40`, deliberately.** It is the one band GitHub
+will not describe — `restrictedContributionsCount` is a number and nothing else —
+so it gets no colour, and a footnote says why. Leaving the band out altogether,
+as the first version did, made this screen disagree with every other screen in the
+app by an order of magnitude on accounts whose work is private.
+
+The second stage belongs to **the commits band alone**: `commitContributionsByRepository`
+counts commits, so the repositories hang off the commits band and are scaled to it,
+not to the trunk. They are drawn in each repository's own **language colour**, the
+same mark `cards` uses, `others` in `ink20`. A year that was mostly private therefore
+shows a thin fan — that is the shape of the year, and the legend carries the numbers.
 
 ### 4. `poster` — pin09 (IBM)
 `#EFEFEF` flat canvas, **full page**: head, chart, caption and chips, with the chart taking
@@ -351,14 +364,39 @@ Resolution order:
  2. Otherwise → the static fallback the package ships, passed in the sync payload from JS
     (`nothingWidgetColors(null, mode)`), so JS stays the owner of the package.
 Elements use `widgetElements` (`#000` light / `#fff` dark) and the accent uses `widgetFood`
-(`#d71921`) — the only Nothing red in the whole project. Layout unchanged in spirit:
-handle, today's commits, dot matrix, footer stats — but the matrix follows day/night elements.
+(`#d71921`) — the only Nothing red in the whole project.
+
+Layout, top to bottom:
+ 1. **A commit message of your own**, mono 10, picked by the date and held for the day,
+    ellipsized to the card. It replaced the sigil + `~handle` lockup: a home-screen card
+    has four lines to spend and one of them was telling its owner their own name.
+ 2. Today's contribution count, 22sp, in `widgetFood` when it is not zero. This is the
+    **calendar** day count, not `totalCommitContributions` — the latter counts public
+    commits only, so it printed `0 today` on days spent in a private repository.
+ 3. The dot field (below).
+ 4. Mono footer `{calendar total} this year · {openPrs} prs`, again the calendar figure,
+    so the number and the field above it are counting the same thing.
+
+### The dot field — one bitmap, equal pitch
+
+Both widgets paint the field with `DotFieldRenderer` and hand it to Glance as a single
+`Image` with `ContentScale.Fit`. **Do not go back to a Column of weighted Rows.** That
+layout cannot make a square grid: the columns split the reported width while the rows
+were pinned to a capped dp height, so the horizontal pitch ran about 2.5× the vertical
+one and the field read as stripes. It also lost rows — a launcher that over-reports its
+height leaves the nested LinearLayouts short and RemoteViews gives the last children no
+height at all, so a seven-row grid arrived on the home screen with five rows in it.
+
+Only the *ratio* of the reported size is trusted, to choose a column count; the bitmap
+then scales uniformly into whatever space the widget really has.
 
 ### Widget B — `GitHuhBoardWidget` (pin08 board style)
 The urbit card: `#0B0B0A` card, `#F4F2ED` ink, **no Material You, no red**.
-Sigil + `~{login}` in IBM Plex Mono (ship `ibmplexmono.ttf` in `res/font`), a halftone dot field
-of the last N days (white dots, radius by level, peak days squared off), and a mono footer
-`{totalCommits} commits · {openPrs} prs`. Replaces the old "paper" widget.
+Sigil + `~{login}` in IBM Plex Mono (ship `ibmplexmono.ttf` in `res/font`) — the handle
+stays here, because on this card the sigil *is* the design. Then the same equal-pitch dot
+field (white dots, radius by level, peak days squared off, **no accent**: the pin has none,
+so today reads through size alone), and a mono footer `{calendar total} this year ·
+{openPrs} prs`. Replaces the old "paper" widget.
 
 ## Data coverage
 
@@ -370,6 +408,7 @@ Everything the GraphQL API gives that is worth showing must be surfaced:
 | contribution calendar (365d, per-day counts) | hey, now, poster, dots, weather |
 | contributionYears | poster (chips), archive (rows) |
 | commits / PRs / issues / reviews totals | flow |
+| restrictedContributionsCount (private work) | flow, widgets |
 | repositoriesContributedTo + per-repo commit counts | flow, cards |
 | repositories: name, stars, forks, language(+color), pushedAt, isPrivate | cards, orbit, hey |
 | language byte breakdown | orbit, now (dock) |

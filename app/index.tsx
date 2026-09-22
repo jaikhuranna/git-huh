@@ -289,9 +289,9 @@ export default function Home() {
 
   useEffect(() => {
     if (model && token !== DEMO_TOKEN) {
-      syncWidget(model).catch(() => {});
+      syncWidget(model, words).catch(() => {});
     }
-  }, [model, token]);
+  }, [model, token, words]);
 
   const goTo = (index: number) => {
     setPage(index);

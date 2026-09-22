@@ -79,13 +79,17 @@ on-device from the last one.
   otherwise just reshuffled. `src/lib/commitLines.ts` fills it, oldest-heavy,
   from the REST commit-search endpoint — GraphQL has no commit search, and
   `activity.ts` only ever sees the last few days.
+- `src/hooks/useTokenScopes.ts` — reads `x-oauth-scopes` off a REST call and
+  drives the "no repo scope" strip in `app/index.tsx`. See the trap below.
 - `src/lib/pullDetail.ts` — one pull request in full: GraphQL for the object,
   its comments and its review threads, REST for the file patches (GraphQL's
   `files` connection carries no patch text), plus the unified-diff parser.
 - `src/lib/` — GitHub GraphQL, the `GitHubModel` view model, seeded demo data.
 - `src/theme/index.ts` — every colour, font and radius. Use these tokens; do
   not invent values in screens.
-- `android/app/src/main/java/app/githuh/widget/` — both Glance widgets.
+- `android/app/src/main/java/app/githuh/widget/` — both Glance widgets, plus
+  the three bitmap renderers they are built from (`TextRenderer`,
+  `GlyphRenderer`, `DotFieldRenderer`).
 - `preview/` — ten of the screens as HTML at 393×852, used to iterate on
   layout in a browser and to build `review.html`. It lags the app.
 - `design/DESIGN.md` — the spec every screen is derived from.
@@ -139,7 +143,30 @@ JVM `SIGBUS` in `PerfLongVariant::sample`, delete the offending
 `node_modules/*/android/.cxx` directory and pass
 `-Dorg.gradle.jvmargs="… -XX:-UsePerfData"`.
 
-## Two traps
+## Three traps
+
+### A token without `repo` returns a smaller, valid, wrong year
+
+This is the one that looks like a bug in the app and is not.
+`contributionsCollection` is scoped to the **token**, not to the account. A PAT
+without `repo` is answered with the public half of your year, with no error
+and no warning, because GitHub considers that a complete answer. On an account
+whose work is mostly private that means a flat dot grid, `0 today`, and a flow
+diagram totalling ten contributions against a calendar of four hundred.
+
+Two separate things follow from it and both are load-bearing:
+
+- **`restrictedContributionsCount` is not in the four typed totals.** Even with
+  a perfect token, `totalCommitContributions` + PRs + issues + reviews does not
+  add up to `contributionCalendar.totalContributions` — the difference is work
+  in repositories the profile does not expose. It has to be queried and carried
+  as its own bucket, or every "where it went" figure understates the year.
+- **The widgets must read the calendar, not the commit buckets.** `todayCount`
+  and `total` include private work; `todayCommits` and `totalCommits` do not.
+
+`useTokenScopes` only reports `limited` when it is certain: classic PATs send
+`x-oauth-scopes`, fine-grained ones send nothing, and there is nothing to infer
+from silence, so those stay quiet.
 
 ### react-native-svg text in a downloaded font
 
@@ -166,7 +193,11 @@ response*, which is the entire point of that screen. Measure with
 ## Checks
 
 There are no tests. Before shipping, run `npx tsc --noEmit` (it should be
-clean). `npx eslint app src` has two pre-existing complaints (`FlowScreen`
-reassigns a cursor during render, `NowScreen` imports an unused `G`) — do not
-add more. The `preview/*.html` sheet is a browser sandbox and has drifted
+clean) and `npx eslint app src` (warnings only — `NowScreen` imports an unused
+`G`, `IndexScreen` has an exhaustive-deps note, and `app/index.tsx` imports
+`react-native` twice). **Zero errors; do not add more warnings.** Note that
+eslint here errors on `setState` called synchronously in an effect body, so a
+hook that resets state on a prop change has to derive it during render instead
+— `useContributions` and `useTokenScopes` both stamp their result with the
+token that produced it for exactly this reason. The `preview/*.html` sheet is a browser sandbox and has drifted
 behind the app; trust the emulator over it.

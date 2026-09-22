@@ -49,6 +49,11 @@ object DotFieldRenderer {
         accent: Int,
         /** Alpha for a cell with no day behind it — the grid's own ghost. */
         emptyAlpha: Float,
+        /**
+         * Widget B's source pin has no accent colour at all, so there today
+         * reads through size alone and this is false.
+         */
+        markToday: Boolean = true,
     ): ImageProvider {
         val pitch = PITCH_DP * context.resources.displayMetrics.density
         val cell = pitch * (1f - GAP_SHARE)
@@ -67,7 +72,7 @@ object DotFieldRenderer {
             for (row in 0 until rows) {
                 val day = visible.getOrNull(col * rows + row)
                 val level = day?.level ?: 0
-                val today = day?.isToday == true
+                val today = markToday && day?.isToday == true
 
                 paint.color = when {
                     today -> accent

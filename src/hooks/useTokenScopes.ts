@@ -17,11 +17,16 @@ import { DEMO_TOKEN } from '../lib/token';
  */
 export type ScopeState = 'unknown' | 'full' | 'limited';
 
+/** The answer, stamped with the token that produced it. */
+interface Settled {
+  token: string;
+  limited: boolean;
+}
+
 export function useTokenScopes(token: string | null): ScopeState {
-  const [state, setState] = useState<ScopeState>('unknown');
+  const [result, setResult] = useState<Settled | null>(null);
 
   useEffect(() => {
-    setState('unknown');
     if (!token || token === DEMO_TOKEN) return;
 
     const controller = new AbortController();
@@ -29,7 +34,7 @@ export function useTokenScopes(token: string | null): ScopeState {
       .then((scopes) => {
         const sees = seesPrivateWork(scopes);
         if (sees === null) return;
-        setState(sees ? 'full' : 'limited');
+        setResult({ token, limited: !sees });
       })
       .catch(() => {
         // Best effort: a failed check is not worth an error path, it just
@@ -39,5 +44,8 @@ export function useTokenScopes(token: string | null): ScopeState {
     return () => controller.abort();
   }, [token]);
 
-  return state;
+  // Derived rather than reset in the effect, so swapping tokens cannot leave
+  // the previous account's answer on screen for a render.
+  if (!token || result?.token !== token) return 'unknown';
+  return result.limited ? 'limited' : 'full';
 }
