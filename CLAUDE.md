@@ -2,15 +2,23 @@
 
 ## Goal
 
-**Make your own GitHub history worth looking at.** The numbers GitHub already
-has about you — a year of contributions, the languages, the repos, the pull
-requests and the arguments in them — rendered as a set of printed artefacts
-rather than as a dashboard. Fourteen screens, each one a pin from the
-"nothing github" Pinterest board (`design/board/`), grouped into five
-sections, plus one Android home-screen widget.
+**Make your own GitHub history worth looking at — and deal with what wants
+you without reaching for a laptop.** The numbers GitHub already has about
+you — a year of contributions, the languages, the repos, the pull requests
+and the arguments in them — rendered as a set of printed artefacts rather
+than as a dashboard: fourteen screens, each one a pin from the "nothing
+github" Pinterest board (`design/board/`), grouped into five sections, plus
+one Android home-screen widget.
 
-It is a personal app for one account at a time: you paste a token, it reads
-your year, and nothing leaves the device except requests to GitHub.
+Since 3.1 it also *acts*, because that is what the lists in
+`design/STORIES.md` asked for: an inbox you can put things away in,
+notifications without a server, review and reply, line comments, CI with
+re-run and approvals, repositories with code search, files you can edit into
+a pull request, issues (forms included), discussions, releases, security
+alerts, several accounts, and everything readable offline.
+
+It is personal: you paste a token (or several), and nothing leaves the
+device except requests to GitHub.
 
 Three documents govern the work and all three are part of it:
 
@@ -67,7 +75,31 @@ on-device from the last one.
 - `src/screens/` — one file per screen: `Hey`, `Now`, `Weather`, `Clock`,
   `Inbox`, `Index`, `Brief`, `Review`, `Cards`, `Poster`, `Flow`, `Orbit`,
   `Archive`, `Dots`, plus `Loading` (pin11, shown while the first request is
-  in flight) and `Pull`.
+  in flight), and the pushed pages: `Pull`, `Thread` (issue or discussion),
+  `Repo`, `File`, `NewIssue`.
+- **Pushed pages are a stack** (`src/lib/nav.tsx`, rendered at the bottom of
+  `app/index.tsx`). Screens reach it with `useNav()`, which also carries the
+  token, the login and whether this is the demo — do not thread those
+  through props. `routeForUrl` turns a github.com link into a page; rendered
+  Markdown uses it so links stay in the app.
+- **Every read is cache-first** through `src/hooks/useRemote.ts`: the saved
+  answer (`src/lib/store.ts`, JSON files in the documents directory — *not*
+  SecureStore, which caps at ~2 KB) is drawn first, the fresh one replaces
+  it, and offline the saved one stays with its age. New data sources should
+  use it rather than a hand-rolled hook. Cache keys start with the lowercase
+  login and a dash, so `accountStore.remove` can clear an account's answers.
+- **Every write** is in `src/lib/writes.ts` (comments, reviews, line
+  comments, issues, the edit → branch → pull request flow including the
+  fork fallback) and `src/lib/checks.ts` (re-run, approvals), and every
+  write in the UI goes through `src/components/Composer.tsx`. On the demo
+  token the composer answers `nothing was sent` and never calls them.
+- `src/lib/triage.ts` + `src/hooks/useTriage.ts` — the inbox's own done /
+  snooze marks, per account, on the device.
+- `src/lib/notify.ts` — the background inbox check (expo-background-task,
+  ~15 min, Android decides) and its local notifications. See the entry-file
+  trap below.
+- `src/lib/accounts.ts` — the list of accounts in the keystore; the current
+  token is still `tokenStore`.
 - **Navigation is five sections, and it lives in `app/index.tsx`.**
   `SECTIONS` is the whole map: `today` (you · now · weather · hours),
   `inbox` (recent), `work` (pulls · brief · cycle · repos), `year` (weeks ·
@@ -82,17 +114,20 @@ on-device from the last one.
 - A section mounts the first time it is opened and keeps its own page after
   that, so the fetches are gated on the *section* (and, for the heavy
   activity request, on the view one step before the one that needs it).
-- **`Pull` is not a section.** It is a full-screen overlay rendered *over*
-  everything from `app/index.tsx`, opened from a row on `index`, `inbox` or
-  the link on `brief`. It has horizontal scrollers of its own (the diff), and
+- **Pushed pages are not sections.** They render *over* everything because
+  they have horizontal scrollers of their own (the diff, a file, a log), and
   a horizontal scroller nested inside a pager loses every drag to the page
   swipe — which is also why the poster's year chips wrap instead of
-  scrolling.
+  scrolling. A one-view section (`inbox`, `lab`) turns its pager's scrolling
+  off, or the inbox's swipe actions would lose their drag the same way.
 - `src/lib/activity.ts` — the second-tier data layer: sampled commit history
   and pull request detail. `src/lib/social.ts` — the `inbox` section's feed,
   built from search plus each PR's comment and review connections
   **deliberately not** from the notifications API, which would need a
-  `notifications` scope the app never asks for.
+  `notifications` scope the app never asks for. The scopes it *does* ask for
+  are in `TOKEN_SETTINGS_URL` (`PatForm.tsx`): `read:user, repo,
+  read:discussion, write:discussion, security_events`. Every screen works on
+  less and says what the missing scope costs.
 - `src/lib/messageCache.ts` — the pool of commit messages the loading screen
   and widget A's strip are made of. It has to be on screen before the request
   that would fetch them, hence the cache; it is refetched only when more than
@@ -114,8 +149,10 @@ on-device from the last one.
 - `android/app/src/main/java/app/githuh/widget/` — the Glance widget, plus
   the three bitmap renderers it is built from (`TextRenderer`,
   `GlyphRenderer`, `DotFieldRenderer`). It is a travelling commit message and
-  the dot field, nothing else: no counts, no accent, a plus for today, and one
-  14dp padding on every side. The strip lives in
+  the dot field, nothing else: no counts, no accent, a plus for today in the
+  **bottom-right** corner (the field is a run of days ending today, not a
+  weekday calendar), three weeks or more of nothing drawn as a wave with its
+  length on it, and one 14dp padding on every side. The strip lives in
   `res/layout/widget_strip.xml` and is the one view here that is not painted
   by Glance. See the widget trap below before touching it.
 - `preview/` — ten of the screens as HTML at 393×852, used to iterate on
@@ -172,7 +209,7 @@ JVM `SIGBUS` in `PerfLongVariant::sample`, delete the offending
 `node_modules/*/android/.cxx` directory and pass
 `-Dorg.gradle.jvmargs="… -XX:-UsePerfData"`.
 
-## Five traps
+## Six traps
 
 ### A token without `repo` returns a smaller, valid, wrong year
 
@@ -239,9 +276,21 @@ the background makes the radius survive. So a toggled surface here carries a
 1px border (transparent when off) whether or not it needs one. Do not
 "simplify" that border away.
 
+### The entry file is `index.js`, and it has to stay that way
+
+`package.json` `main` points at `index.js`, not `expo-router/entry`, and
+Android's bundle entry is resolved from it. `index.js` imports
+`src/lib/notify.ts` *before* the router so that `TaskManager.defineTask`
+runs when the bundle is evaluated: Android starts the JavaScript runtime
+headless to run the background inbox check, no screen renders, and a task
+defined inside a screen module or `app/_layout.tsx` is simply never defined
+— the check fails silently every fifteen minutes. Anything else that must
+run in the background goes in that file too.
+
 ### Animating from JavaScript
 
-Do not. The loading wave went through a `setInterval` stepping a counter
+Do not. (The one exception is an inbox row following a finger, which a
+`PanResponder` has to drive.) The loading wave went through a `setInterval` stepping a counter
 (~16 fps, visibly steppy) and then a `requestAnimationFrame` loop (right
 timing, still slow) before landing on the only thing that works: precompute
 every glyph's whole track at mount, hand it to one looping `Animated.Value`

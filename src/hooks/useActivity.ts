@@ -1,53 +1,41 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 
-import {
-  EMPTY_ACTIVITY,
-  fetchActivity,
-  type Activity,
-} from '../lib/activity';
+import { EMPTY_ACTIVITY, fetchActivity, type Activity } from '../lib/activity';
 import { demoActivity } from '../lib/demo';
 import { DEMO_TOKEN } from '../lib/token';
+import { useRemote } from './useRemote';
 
 export type ActivityState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'ready'; activity: Activity };
 
-interface Settled {
-  key: string;
-  activity: Activity;
-}
-
 /**
  * Commit timestamps and pull request detail. Only fetched once a screen that
  * needs them is reachable, and a failure resolves to the empty activity
  * rather than an error state — these screens are additive, so the rest of
- * the app must not care when GitHub declines.
+ * the app must not care when GitHub declines. The last sample is kept on the
+ * device, which also keeps `hours` and `repos` drawn when offline.
  */
 export function useActivity(
   token: string | null,
   login: string | null,
   active: boolean,
 ): ActivityState {
-  const [settled, setSettled] = useState<Settled | null>(null);
-  const key = `${token ?? ''}|${login ?? ''}`;
+  const demo = useMemo(
+    () => (token === DEMO_TOKEN ? demoActivity() : undefined),
+    [token],
+  );
+  const remote = useRemote(
+    active && token && login ? `${token}|${login}` : null,
+    (signal) => fetchActivity(token ?? '', login ?? '', signal),
+    {
+      cacheKey: login && token !== DEMO_TOKEN ? `${login.toLowerCase()}-activity` : null,
+      demo,
+    },
+  );
 
-  useEffect(() => {
-    if (!active || !token || !login || token === DEMO_TOKEN) return;
-
-    const controller = new AbortController();
-    fetchActivity(token, login, controller.signal)
-      .then((activity) => setSettled({ key, activity }))
-      .catch((error: unknown) => {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        setSettled({ key, activity: EMPTY_ACTIVITY });
-      });
-
-    return () => controller.abort();
-  }, [active, key, token, login]);
-
-  if (!token || !login) return { status: 'idle' };
-  if (token === DEMO_TOKEN) return { status: 'ready', activity: demoActivity() };
-  if (settled?.key !== key) return { status: 'loading' };
-  return { status: 'ready', activity: settled.activity };
+  if (remote.status === 'ready') return { status: 'ready', activity: remote.data };
+  if (remote.status === 'error') return { status: 'ready', activity: EMPTY_ACTIVITY };
+  return { status: remote.status };
 }

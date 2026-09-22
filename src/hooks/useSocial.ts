@@ -1,49 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 
 import { demoSocial } from '../lib/demo';
 import { fetchSocial, type SocialEvent } from '../lib/social';
 import { DEMO_TOKEN } from '../lib/token';
+import { useRemote } from './useRemote';
 
 export type SocialState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; events: SocialEvent[] }
+  | { status: 'ready'; events: SocialEvent[]; savedAt: number | null; offline: boolean }
   | { status: 'error' };
 
-interface Settled {
-  key: string;
-  outcome: { status: 'ready'; events: SocialEvent[] } | { status: 'error' };
-}
-
 /**
- * The home screen's activity feed. It fails into an error row rather than an
- * empty one: "nobody has said anything" and "GitHub would not tell us" are
- * different facts and the screen says which one it is.
+ * The inbox. It fails into an error row rather than an empty one: "nobody
+ * has said anything" and "GitHub would not tell us" are different facts and
+ * the screen says which one it is. The last feed that loaded is kept, so the
+ * inbox opens with what it had and a line saying how old that is.
  */
 export function useSocial(
   token: string | null,
   login: string | null,
   active: boolean,
-): SocialState {
-  const [settled, setSettled] = useState<Settled | null>(null);
-  const key = `${token ?? ''}|${login ?? ''}`;
+): SocialState & { reload: () => void } {
+  const demo = useMemo(
+    () => (token === DEMO_TOKEN ? demoSocial() : undefined),
+    [token],
+  );
+  const remote = useRemote(
+    active && token && login ? `${token}|${login}` : null,
+    (signal) => fetchSocial(token ?? '', login ?? '', signal),
+    {
+      cacheKey: login && token !== DEMO_TOKEN ? `${login.toLowerCase()}-social` : null,
+      demo,
+    },
+  );
 
-  useEffect(() => {
-    if (!active || !token || !login || token === DEMO_TOKEN) return;
-
-    const controller = new AbortController();
-    fetchSocial(token, login, controller.signal)
-      .then((events) => setSettled({ key, outcome: { status: 'ready', events } }))
-      .catch((error: unknown) => {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        setSettled({ key, outcome: { status: 'error' } });
-      });
-
-    return () => controller.abort();
-  }, [active, key, token, login]);
-
-  if (!token || !login) return { status: 'idle' };
-  if (token === DEMO_TOKEN) return { status: 'ready', events: demoSocial() };
-  if (settled?.key !== key) return { status: 'loading' };
-  return settled.outcome;
+  if (remote.status === 'ready') {
+    return {
+      status: 'ready',
+      events: remote.data,
+      savedAt: remote.savedAt,
+      offline: remote.offline,
+      reload: remote.reload,
+    };
+  }
+  if (remote.status === 'error') return { status: 'error', reload: remote.reload };
+  return { status: remote.status, reload: remote.reload };
 }

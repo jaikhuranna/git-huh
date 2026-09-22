@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  BackHandler,
   Linking,
   Platform,
   Pressable,
@@ -10,17 +11,25 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 
 import { Segments } from '../src/components/Segments';
 import { TabBar } from '../src/components/TabBar';
 import { Body, Label } from '../src/components/Type';
 import { Wordmark } from '../src/components/Wordmark';
-import { PatForm } from '../src/components/PatForm';
+import { PatForm, TOKEN_SETTINGS_URL } from '../src/components/PatForm';
 import { useActivity } from '../src/hooks/useActivity';
 import { useContributions } from '../src/hooks/useContributions';
 import { useOpenPrs } from '../src/hooks/useOpenPrs';
 import { useSocial, type SocialState } from '../src/hooks/useSocial';
 import { useTokenScopes } from '../src/hooks/useTokenScopes';
+import { useTriage } from '../src/hooks/useTriage';
+import { accountStore, type Account } from '../src/lib/accounts';
+import { NavContext, routeForUrl, type Nav, type Route } from '../src/lib/nav';
+import { markSeen } from '../src/lib/notify';
+import type { SocialEvent } from '../src/lib/social';
+import { savedAge } from '../src/lib/store';
+import { stateOf, type Marks } from '../src/lib/triage';
 import type { GitHubModel } from '../src/lib/contributions';
 import { DEMO_TOKEN, tokenStore } from '../src/lib/token';
 import { clearWidget, syncWidget } from '../src/lib/widgetBridge';
@@ -39,27 +48,25 @@ import { BriefScreen } from '../src/screens/BriefScreen';
 import { ClockScreen } from '../src/screens/ClockScreen';
 import { CardsScreen } from '../src/screens/CardsScreen';
 import { DotsScreen } from '../src/screens/DotsScreen';
+import { FileScreen } from '../src/screens/FileScreen';
 import { FlowScreen } from '../src/screens/FlowScreen';
 import { HeyScreen } from '../src/screens/HeyScreen';
 import { IndexScreen } from '../src/screens/IndexScreen';
 import { InboxScreen } from '../src/screens/InboxScreen';
 import { LoadingScreen } from '../src/screens/LoadingScreen';
+import { NewIssueScreen } from '../src/screens/NewIssueScreen';
 import { NowScreen } from '../src/screens/NowScreen';
 import { OrbitScreen } from '../src/screens/OrbitScreen';
 import { PosterScreen } from '../src/screens/PosterScreen';
 import { PullScreen } from '../src/screens/PullScreen';
+import { RepoScreen } from '../src/screens/RepoScreen';
 import { ReviewScreen } from '../src/screens/ReviewScreen';
+import { ThreadScreen } from '../src/screens/ThreadScreen';
 import { WeatherScreen } from '../src/screens/WeatherScreen';
 import { colors, space } from '../src/theme';
 
 /** undefined = restoring from the keystore, null = signed out. */
 type TokenState = string | null | undefined;
-
-/** Which pull request the detail overlay is showing, if any. */
-interface OpenPull {
-  repo: string;
-  number: number;
-}
 
 type ScreenName =
   | 'hey'
@@ -143,10 +150,6 @@ const FLAT = SECTIONS.flatMap((section, tab) =>
 /** Lines kept for the loading screen — it draws about 26 at a time. */
 const POOL_SIZE = 40;
 
-/** Where to mint a token that can actually see the whole account. */
-const TOKEN_SETTINGS_URL =
-  'https://github.com/settings/tokens/new?scopes=read:user,repo&description=git-huh';
-
 /**
  * The one thing the app cannot fix for you.
  *
@@ -224,6 +227,9 @@ function SectionPager({
         }}
         pagingEnabled
         ref={pager}
+        // A one-view section has nothing to page to, and a pager that still
+        // claims horizontal drags would eat the inbox's swipe actions.
+        scrollEnabled={views.length > 1}
         showsHorizontalScrollIndicator={false}
         style={styles.pager}
       >
@@ -237,15 +243,65 @@ function SectionPager({
   );
 }
 
-/** Events that are addressed to you rather than about you — the tab count. */
-function wantsYou(social: SocialState): number {
+/**
+ * Events that are addressed to you rather than about you, and that you have
+ * not put away — the tab count. It is counted from the same rows the inbox
+ * draws, so a badge can never say three over an inbox that shows none.
+ */
+function wantsYou(social: SocialState, marks: Marks): number {
   if (social.status !== 'ready') return 0;
   return social.events.filter(
     (event) =>
-      event.kind === 'review-request' ||
-      event.kind === 'mention' ||
-      (event.kind === 'review' && event.state === 'CHANGES_REQUESTED'),
+      (event.kind === 'review-request' ||
+        event.kind === 'mention' ||
+        (event.kind === 'review' && event.state === 'CHANGES_REQUESTED')) &&
+      stateOf(event, marks) === 'open',
   ).length;
+}
+
+/** One thing pushed over the sections. */
+function RouteView({ route }: { route: Route }) {
+  switch (route.kind) {
+    case 'pull':
+      return <PullScreen number={route.number} repo={route.repo} />;
+    case 'thread':
+      return <ThreadScreen number={route.number} repo={route.repo} type={route.type} />;
+    case 'repo':
+      return <RepoScreen repo={route.repo} />;
+    case 'file':
+      return <FileScreen find={route.find} path={route.path} refName={route.ref} repo={route.repo} />;
+    case 'new-issue':
+      return <NewIssueScreen repo={route.repo} />;
+    case 'add-account':
+      return null;
+  }
+}
+
+function routeKey(route: Route): string {
+  switch (route.kind) {
+    case 'pull':
+    case 'thread':
+      return `${route.kind}:${route.repo}#${route.number}`;
+    case 'file':
+      return `file:${route.repo}:${route.path}`;
+    case 'repo':
+    case 'new-issue':
+      return `${route.kind}:${route.repo}`;
+    case 'add-account':
+      return 'add-account';
+  }
+}
+
+/** The token form as a pushed screen, with the system back button wired to cancel. */
+function AddAccount({ onCancel, onVerified }: { onCancel: () => void; onVerified: (token: string) => void }) {
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      onCancel();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [onCancel]);
+  return <PatForm onCancel={onCancel} onTokenVerified={onVerified} />;
 }
 
 export default function Home() {
@@ -255,7 +311,9 @@ export default function Home() {
   // back to it — which is what a tab bar promises.
   const [pages, setPages] = useState<number[]>(() => SECTIONS.map(() => 0));
   const [visited, setVisited] = useState<number[]>([0]);
-  const [openPull, setOpenPull] = useState<OpenPull | null>(null);
+  // Everything pushed over the sections, bottom first; the last one is on screen.
+  const [stack, setStack] = useState<Route[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const { width } = useWindowDimensions();
 
   const section = SECTIONS[tab].key;
@@ -266,14 +324,13 @@ export default function Home() {
   const model = contributions.status === 'ready' ? contributions.model : null;
   const login = model?.login ?? null;
   const prs = useOpenPrs(token ?? null, login, section === 'work');
-  // The inbox is the reason to open the app, so it is fetched from the first
-  // section rather than waiting for its own tab: the count on the bar has to
-  // be true before you tap it.
-  const social = useSocial(
-    token ?? null,
-    login,
-    section === 'inbox' || section === 'today',
-  );
+  // The inbox is the reason to open the app, so it is fetched as soon as we
+  // know who you are and kept whichever section is open: the count on the
+  // bar has to be true before you tap it.
+  const social = useSocial(token ?? null, login, true);
+  // The demo keeps its marks under its own name, never under the real login
+  // it happens to borrow.
+  const triage = useTriage(token === DEMO_TOKEN ? 'demo' : login);
   // Commit timestamps and PR bodies are a second, heavier request — asked
   // for one view before anything needs them, never on launch.
   const activityState = useActivity(
@@ -283,6 +340,80 @@ export default function Home() {
   );
   const activity =
     activityState.status === 'ready' ? activityState.activity : EMPTY_ACTIVITY;
+
+  const open = useCallback((route: Route) => setStack((current) => [...current, route]), []);
+  const replace = useCallback(
+    (route: Route) => setStack((current) => [...current.slice(0, -1), route]),
+    [],
+  );
+  const close = useCallback(() => setStack((current) => current.slice(0, -1)), []);
+  const nav = useMemo<Nav>(
+    () => ({
+      open,
+      replace,
+      close,
+      token: token ?? null,
+      login,
+      demo: token === DEMO_TOKEN,
+    }),
+    [close, login, open, replace, token],
+  );
+
+  /** A row in the inbox opens the thing it is about — here, not in a browser. */
+  const openEvent = useCallback(
+    (event: SocialEvent) => {
+      const route = routeForUrl(event.url);
+      if (route) open(route);
+      else Linking.openURL(event.url).catch(() => {});
+    },
+    [open],
+  );
+
+  // Every account this phone has been given, kept beside the current token.
+  useEffect(() => {
+    accountStore.list().then(setAccounts).catch(() => {});
+  }, []);
+
+  // The account in use joins the list the first time its login is known.
+  useEffect(() => {
+    if (!login || !token || token === DEMO_TOKEN) return;
+    accountStore.upsert(login, token).then(setAccounts).catch(() => {});
+  }, [login, token]);
+
+  // What the inbox has shown with the app open is not worth a notification
+  // later; the background check skips anything recorded here.
+  const feedEvents = social.status === 'ready' ? social.events : null;
+  useEffect(() => {
+    if (!login || !feedEvents || token === DEMO_TOKEN) return;
+    markSeen(login, feedEvents).catch(() => {});
+  }, [feedEvents, login, token]);
+
+  // A tapped notification opens the pull request, issue or discussion it was
+  // about — including when it is what started the app.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const handle = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data as {
+        url?: string;
+        inbox?: boolean;
+      };
+      const route = data?.url ? routeForUrl(data.url) : null;
+      if (route) {
+        setStack((current) => [...current, route]);
+      } else if (data?.inbox) {
+        setTab(1);
+        setVisited((current) => (current.includes(1) ? current : [...current, 1]));
+      }
+      Notifications.clearLastNotificationResponseAsync().catch(() => {});
+    };
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (response) handle(response);
+      })
+      .catch(() => {});
+    const subscription = Notifications.addNotificationResponseReceivedListener(handle);
+    return () => subscription.remove();
+  }, []);
 
   /**
    * The loading screen is written in your own commit messages, which is a
@@ -401,17 +532,41 @@ export default function Home() {
       current.map((value, position) => (position === index ? page : value)),
     );
 
-  const disconnect = async () => {
-    if (token !== DEMO_TOKEN) await clearWidget().catch(() => {});
+  /** Everything that belongs to one account's session, back to the start. */
+  const resetSession = async () => {
     await clearCachedLines();
+    searched.current = false;
     setLines([]);
     setRefreshWords(true);
-    await tokenStore.clear();
-    setToken(null);
     setTab(0);
     setPages(SECTIONS.map(() => 0));
     setVisited([0]);
-    setOpenPull(null);
+    setStack([]);
+  };
+
+  const switchTo = async (next: string) => {
+    await resetSession();
+    await tokenStore.set(next);
+    setToken(next);
+  };
+
+  /**
+   * Forget this account. If the phone holds another, the app moves to it;
+   * only the last one leaves you at the token form.
+   */
+  const disconnect = async () => {
+    const demo = token === DEMO_TOKEN;
+    if (!demo) await clearWidget().catch(() => {});
+    const remaining = !demo && login ? await accountStore.remove(login) : accounts;
+    setAccounts(remaining);
+    const next = remaining.find((account) => account.token !== token);
+    if (next) {
+      await switchTo(next.token);
+      return;
+    }
+    await resetSession();
+    await tokenStore.clear();
+    setToken(null);
   };
 
   const screen = (model: GitHubModel) =>
@@ -420,9 +575,12 @@ export default function Home() {
         case 'hey':
           return (
             <HeyScreen
+              accounts={accounts}
               demo={token === DEMO_TOKEN}
               model={model}
+              onAdd={() => open({ kind: 'add-account' })}
               onDisconnect={disconnect}
+              onSwitch={(account) => switchTo(account.token)}
             />
           );
         case 'now':
@@ -437,11 +595,11 @@ export default function Home() {
             />
           );
         case 'inbox':
-          return <InboxScreen onOpen={setOpenPull} state={social} />;
+          return <InboxScreen onOpen={openEvent} state={social} triage={triage} />;
         case 'index':
           return (
             <IndexScreen
-              onOpen={(pr) => setOpenPull({ repo: pr.repo, number: pr.number })}
+              onOpen={(pr) => open({ kind: 'pull', repo: pr.repo, number: pr.number })}
               state={prs}
             />
           );
@@ -450,7 +608,7 @@ export default function Home() {
             <BriefScreen
               activity={activity}
               loading={activityState.status === 'loading'}
-              onOpen={(pr) => setOpenPull({ repo: pr.repo, number: pr.number })}
+              onOpen={(pr) => open({ kind: 'pull', repo: pr.repo, number: pr.number })}
             />
           );
         case 'review':
@@ -507,17 +665,21 @@ export default function Home() {
   const tabs = SECTIONS.map((item) => ({
     key: item.key,
     label: item.key,
-    badge: item.key === 'inbox' ? wantsYou(social) : undefined,
+    badge: item.key === 'inbox' ? wantsYou(social, triage.marks) : undefined,
   }));
 
   return (
-    <>
+    <NavContext.Provider value={nav}>
       <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
         <StatusBar style="dark" />
         <View style={styles.chrome}>
           <Wordmark size={20} />
           <Label style={styles.handle}>
-            {model ? `~${model.login.toLowerCase()}` : ''}
+            {contributions.status === 'ready' && contributions.offline && contributions.savedAt != null
+              ? `offline · saved ${savedAge(contributions.savedAt)}`
+              : model
+                ? `~${model.login.toLowerCase()}`
+                : ''}
           </Label>
         </View>
 
@@ -532,7 +694,7 @@ export default function Home() {
                   style={index === tab ? styles.section : styles.hidden}
                 >
                   <SectionPager
-                    active={index === tab && openPull === null}
+                    active={index === tab && stack.length === 0}
                     onPage={(page) => goToPage(index, page)}
                     page={pages[index]}
                     render={screen(model)}
@@ -550,9 +712,17 @@ export default function Home() {
                   ? 'that token expired or was revoked'
                   : 'could not reach github'}
               </Body>
-              <Pressable accessibilityRole="button" onPress={disconnect}>
-                <Label style={styles.reset}>start over</Label>
-              </Pressable>
+              {contributions.error.kind === 'invalid-token' ? (
+                <Pressable accessibilityRole="button" onPress={disconnect}>
+                  <Label style={styles.reset}>start over</Label>
+                </Pressable>
+              ) : (
+                // No signal and nothing saved yet is not a reason to forget
+                // the token; it is a reason to try again.
+                <Pressable accessibilityRole="button" onPress={contributions.reload}>
+                  <Label style={styles.reset}>try again</Label>
+                </Pressable>
+              )}
             </View>
           )}
         </View>
@@ -560,20 +730,28 @@ export default function Home() {
         {model && <TabBar current={tab} onSelect={goToTab} tabs={tabs} />}
       </SafeAreaView>
 
-      {/* Over the sections rather than inside one: the detail page has its
-          own horizontal scrollers, and nested in a pager every one of them
-          would lose its drag to the page swipe. */}
-      {openPull && (
-        <View style={styles.overlay}>
-          <PullScreen
-            number={openPull.number}
-            onClose={() => setOpenPull(null)}
-            repo={openPull.repo}
-            token={token}
-          />
+      {/* Over the sections rather than inside one: the detail pages have
+          their own horizontal scrollers, and nested in a pager every one of
+          them would lose its drag to the page swipe. Lower pages stay
+          mounted, hidden, so back returns to them as they were. */}
+      {stack.map((route, index) => (
+        <View
+          key={`${index}-${routeKey(route)}`}
+          style={[styles.overlay, index < stack.length - 1 && styles.hidden]}
+        >
+          {route.kind === 'add-account' ? (
+            <AddAccount
+              onCancel={close}
+              onVerified={(verified) => {
+                switchTo(verified).catch(() => {});
+              }}
+            />
+          ) : (
+            <RouteView route={route} />
+          )}
         </View>
-      )}
-    </>
+      ))}
+    </NavContext.Provider>
   );
 }
 

@@ -1,51 +1,47 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 
 import { demoPullRequests } from '../lib/demo';
 import { fetchOpenPrs, type PullRequest } from '../lib/prs';
 import { DEMO_TOKEN } from '../lib/token';
+import { useRemote } from './useRemote';
 
 export type PrsState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; prs: PullRequest[] }
+  | { status: 'ready'; prs: PullRequest[]; savedAt: number | null; offline: boolean }
   | { status: 'error' };
 
-/** Settled result stamped with the request key that produced it. */
-interface Settled {
-  key: string;
-  outcome: { status: 'ready'; prs: PullRequest[] } | { status: 'error' };
-}
-
 /**
- * Open PRs for the token owner, fetched only while the tab is active.
- * Demo tokens resolve instantly; real requests settle into a keyed result
- * so status is derived — never set synchronously inside the effect.
+ * Open PRs for the token owner, fetched while the section is open. The saved
+ * list is drawn first, so coming back to `work` shows the drawer at once and
+ * lets the new answer slide in under it.
  */
 export function useOpenPrs(
   token: string | null,
   login: string | null,
   active: boolean,
 ): PrsState {
-  const [settled, setSettled] = useState<Settled | null>(null);
-  const key = `${token ?? ''}|${login ?? ''}|${active}`;
+  const demo = useMemo(
+    () => (token === DEMO_TOKEN ? demoPullRequests : undefined),
+    [token],
+  );
+  const remote = useRemote(
+    active && token && login ? `${token}|${login}` : null,
+    (signal) => fetchOpenPrs(token ?? '', login ?? '', signal),
+    {
+      cacheKey: login && token !== DEMO_TOKEN ? `${login.toLowerCase()}-prs` : null,
+      demo,
+    },
+  );
 
-  useEffect(() => {
-    if (!active || !token || !login || token === DEMO_TOKEN) return;
-
-    const controller = new AbortController();
-
-    fetchOpenPrs(token, login, controller.signal)
-      .then((prs) => setSettled({ key, outcome: { status: 'ready', prs } }))
-      .catch((error: unknown) => {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        setSettled({ key, outcome: { status: 'error' } });
-      });
-
-    return () => controller.abort();
-  }, [key, token, login, active]);
-
-  if (!active || !token || !login) return { status: 'idle' };
-  if (token === DEMO_TOKEN) return { status: 'ready', prs: demoPullRequests };
-  if (settled?.key !== key) return { status: 'loading' };
-  return settled.outcome;
+  if (remote.status === 'ready') {
+    return {
+      status: 'ready',
+      prs: remote.data,
+      savedAt: remote.savedAt,
+      offline: remote.offline,
+    };
+  }
+  if (remote.status === 'error') return { status: 'error' };
+  return { status: remote.status };
 }

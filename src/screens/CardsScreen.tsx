@@ -1,5 +1,5 @@
-import { useMemo, type ReactElement } from 'react';
-import { Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useMemo, useState, type ReactElement } from 'react';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { LanguageChip } from '../components/LanguageChip';
@@ -13,7 +13,12 @@ import {
   type MonthBar,
 } from '../lib/activity';
 import type { GitHubModel, RepoSummary } from '../lib/contributions';
+import { useRemote } from '../hooks/useRemote';
+import { demoSearch } from '../lib/demo';
+import { useNav } from '../lib/nav';
+import { searchCode } from '../lib/repo';
 import { colors, fonts, radii } from '../theme';
+import { SearchField, SearchResults } from './RepoScreen';
 import { ago, fmt, hash, Page, ScreenHead } from './shared';
 
 const CARD_HEIGHT = 176;
@@ -59,11 +64,39 @@ export function CardsScreen({
     [activity.commits, model.repos],
   );
 
+  // A search through the code of everything this account owns. While it has
+  // an answer, the answer replaces the deck; `clear` puts the deck back.
+  const nav = useNav();
+  const [draft, setDraft] = useState('');
+  const [terms, setTerms] = useState('');
+  const searchDemo = useMemo(
+    () => (nav.demo && terms ? demoSearch(terms) : undefined),
+    [nav.demo, terms],
+  );
+  const search = useRemote(
+    nav.token && terms ? `${nav.token}|search|user|${terms}` : null,
+    (signal) => searchCode(nav.token ?? '', terms, { user: model.login }, signal),
+    { demo: searchDemo },
+  );
+
   return (
     <Page>
       <ScreenHead left="repositories" right={`${fmt(model.repoCount)} owned`} />
 
-      <View style={styles.deck}>
+      <SearchField
+        draft={draft}
+        onChange={setDraft}
+        onClear={() => {
+          setDraft('');
+          setTerms('');
+        }}
+        onSubmit={() => setTerms(draft.trim())}
+        placeholder="search the code in all of them"
+        searching={terms.length > 0}
+      />
+      {terms.length > 0 && <SearchResults state={search} terms={terms} />}
+
+      <View style={[styles.deck, terms.length > 0 && styles.hidden]}>
         {deck.map(({ repo, at }, index) => (
           <RepoCard
             axis={axis}
@@ -119,10 +152,11 @@ function RepoCard({
   const bars = sampled ? months : axis;
   const total = months.reduce((sum, month) => sum + month.count, 0);
 
+  const nav = useNav();
   return (
     <Pressable
-      accessibilityRole="link"
-      onPress={() => Linking.openURL(repo.url).catch(() => {})}
+      accessibilityRole="button"
+      onPress={() => nav.open({ kind: 'repo', repo: repo.nameWithOwner })}
       style={[
         styles.card,
         {
@@ -340,7 +374,10 @@ const styles = StyleSheet.create({
   deck: {
     alignItems: 'center',
     paddingBottom: 30,
-    paddingTop: 6,
+    paddingTop: 14,
+  },
+  hidden: {
+    display: 'none',
   },
   card: {
     backgroundColor: colors.black,

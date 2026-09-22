@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 
+import { routeForUrl, useNav } from '../lib/nav';
 import { Body, Data, Serif } from './Type';
 import { Squiggle } from './Squiggle';
 import { colors, fonts, radii } from '../theme';
@@ -155,6 +156,14 @@ function Quote({ text }: { text: string }) {
 /** `**bold**`, `*italic*`, `` `code` ``, `[label](url)` and bare links. */
 function Inline({ text }: { text: string }) {
   const parts = useMemo(() => inline(text), [text]);
+  const nav = useNav();
+  // A link to a pull request, an issue, a discussion or a repository opens
+  // here; anything else is a real link and leaves.
+  const follow = (href: string) => {
+    const route = routeForUrl(href);
+    if (route) nav.open(route);
+    else Linking.openURL(href).catch(() => {});
+  };
   return (
     <>
       {parts.map((part, index) => {
@@ -162,7 +171,7 @@ function Inline({ text }: { text: string }) {
           return (
             <Text
               key={index}
-              onPress={() => Linking.openURL(part.href as string).catch(() => {})}
+              onPress={() => follow(part.href as string)}
               style={styles.link}
             >
               {part.text}

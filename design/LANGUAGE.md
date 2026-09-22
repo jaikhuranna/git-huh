@@ -160,6 +160,11 @@ Three rules, all of them learned the hard way:
 Everything else is still. There are no hover states, no spinners, no
 skeletons — a screen that is loading says so in words.
 
+The one exception to rule 1 is a **row under a finger**: an inbox row
+follows the drag through a `PanResponder`, because there is no other way to
+follow a finger. It moves one transform, for as long as the finger does, and
+then lets go.
+
 ## 7. Patterns
 
 **Navigation is two levels and both are visible.** A bar of five sections at
@@ -192,7 +197,26 @@ voice — `nothing filed here · go ship`, `outside the commit sample`,
 
 **Degradation is visible.** Where the app shows a sample rather than the
 whole truth, it says so on the surface (`in 12mo`, `outside the commit
-sample`, `the rest of this patch is on github`).
+sample`, `the rest of this patch is on github`). A saved answer shown
+without a connection carries its age — `offline · saved 3h ago` — and a
+refusal is never drawn as an empty list: "this token cannot read security
+alerts" is a different sentence from "no open alerts".
+
+**Writing is one object.** Every write goes through `Composer`: one box, a
+row of verbs, a line under them. The verb names the act (`approve`,
+`request changes`, `comment on this line`, `propose change`), nothing leaves
+until it is pressed, the result is said in words in green or red, and a
+failure keeps the text. The words for a failure name the one thing that
+would change it — the scope, the connection, the token.
+
+**A gesture always has a second way in.** The inbox's swipe actions are
+also accessibility actions on the row, and the words `done` and `snooze`
+are printed under the row so the gesture announces itself before it
+commits.
+
+**Detail pushes; sections do not.** A pull request, a thread, a repository,
+a file: each one pushes over what is there with `← back`, and back pops it.
+Nothing in the bar ever pushes.
 
 ## 8. Charts
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { demoGitHubModel } from '../lib/demo';
 import {
@@ -8,21 +8,22 @@ import {
   type ContributionStats,
 } from '../lib/github';
 import { toGitHubModel, type GitHubModel } from '../lib/contributions';
+import { keyOf } from '../lib/store';
 import { DEMO_TOKEN } from '../lib/token';
+import { useRemote } from './useRemote';
 
 export type ContributionsState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; model: GitHubModel }
+  | {
+      status: 'ready';
+      model: GitHubModel;
+      /** Set when the year on screen came off the disk rather than from GitHub. */
+      savedAt: number | null;
+      /** True when that is because GitHub could not be reached. */
+      offline: boolean;
+    }
   | { status: 'error'; error: GitHubError };
-
-/** Async result stamped with the token that produced it. */
-interface SettledResult {
-  token: string;
-  outcome:
-    | { status: 'ready'; model: GitHubModel }
-    | { status: 'error'; error: GitHubError };
-}
 
 /**
  * Everything the second query would have provided, zeroed. The calendar is
@@ -43,67 +44,67 @@ const EMPTY_STATS: ContributionStats = {
   years: [],
 };
 
+async function loadModel(token: string, signal: AbortSignal): Promise<GitHubModel> {
+  const contributions = await fetchContributions(token, signal);
+  let stats: ContributionStats;
+  try {
+    stats = await fetchStats(token, contributions.login, contributions.years, signal);
+  } catch (error) {
+    // A revoked token must fail loudly; anything else (rate limits, search
+    // hiccups) degrades to zeroed stats so the grid survives.
+    if (error instanceof GitHubError && error.kind === 'invalid-token') throw error;
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    stats = EMPTY_STATS;
+  }
+  return toGitHubModel(contributions, stats);
+}
+
 /**
  * Load and shape contributions for a token; null token means signed out.
  * The literal token "demo" short-circuits to deterministic fake data —
  * the layout sandbox for hand-tuning without touching GitHub.
+ *
+ * The last year that loaded is kept on the device, so a launch with a warm
+ * cache goes straight to the app instead of the loading wave, and a launch
+ * with no signal still has a year to show — marked with its age.
  */
-export function useContributions(token: string | null): ContributionsState {
-  const [result, setResult] = useState<SettledResult | null>(null);
-
-  const demoModel = useMemo(
-    () => (token === DEMO_TOKEN ? demoGitHubModel() : null),
+export function useContributions(
+  token: string | null,
+): ContributionsState & { reload: () => void } {
+  const demo = useMemo(
+    () => (token === DEMO_TOKEN ? demoGitHubModel() : undefined),
     [token],
   );
+  const remote = useRemote(
+    token,
+    (signal) => loadModel(token ?? '', signal),
+    {
+      cacheKey: token && token !== DEMO_TOKEN ? `model-${keyOf(token)}` : null,
+      demo,
+    },
+  );
 
-  useEffect(() => {
-    if (!token || token === DEMO_TOKEN) return;
-
-    const controller = new AbortController();
-
-    fetchContributions(token, controller.signal)
-      .then(async (contributions) => {
-        let stats: ContributionStats;
-        try {
-          stats = await fetchStats(
-            token,
-            contributions.login,
-            contributions.years,
-            controller.signal,
-          );
-        } catch (error) {
-          // A revoked token must fail loudly; anything else (rate limits,
-          // search hiccups) degrades to zeroed stats so the grid survives.
-          if (error instanceof GitHubError && error.kind === 'invalid-token') {
-            throw error;
-          }
-          if (error instanceof Error && error.name === 'AbortError') throw error;
-          stats = EMPTY_STATS;
-        }
-        return toGitHubModel(contributions, stats);
-      })
-      .then((model) =>
-        setResult({ token, outcome: { status: 'ready', model } }),
-      )
-      .catch((error: unknown) => {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        setResult({
-          token,
-          outcome: {
-            status: 'error',
-            error:
-              error instanceof GitHubError
-                ? error
-                : new GitHubError('api', 'Something unexpected happened.'),
-          },
-        });
-      });
-
-    return () => controller.abort();
-  }, [token]);
-
-  if (!token) return { status: 'idle' };
-  if (demoModel) return { status: 'ready', model: demoModel };
-  if (result?.token !== token) return { status: 'loading' };
-  return result.outcome;
+  switch (remote.status) {
+    case 'idle':
+      return { status: 'idle', reload: remote.reload };
+    case 'loading':
+      return { status: 'loading', reload: remote.reload };
+    case 'ready':
+      return {
+        status: 'ready',
+        model: remote.data,
+        savedAt: remote.savedAt,
+        offline: remote.offline,
+        reload: remote.reload,
+      };
+    case 'error':
+      return {
+        status: 'error',
+        error:
+          remote.error instanceof GitHubError
+            ? remote.error
+            : new GitHubError('api', 'Something unexpected happened.'),
+        reload: remote.reload,
+      };
+  }
 }

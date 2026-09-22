@@ -1,7 +1,7 @@
 import { NativeModules, Platform } from 'react-native';
 import { nothingWidgetColors, type MaterialYouPalette } from 'nothing-mtui';
 
-import { GRID_WEEKS, type GitHubModel } from './contributions';
+import type { GitHubModel } from './contributions';
 import type { CommitLine } from './messageCache';
 
 /**
@@ -55,24 +55,23 @@ export async function syncWidget(
   if (!isAvailable) return;
 
   /**
-   * Seven cells per week, always.
+   * Every day of the year, in order, ending on today.
    *
-   * GitHub clips the first and last weeks of the window to the days that
-   * exist, so the flat array was not a multiple of seven — and the widget
-   * indexes it column-major as `column * 7 + row`. Every weekday in the grid
-   * was therefore drawn one or two rows away from where it belonged, which is
-   * invisible when it is wrong and quietly wrong when it looks fine. Padding
-   * the two ragged weeks with empty days puts each row back on its own
-   * weekday, and future days read as unfilled, exactly as they do on GitHub.
+   * The widget used to be sent weekday-aligned weeks — seven cells a column,
+   * the ragged first and last weeks padded — because it drew GitHub's own
+   * calendar, with today halfway up the last column and the rest of the week
+   * drawn as days that had not happened. It now draws a run of days whose
+   * last mark is always the bottom-right one, and collapses three weeks or more
+   * of nothing into a wave with its length on it; both need the days as they
+   * happened, with no padding in them. The whole year travels, because once
+   * the silences are folded away there is room on the card for older work.
    */
-  const cells = model.columns.flatMap((column, index) => {
-    const filled = column.map((day) => ({ l: day.level, t: day.isToday }));
-    const missing = 7 - filled.length;
-    if (missing <= 0) return filled;
-    const blanks = Array.from({ length: missing }, () => ({ l: 0, t: false }));
-    return index === 0 ? [...blanks, ...filled] : [...filled, ...blanks];
-  });
-  const days = cells.slice(-GRID_WEEKS * 7);
+  const flat = model.columns.flat();
+  const todayAt = flat.findIndex((day) => day.isToday);
+  const days = (todayAt >= 0 ? flat.slice(0, todayAt + 1) : flat).map((day) => ({
+    l: day.level,
+    t: day.isToday,
+  }));
 
   // Re-read every sync rather than caching: the palette follows the
   // wallpaper, which the user can change while the app is running.

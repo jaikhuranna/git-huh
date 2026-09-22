@@ -5,48 +5,50 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ChecksPanel } from '../components/ChecksPanel';
+import { Composer } from '../components/Composer';
 import { Diff } from '../components/Diff';
 import { Markdown } from '../components/Markdown';
+import { SavedNote } from '../components/Overlay';
 import { Squiggle } from '../components/Squiggle';
 import { Body, Data, Heading, Label, Micro } from '../components/Type';
 import { usePullDetail } from '../hooks/usePullDetail';
+import { useNav } from '../lib/nav';
 import { parsePatch, type PullComment, type PullDetailFull } from '../lib/pullDetail';
-import { colors, fonts, radii, space } from '../theme';
+import { explain } from '../lib/rest';
+import { addComment, commentOnLine, submitReview } from '../lib/writes';
+import { colors, fallbacks, fonts, radii, space } from '../theme';
 import { ago, fmt } from './shared';
 
-type Tab = 'brief' | 'talk' | 'diff';
+type Tab = 'brief' | 'talk' | 'diff' | 'checks';
 
 /**
  * A pull request, opened.
  *
  * The filing index and the brief both stop at the cover of the object: a
  * number, a title, a size. This is the inside — what was written, what
- * people said back, and the lines that actually changed.
+ * people said back, the lines that actually changed, and whether CI agreed.
+ * And now the other half: reply, approve or request changes at the end of
+ * `talk`, and tap any line in `files` — changed or not — to comment on it.
  *
  * The conversation is drawn in wavy rules throughout. Everything else in
  * this app is ruled and filed and measured, and a review thread is none of
  * those things; the wave is what marks the part of a pull request that is
  * two people arguing rather than a statistic.
  */
-export function PullScreen({
-  token,
-  repo,
-  number,
-  onClose,
-}: {
-  token: string | null;
-  repo: string;
-  number: number;
-  onClose: () => void;
-}) {
+export function PullScreen({ repo, number }: { repo: string; number: number }) {
+  const nav = useNav();
+  const onClose = nav.close;
   const { width } = useWindowDimensions();
-  const state = usePullDetail(token, repo, number);
+  const state = usePullDetail(nav.token, nav.login, repo, number);
   const [tab, setTab] = useState<Tab>('brief');
+  const [find, setFind] = useState('');
   const body = width - space.gutter * 2;
 
   // The overlay is not a route, so the system back button has to be told
@@ -63,6 +65,7 @@ export function PullScreen({
   }, [onClose]);
 
   const pull = state.status === 'ready' ? state.pull : null;
+  const token = nav.token ?? '';
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.screen}>
@@ -75,17 +78,24 @@ export function PullScreen({
         >
           <Label style={styles.backLabel}>← back</Label>
         </Pressable>
-        <Data style={styles.chromeRepo} numberOfLines={1}>
-          {repo} #{number}
-        </Data>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => nav.open({ kind: 'repo', repo })}
+          style={styles.chromeRepoHit}
+        >
+          <Data style={styles.chromeRepo} numberOfLines={1}>
+            {repo} #{number}
+          </Data>
+        </Pressable>
       </View>
+      {state.status === 'ready' && <SavedNote offline={state.offline} savedAt={state.savedAt} />}
 
       {state.status === 'loading' && (
         <Label style={styles.note}>opening the file…</Label>
       )}
       {state.status === 'error' && (
         <View style={styles.errorStack}>
-          <Body style={styles.error}>could not open this pull request</Body>
+          <Body style={styles.error}>{explain(state.error, 'opening this pull request')}</Body>
           <Pressable
             accessibilityRole="link"
             onPress={() =>
@@ -109,6 +119,7 @@ export function PullScreen({
                 ['brief', 'the brief'],
                 ['talk', `talk ${pull.comments.length}`],
                 ['diff', `files ${pull.changedFiles}`],
+                ['checks', 'checks'],
               ] as const
             ).map(([value, label]) => (
               <Pressable
@@ -127,13 +138,76 @@ export function PullScreen({
 
           <ScrollView
             contentContainerStyle={styles.page}
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
             {tab === 'brief' && <Markdown source={pull.body} width={body} />}
-            {tab === 'talk' && <Conversation pull={pull} width={body} />}
-            {tab === 'diff' && (
-              <Diff files={pull.files} moreFiles={pull.moreFiles} width={body} />
+            {tab === 'talk' && (
+              <>
+                <Conversation pull={pull} width={body} />
+                <Composer
+                  actions={[
+                    { key: 'comment', label: 'comment', primary: true },
+                    ...(!pull.viewerIsAuthor && pull.state === 'OPEN'
+                      ? [
+                          { key: 'approve', label: 'approve', allowEmpty: true },
+                          { key: 'changes', label: 'request changes' },
+                        ]
+                      : []),
+                  ]}
+                  demo={nav.demo}
+                  doing={'that review'}
+                  onSubmit={async (action, text) => {
+                    if (action === 'comment') await addComment(token, pull.id, text);
+                    if (action === 'approve') await submitReview(token, pull.id, 'APPROVE', text);
+                    if (action === 'changes') {
+                      await submitReview(token, pull.id, 'REQUEST_CHANGES', text);
+                    }
+                    state.reload();
+                    return action === 'approve'
+                      ? 'approved'
+                      : action === 'changes'
+                        ? 'changes requested'
+                        : 'sent · it is on github now';
+                  }}
+                  placeholder={
+                    pull.viewerIsAuthor ? 'reply to the thread' : 'reply, or say why with your review'
+                  }
+                />
+              </>
             )}
+            {tab === 'diff' && (
+              <>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setFind}
+                  placeholder="find in these files"
+                  placeholderTextColor={colors.ink40}
+                  style={styles.find}
+                  value={find}
+                />
+                <Diff
+                  demo={nav.demo}
+                  files={pull.files}
+                  find={find}
+                  moreFiles={pull.moreFiles}
+                  onComment={async (target, text) => {
+                    await commentOnLine(
+                      token,
+                      repo,
+                      number,
+                      { commitId: pull.headSha, ...target },
+                      text,
+                    );
+                    state.reload();
+                    return `commented on ${target.side === 'LEFT' ? 'old ' : ''}line ${target.line}`;
+                  }}
+                  width={body}
+                />
+              </>
+            )}
+            {tab === 'checks' && <ChecksPanel repo={repo} sha={pull.headSha} />}
           </ScrollView>
 
           <View style={styles.footer}>
@@ -368,11 +442,26 @@ const styles = StyleSheet.create({
   backLabel: {
     color: colors.ink,
   },
+  chromeRepoHit: {
+    flex: 1,
+  },
   chromeRepo: {
     color: colors.ink40,
-    flex: 1,
     fontSize: 10,
     textAlign: 'right',
+    textDecorationLine: 'underline',
+  },
+  find: {
+    backgroundColor: colors.card,
+    borderColor: colors.hair,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    color: colors.ink,
+    fontFamily: fonts.mono ?? fallbacks.mono,
+    fontSize: 12,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
   },
   header: {
     paddingHorizontal: space.gutter,

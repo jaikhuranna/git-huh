@@ -68,6 +68,12 @@ export interface DiffFile {
 }
 
 export interface PullDetailFull {
+  /** Node id — what a reply or a review is attached to. */
+  id: string;
+  /** The head commit: where line comments land and where checks ran. */
+  headSha: string;
+  /** GitHub will not let you approve your own pull request. */
+  viewerIsAuthor: boolean;
   number: number;
   title: string;
   url: string;
@@ -112,6 +118,9 @@ const pullSchema = z.object({
     .object({
       pullRequest: z
         .object({
+          id: z.string(),
+          headRefOid: z.string(),
+          viewerDidAuthor: z.boolean(),
           number: z.number().int(),
           title: z.string(),
           url: z.string(),
@@ -168,6 +177,9 @@ function query(owner: string, name: string, number: number): string {
     query Pull {
       repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) {
         pullRequest(number: ${number}) {
+          id
+          headRefOid
+          viewerDidAuthor
           number
           title
           url
@@ -375,6 +387,9 @@ export async function fetchPullDetail(
   ].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
 
   return {
+    id: pr.id,
+    headSha: pr.headRefOid,
+    viewerIsAuthor: pr.viewerDidAuthor,
     number: pr.number,
     title: pr.title,
     url: pr.url,

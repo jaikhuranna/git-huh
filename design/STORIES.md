@@ -31,8 +31,9 @@ is at a desk — anyone at a desk has the web.
 ## 2. The stories
 
 Each story names the section it lives in, what it needs from GitHub, and
-where it stops. **Where a story stops matters**: this app reads, it does not
-write, and a story that ends in "and then I approve it" ends outside the app.
+where it stops. **Where a story stops matters.** Until 3.1 this app only
+read, and every story that ended in "and then I approve it" ended outside
+the app; 3.1 moved those endings inside.
 
 ### today — *how am I doing*
 
@@ -59,9 +60,12 @@ write, and a story that ends in "and then I approve it" ends outside the app.
 7. **I want to know what they said, from the list.** Every row quotes the
    comment. A row that only says "someone commented" makes you open it to find
    out it was a thumbs up. → `inbox`.
-8. **I want the row to open the thing, in the app.** Tapping a pull request
-   row opens it here; an issue still leaves for the browser, and the app does
-   not pretend otherwise. → `inbox` → `pull`.
+8. **I want the row to open the thing, in the app.** A pull request, an
+   issue or a discussion — all three open here. → `inbox` → `pull` / thread.
+8a. **I want to put a row away and have it come back if it matters.** Swipe
+   left for `done`, right for `snooze` until nine; a new comment on the
+   thread brings it back. → `inbox`.
+8b. **I want to be told, even with the app shut.** → notifications on `you`.
 9. **I want to know the difference between "nobody said anything" and "GitHub
    would not tell us".** Two different facts, two different lines.
    → `inbox` empty and error states.
@@ -106,10 +110,24 @@ write, and a story that ends in "and then I approve it" ends outside the app.
     leaves `lab` by earning a place in one of the four sections above.
     → `join the dots` today.
 
+### writing back (3.1)
+
+26. **I want to answer from where I read it** — reply, approve, request
+    changes. → `pull` → `talk`.
+27. **I want to point at a line** — any line, including the ones around the
+    change. → `pull` → `files`, tap it.
+28. **I want to know why CI is red and push it again.** → `pull` → `checks`.
+29. **I want to let a held run or a deployment through.** → `checks`.
+30. **I want to fix the typo I just found.** → a file → `edit` → a pull
+    request.
+31. **I want to open an issue the way the maintainers asked for it.** →
+    repository → `issues` → `new issue`, templates and forms.
+
 ### the account
 
 22. **I want to paste a token once and never see a login again.** Stored in the
-    keystore, restored on launch, never sent anywhere but GitHub.
+    keystore, restored on launch, never sent anywhere but GitHub. And a
+    second one beside it, for the work account. → `you` → accounts.
 23. **I want to be told when my token is the reason the numbers are wrong.** A
     PAT without `repo` returns a smaller, valid, wrong year and GitHub reports
     no error; the strip under the masthead names it and links to a token that
@@ -148,15 +166,26 @@ messages are a pool kept on the device rather than a request.
              issue?        → browser, and the app says that is what it did
            → back → the inbox is where you left it
 
-There is no "mark as read". This app holds no `notifications` scope and does
-not ask for one, so it cannot write to an inbox — it reads a feed built from
-search plus each pull request's own comments and reviews.
+There is no GitHub "mark as read" — this app holds no `notifications` scope.
+It keeps its own: swipe left `done`, right `snooze` until nine, and a row
+comes back by itself when someone writes on the thread again.
 
-### reading one of yours
+    notification (app shut) → tap → the thread it was about, over `today`
+
+### reading one of yours, and someone else's
 
     work · pulls → guide tab per repo → card → pull
     work · brief → ← prev · n of N · next →   (skim descriptions in order)
-    pull → open on github ↗                    (the one thing it cannot do)
+    pull · talk  → comment · approve · request changes
+    pull · files → find · tap a line → comment on this line
+    pull · checks → why (log tail) · re-run failed · approve and run · approve deploy
+
+### the one-line fix
+
+    work · repos → card → repository · code → folder → file
+                 → find → edit → message → new branch + pull request
+                 → (not a collaborator? a fork, made for you)
+                 → the new pull request, opened
 
 ### the retrospective
 
@@ -185,48 +214,52 @@ from silence.
 ## 4. What people want from a GitHub app
 
 Ranked by how often it is asked for, not by how easy it is. The last column
-is honest about this app: **yes**, **partly**, **no**, or **never** — where
-`never` means a deliberate refusal, not a backlog.
+is honest about this app: **yes**, **partly**, or **no** — and as of 3.1 the
+column is mostly *yes*, because 3.1 was the release that took this list as
+its brief.
 
 | # | want | why it is wanted | git-huh |
 |---|---|---|---|
-| 1 | triage what is addressed to me | the phone is where you find out, not where you work | **yes** — `inbox`, with counts on the tab |
-| 2 | read a pull request in full — body, conversation, patch | reviewing on a phone is "too easy to miss context", and that is a UI failure | **yes** — `pull`, three tabs |
-| 3 | reply, approve, request changes | triage that ends in "open the laptop" is half a tool | **never** — this app is read-only; it links out instead |
-| 4 | search code, and search *within* a file | source files run past a thousand lines with no way to navigate | **no** — candidate for `lab` |
-| 5 | see why CI failed, and re-run it | Actions debugging is the weakest part of the mobile product | **no** |
-| 6 | offline reading | planes, trains, tunnels; asked for since 2021 and still not prioritised | **partly** — the commit pool and widget payload survive offline; nothing else is cached |
-| 7 | stay in the app when a notification is tapped | security alerts, releases and workflow approvals bounce to the browser and back | **partly** — feed rows open pull requests in-app, issues still leave |
-| 8 | an activity feed | it exists on the web, was absent from mobile, and people keep asking | **yes** — `inbox` is exactly this |
+| 1 | triage what is addressed to me | the phone is where you find out, not where you work | **yes** — `inbox`, a count on the tab, `done` and `snooze` |
+| 2 | read a pull request in full — body, conversation, patch | reviewing on a phone is "too easy to miss context", and that is a UI failure | **yes** — `pull`: brief · talk · files · checks |
+| 3 | reply, approve, request changes | triage that ends in "open the laptop" is half a tool | **yes** — the box at the end of `talk`; approve is hidden on your own pull requests, as GitHub requires |
+| 4 | search code, and search *within* a file | source files run past a thousand lines with no way to navigate | **yes** — code search on `repos` and in every repository; find-in-file with `n / m`; find across a diff |
+| 5 | see why CI failed, and re-run it | Actions debugging is the weakest part of the mobile product | **yes** — `checks`: red first, the end of the failing job's log, `re-run failed` |
+| 6 | offline reading | planes, trains, tunnels; asked for since 2021 and still not prioritised | **yes** — every answer is saved on the device and shown with its age when there is no signal |
+| 7 | stay in the app when a notification is tapped | security alerts, releases and workflow approvals bounce to the browser and back | **yes** — pull requests, issues, discussions, repositories, releases, alerts and approvals all open here |
+| 8 | an activity feed | it exists on the web, was absent from mobile, and people keep asking | **yes** — `inbox` |
 | 9 | my own contribution history, properly | the profile graph is the thing people screenshot, and mobile shows the least of it | **yes** — most of the app |
-| 10 | a widget that works on my phone | glanceable counts without unlocking anything | **yes** — one widget, Material You background, a travelling commit of yours |
-| 11 | releases, discussions, issue forms, security alerts in-app | feature parity with the site | **no** |
-| 12 | multiple accounts and org switching | work and personal on one phone | **never** — one account at a time, by design |
-| 13 | fast cold start, no repeated sign-in | a tool you open twenty times a day | **yes** — token in the keystore, first screen drawn before any request lands |
-| 14 | honest numbers | a number that quietly omits private work is worse than no number | **yes** — `restrictedContributionsCount` carried as its own band |
-| 15 | organise the inbox — swipe actions, folders, saved filters | people ask for Spark-style swipes and custom notification folders by name | **partly** — filters with counts, no swipes, nothing to save |
-| 16 | make the small change from the phone — a branch, a file, a pull request | the one-line typo fix at a bus stop is the reason the app is open | **never** — read-only, and the link out is the honest answer |
-| 17 | comment on any line, not only changed ones | context lines are where half of review comments belong | **n/a** — this app does not write comments; GitHub shipped this in 2025 |
+| 10 | a widget that works on my phone | glanceable counts without unlocking anything | **yes** |
+| 11 | releases, discussions, issue forms, security alerts in-app | feature parity with the site | **yes** — the repository screen; issue *forms* render as fields |
+| 12 | multiple accounts and org switching | work and personal on one phone | **yes** — accounts on `you`; orgs come with whichever account can see them |
+| 13 | fast cold start, no repeated sign-in | a tool you open twenty times a day | **yes** — a warm launch draws the saved year before any request lands |
+| 14 | honest numbers | a number that quietly omits private work is worse than no number | **yes** |
+| 15 | organise the inbox — swipe actions, folders | people ask for Spark-style swipes and custom notification folders by name | **yes** — swipe left `done`, right `snooze`; `snoozed` and `done` folders; anything written on again comes back |
+| 16 | make the small change from the phone — a branch, a file, a pull request | the one-line typo fix at a bus stop is the reason the app is open | **yes** — edit a file, then a new branch and pull request (through a fork if you cannot push), or a commit straight onto the branch |
+| 17 | comment on any line, not only changed ones | context lines are where half of review comments belong | **yes** — tap any line in `files` |
+
+Still **no**: creating a *new* file or repository, merging, and anything in
+repository settings. None of them was on anyone's list above the fold.
 
 ## 5. What people hate about the GitHub app
 
 | # | gripe | where it comes from | what this app does |
 |---|---|---|---|
-| 1 | **everything important opens the browser** — security alerts, release notes, workflow approvals, and then the browser redirects back into the app | community #39004, #110751 | feed rows open a pull request inside the app; where it must leave, it leaves once and says so |
-| 2 | **push notifications are unreliable and narrow** — nothing for mentions inside PR reviews, silence on some Android builds, and only mentions / assignments / review requests at all | community #184354, #159661, #180827 | no push at all, deliberately: no `notifications` scope is requested. The count on the `inbox` tab is the honest version of a badge |
-| 3 | **reviewing a PR is painful** — easy to miss context on a small screen | store and roundup reviews | the patch is the screen, not a summary: line numbers recovered from `@@` headers, banded diffs, folded long files, threads anchored to their lines |
-| 4 | **no code search, no in-file search** — a 1,000-line file with no way to move through it | community #60088 | not addressed. Named here so it is a decision rather than an oversight |
-| 5 | **no offline anything** | community #7365, open since 2021 | the message pool and widget payload are on the device; the rest needs the network and says so in words |
-| 6 | **bare-bones next to the website** — issue forms, releases, half the settings | community #39004 | this app does not chase parity. It does one thing the website does badly |
-| 7 | **promised features that are not there** — a profile activity widget in the release notes and not in the app | community #139804 | every number on every screen is fetched or absent; nothing is drawn as zero because we did not look |
-| 8 | **widgets that do not work on some Android ROMs** | community #139804 | one widget, painted as bitmaps, no custom-font inflation, no reflection tricks — the three things that break widgets on OEM launchers |
-| 9 | **notification and comment management is the oldest unfixed complaint** | Hacker News | the feed filters by what kind of thing it is, with counts, and quotes the text in the row |
-| 10 | **polish decays as features land** — margins and padding drifting, the web UI neglected for the apps | Hacker News | one type scale, four inks, one gutter, and two design documents that are part of the change that breaks them |
-| 11 | **you cannot make the change** — no new branch, no new file, no new pull request, so the phone is never the tool for a one-line fix | community #6348, mary.codes | the same limit, stated up front rather than discovered three taps in |
-| 12 | **notifications are marked read the moment you glance at them**, which makes "come back to this" impossible; people ask for folders and swipe actions | community #18623 | no read state to lose: the feed is rebuilt from search every time, and the filters are what triage looks like here |
-| 13 | **the phantom badge** — "you have unread notifications" with nothing behind it | community #13684 | the tab count is computed from the events on screen; if it says three, three rows are there |
-| 14 | **you could not comment on an unchanged line** in a review until GitHub shipped it in 2025 — the mobile reviewer was limited to the lines the diff touched | GitHub on X | the whole patch is readable, including context; the reply still happens on the web |
-| 15 | **Copilot arrived in the app** and took the room — "github mobile app now has copilot inside it 💀" | X, devRant | no assistant, no chat, no feed of suggestions. The app has no opinions about your code |
+| 1 | **everything important opens the browser** — security alerts, release notes, workflow approvals, and then the browser redirects back into the app | community #39004, #110751 | every one of those is a screen here: issues, discussions, releases, Dependabot alerts, held runs and pending deployments. Links inside comments open here too |
+| 2 | **push notifications are unreliable and narrow** — nothing for mentions inside PR reviews, silence on some Android builds | community #184354, #159661, #180827 | there is no server to push from, so Android wakes the app every fifteen minutes or so and it reads the same feed the inbox does — mentions in reviews included. The setting says exactly that, and says when Android is blocking it |
+| 3 | **reviewing a PR is painful** — easy to miss context on a small screen | store and roundup reviews | the patch is the screen; find across it; comment on any line; approve or request changes at the end of the conversation; the checks beside it |
+| 4 | **no code search, no in-file search** | community #60088 | code search per repository and across everything you own; find-in-file with a count and next / previous |
+| 5 | **no offline anything** | community #7365, open since 2021 | everything read is kept, and shown offline with `offline · saved 3h ago` rather than an error |
+| 6 | **bare-bones next to the website** — issue forms, releases, half the settings | community #39004 | issue forms, releases, discussions and alerts are in; settings are not |
+| 7 | **promised features that are not there** | community #139804 | every number on every screen is fetched or absent; nothing is drawn as zero because we did not look |
+| 8 | **widgets that do not work on some Android ROMs** | community #139804 | one widget, painted as bitmaps, no custom-font inflation, no reflection tricks |
+| 9 | **notification and comment management is the oldest unfixed complaint** | Hacker News | filters with counts, quotes in the row, and a read state you control |
+| 10 | **polish decays as features land** | Hacker News | one type scale, four inks, one gutter, and three design documents that are part of the change that breaks them |
+| 11 | **you cannot make the change** — no branch, no file edit, no pull request | community #6348, mary.codes | `edit` on any file: propose it as a pull request, through a fork when you are not a collaborator |
+| 12 | **notifications are marked read the moment you glance at them** | community #18623 | nothing is read until you say so — and a row you put away comes back when the thread moves |
+| 13 | **the phantom badge** — "you have unread notifications" with nothing behind it | community #13684 | the tab count is computed from the rows on screen, minus the ones you put away |
+| 14 | **you could not comment on an unchanged line** | GitHub on X | any line, changed or not |
+| 15 | **Copilot arrived in the app** and took the room | X, devRant | still no assistant, no chat, no suggestions |
 
 ### What the lists do *not* say
 

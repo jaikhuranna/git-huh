@@ -355,14 +355,136 @@ changes-requested red, review yellow, review-request purple, mention pink,
 yours ink) with the category written out in words as well, the comment text
 quoted, and the repository and number under each row.
 
-**A row opens the thing.** Where the event is a pull request it opens `pull`
-inside the app; a mention on an *issue* still leaves for the browser, because
-`pull` can only read a pull request and pretending otherwise would be an
-error screen. The url is what decides — the mentions search returns both.
+**A row opens the thing** — a pull request in `pull`, an issue or a
+discussion in `thread` (below). The url decides which; the mentions search
+returns all three.
 
-There is no read state. The app holds no `notifications` scope, so it cannot
-write to an inbox; the feed is rebuilt from search on every visit and the
-filters are what triage looks like here.
+**A row can be put away.** Swipe left for `done`, right for `snooze` until
+nine the next morning. The words for both sit under the row and are
+uncovered as it moves, so the gesture says what it will do before you let
+go; the same actions are on the row as accessibility actions. Two more chips
+at the end of the filter row — dashed, because they are where rows *went*
+rather than kinds of row — are the `snoozed` and `done` folders, and inside
+them either swipe puts a row back. The state is the app's own, saved on the
+phone per account (`lib/triage.ts`), and every mark remembers the timestamp
+of the event it was made against: when someone writes on that thread again,
+the row is back in the inbox on its own. GitHub's inbox is never written to;
+no `notifications` scope is asked for.
+
+The tab count is the open wants-you rows — review requests, mentions,
+changes requested — minus anything put away, computed from the same rows the
+screen draws.
+
+### 15. `thread` — an issue or a discussion
+
+The pull request's `talk` without the diff, pushed over everything. Title and
+a state chip (`open` blue, `closed` purple, `answered` green), a mono byline,
+labels as outlined pills in their own colour, the body rendered, then the
+replies on wavy spines (`Spoken`) — the discussion's accepted answer in green
+and marked `the answer` in words, replies to replies nested under their own
+spine. At the end, the composer: `comment` and `close issue` / `reopen` for
+an issue, `reply` for a discussion. Replies GitHub has that were not fetched
+say so above the first one.
+
+### 16. `repo` — a repository, from the inside
+
+Pushed from a repo card, from a pull request's masthead, or from any link to
+a repository in rendered Markdown. Name, description, `★ ⑂ language
+private`, then five chips: `code · issues n · releases · discussions ·
+security`. The footer carries `open on github` and the default branch with
+what this token may do there (`you admin`, `you read`).
+
+- **code** — a search field over the repository's code (GitHub's REST code
+  search: default branch only, ten searches a minute, both said on the
+  results), and under it a file browser: breadcrumbs, folders first with a
+  trailing `/`, files with their size.
+- **issues** — a filled `new issue` pill, then the open issues.
+- **releases** — the newest open, the rest folded; notes rendered.
+- **discussions** — category, title, replies, `answered`. Discussions that
+  are switched off say so; a token without `read:discussion` says that.
+- **security** — open Dependabot alerts, severity as a coloured rule *and* a
+  word, the vulnerable range and the fix. A token without `security_events`
+  is told so and linked to a token that has it — **an empty list is never
+  shown for "not allowed to look"**.
+
+### 17. `file` — one file, readable and editable
+
+Line numbers, no wrapping (a horizontal scroll sized to the longest line,
+capped at 220 columns), virtualised so a long file costs what is on screen. A
+find bar with `n / m` and `↑ ↓`; the current match's line is banded yellow
+and each occurrence is marked. Opened from a code search, the search term is
+already in the bar.
+
+`edit` swaps the reader for a monospace editor and a commit form: a one-line
+message, and two choices as chips — `new branch + pull request` (the default)
+or `commit to {branch}`. The first creates `login-patch-n`, commits there and
+opens the pull request, **forking first when the token cannot push to the
+repository**, which is what the website does for anyone who is not a
+collaborator. The new pull request replaces the file on the stack. Files past
+200 KB are not editable, and say so.
+
+### 18. `new issue`
+
+A list of the repository's templates (`.github/ISSUE_TEMPLATE`) and `blank
+issue`. A Markdown template prefills the body. A **form** (`.yml`) becomes
+fields — a line, a box, a choice as chips, ticks as boxes — with required
+ones starred and listed under the button until they are filled. The body is
+written in the website's own shape (`### Label`, the answer, `_No response_`
+for a blank), so a repository's triage bots cannot tell the difference. The
+new issue replaces the form on the stack.
+
+### 19. `checks` — the fourth tab of `pull`
+
+Every check run on the head commit, red first, then what waits on you, what
+is running, what passed. A tally line (`2 failed · 1 waiting on you · …`),
+then the actions: `re-run failed · {workflow}` for a failed Actions run,
+`approve and run` for a first-time contributor's held run, `approve deploy ·
+{environment}` / `reject` for a deployment waiting on a reviewer — and when
+the reviewer is somebody else, it says that instead of offering a button. A
+failed Actions job opens to the end of its log: the error annotations in red,
+then the last forty lines in mono.
+
+### Writing back
+
+Every write is the same object, `Composer`: one box, a row of verbs as
+pills, the primary one filled, and a line under them that says what
+happened in words — `approved`, `sent · it is on github now`, or exactly why
+not (`this token is not allowed to do that review here · it needs more
+scope`). Nothing is sent until a named button is pressed, and a failure
+leaves the text in the box. On the demo account every write answers `demo
+account · nothing was sent`.
+
+- `talk` ends in `comment`, and — on someone else's open pull request —
+  `approve` (no words needed) and `request changes`.
+- `files` has a find field across every file (`n lines in m files`, matching
+  lines marked with a yellow rule, files holding them opened) and every line
+  is tappable: the tapped line is quoted over a compact composer, `comment on
+  this line`. Deleted lines comment on the old side, everything else on the
+  new — including unchanged context lines.
+
+### Offline
+
+Every answer the app reads is saved on the device (`lib/store.ts`, a JSON
+file per key in the documents directory) and drawn first on the next visit,
+then replaced by the fresh one. When GitHub cannot be reached the saved
+answer stays on screen with its age: `offline · saved 3h ago` in the chrome
+for the year, and at the top of any pushed screen. A revoked token still
+fails loudly, saved answer or not.
+
+### Accounts and notifications — on `today · you`
+
+Under the sentence, two blocks. **accounts**: the one in use filled black,
+the others as chips that switch the whole app, and a dashed `+ add account`
+that pushes the token form with a `cancel`. `disconnect` forgets the current
+account and moves to the next one if the phone holds another.
+
+**notifications**: `turn on`, then one chip per kind (`review requests ·
+mentions · changes requested · approvals · comments`), and a line that says
+exactly what it does — `android checks the inbox every 15 minutes or so, less
+on a low battery` — or why it cannot (`blocked · android is not letting
+git-huh notify`). It is a background check of the inbox, not a push; there
+is no server. Put-away rows never notify, and what the inbox already showed
+with the app open is not repeated.
 
 ## Navigation
 
@@ -396,8 +518,12 @@ to. `STORIES.md` is why the grouping is this grouping.
 - **Sections keep their place.** Each remembers which view you left it on,
   and mounts the first time it is opened rather than on launch — the old
   pager built all thirteen screens before the first one was looked at.
-- `pull` is not in any section; it is a full-screen overlay over everything
-  (see 13).
+- **Detail is a stack.** `pull`, `thread`, `repo`, `file`, `new issue` and
+  `add account` push over the sections and over each other, each with `←
+  back` and the system back button wired to pop the top. Lower pages stay
+  mounted, hidden, so back returns to them as they were. A github.com link
+  anywhere in rendered Markdown opens the matching page on the stack instead
+  of the browser. (`lib/nav.tsx`.)
 
 *(Superseded: a single horizontal pager of thirteen pages under a
 horizontally scrolling name rail. Everything was one swipe from its
@@ -512,11 +638,22 @@ Three rules, and all three exist because breaking one was visible on a real phon
    width at that pitch. Nothing is left over to centre, so the field's edges are the
    card's padding. Only the *ratio* of the reported size is trusted; a launcher that
    under-reports just gets a smaller bitmap scaled back up.
-3. **The weeks are laid out from the right.** Today is the last column, always. A
-   payload with less history than the card has room for shows that as empty weeks on
-   the left, where the missing history would be. Indexing from the left instead left a
-   block of dead grid to the right of today on any card wider than the payload — which
-   was every 4×2 card, because the payload used to carry eighteen weeks.
+3. **The newest day is the bottom-right mark.** The field is a run of days, not
+   GitHub's weekday calendar: days go down each column and on to the next, oldest
+   top-left, so the last mark on the card is today — the same corner every day. It
+   used to keep weekday rows, which put today halfway up the last column with the
+   rest of the week drawn as days that had not happened yet. The payload is therefore
+   the year as it happened, ending on today, with no padding in it.
+4. **Three weeks or more of nothing is a wave.** A quiet stretch that long is drawn
+   as the app's hand-drawn rule across the middle of the field, three columns wide,
+   with its length over it in mono — `5 wk`, `4 mo`, `1 yr` — and the columns it would
+   have filled go to days that had something in them. A year with one busy spring
+   used to be a card of ghost dots with the spring pushed off the left edge; now the
+   spring is on the card and the silence is one line that says how long it was. The
+   threshold is three weeks because a wave is three columns wide: collapsing a
+   stretch can give the card room back but never cost it any. The oldest silence
+   runs out to the card's left edge — quiet since before anything the card can show.
+   Only an account younger than the card leaves ghost dots on the left.
 
 ### There is no widget B
 

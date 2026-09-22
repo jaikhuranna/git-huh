@@ -10,6 +10,19 @@ import type { Activity, CommitSample, PullDetail } from './activity';
 import { parsePatch, type PullDetailFull } from './pullDetail';
 import type { PullRequest } from './prs';
 import type { SocialEvent } from './social';
+import type { Checks, LogTail, PendingDeployment } from './checks';
+import type { IssueTemplate } from './issueForms';
+import type {
+  Alert,
+  CodeHit,
+  DiscussionRow,
+  Entry,
+  IssueRow,
+  Release,
+  RepoFile,
+  RepoInfo,
+} from './repo';
+import type { Thread } from './thread';
 
 /** Mulberry32 — tiny seeded PRNG so demo data is stable across renders. */
 function rng(seed: number): () => number {
@@ -528,6 +541,11 @@ export function demoPullDetail(repo: string, number: number): PullDetailFull {
     new Date(Date.parse(opened) + hours * 3_600_000).toISOString();
 
   return {
+    id: `demo-pr-${number}`,
+    headSha: 'd3m0c0ffee',
+    // The demo account wrote its own pull requests; the one it was asked to
+    // review is someone else's, so approve is on offer there.
+    viewerIsAuthor: repo.startsWith(`${DEMO_LOGIN}/`),
     number,
     title: listed?.title ?? 'feat: adaptive icon monochrome layer',
     url: listed?.htmlUrl ?? `https://github.com/${repo}/pull/${number}`,
@@ -642,3 +660,382 @@ const layers = ["foreground", "monochrome"] as const;
 
 > Checked against Pixel Launcher and Nothing Launcher on a tinted wallpaper.
 `;
+
+// ---------------------------------------------------------------------------
+// The rest of the world, for the demo account: a repository to walk around
+// in, a file to edit, a thread to answer and a CI run that failed — so every
+// screen that reads or writes has something real-looking to do without a
+// network, and nothing it "sends" goes anywhere.
+
+const ago = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+
+export function demoChecks(): Checks {
+  return {
+    runs: [
+      {
+        id: 9001,
+        name: 'test (android)',
+        status: 'completed',
+        conclusion: 'failure',
+        url: '#',
+        app: 'github-actions',
+        isActions: true,
+        summary: '2 tests failed in widgetPayload',
+      },
+      {
+        id: 9004,
+        name: 'deploy (preview)',
+        status: 'waiting',
+        conclusion: null,
+        url: '#',
+        app: 'github-actions',
+        isActions: true,
+        summary: 'waiting for approval on preview',
+      },
+      {
+        id: 9003,
+        name: 'build (release)',
+        status: 'in_progress',
+        conclusion: null,
+        url: '#',
+        app: 'github-actions',
+        isActions: true,
+        summary: null,
+      },
+      {
+        id: 9002,
+        name: 'typecheck',
+        status: 'completed',
+        conclusion: 'success',
+        url: '#',
+        app: 'github-actions',
+        isActions: true,
+        summary: null,
+      },
+      {
+        id: 9005,
+        name: 'lint',
+        status: 'completed',
+        conclusion: 'success',
+        url: '#',
+        app: 'github-actions',
+        isActions: true,
+        summary: null,
+      },
+    ],
+    workflows: [
+      { id: 71, name: 'ci', status: 'completed', conclusion: 'failure', event: 'pull_request', url: '#' },
+      { id: 72, name: 'preview', status: 'waiting', conclusion: null, event: 'pull_request', url: '#' },
+    ],
+  };
+}
+
+export function demoLog(): LogTail {
+  return {
+    errors: [
+      'FAIL src/lib/widgetBridge.test.ts',
+      "  ● widgetPayload › carries the monochrome layer: expected 'monochrome', received undefined",
+      "  ● widgetPayload › falls back when a launcher asks for both: TypeError: layers is not iterable",
+    ],
+    tail: [
+      '> jest --ci',
+      'PASS src/lib/contributions.test.ts',
+      'PASS src/lib/messageCache.test.ts',
+      'FAIL src/lib/widgetBridge.test.ts',
+      '  ● widgetPayload › carries the monochrome layer',
+      "    expected 'monochrome', received undefined",
+      '      41 |   const payload = widgetPayload(model);',
+      "    > 42 |   expect(payload.layers[1]).toBe('monochrome');",
+      '         |                              ^',
+      'Tests:       2 failed, 61 passed, 63 total',
+      'Error: Process completed with exit code 1.',
+    ],
+  };
+}
+
+export function demoPending(): PendingDeployment[] {
+  return [{ environmentId: 1, environment: 'preview', canApprove: true }];
+}
+
+export function demoThread(repo: string, number: number, type: 'issue' | 'discussion'): Thread {
+  const discussion = type === 'discussion';
+  return {
+    type,
+    id: `demo-${type}-${number}`,
+    number,
+    repo,
+    title: discussion
+      ? 'Should the widget follow the wallpaper or the theme?'
+      : 'Widget stops updating after a theme change',
+    url: `https://github.com/${repo}/${discussion ? 'discussions' : 'issues'}/${number}`,
+    body: discussion
+      ? 'Material You gives us both. The wallpaper is prettier, the theme is what people *chose*. Which one wins when they disagree?'
+      : 'After switching from light to dark the widget keeps the old background until the next sync.\n\n**Steps**\n\n1. Place the widget\n2. Switch the system theme\n3. Wait\n\n@jaikhuranna any idea whether the palette is read once?',
+    state: discussion ? 'OPEN' : 'OPEN',
+    author: 'devonwrites',
+    createdAt: ago(52),
+    labels: discussion ? [] : [{ name: 'bug', color: 'd73a4a' }],
+    category: discussion ? 'Ideas' : null,
+    comments: [
+      {
+        id: 'demo-tc1',
+        author: 'annapetrova',
+        body: 'Same on a Pixel 8. It fixes itself after the next sync, so the palette is cached somewhere.',
+        createdAt: ago(40),
+        url: '#',
+        replies: discussion
+          ? [
+              {
+                id: 'demo-tc1r',
+                author: DEMO_LOGIN,
+                body: 'It is read once per sync — the fix is to read it at bind time.',
+                createdAt: ago(38),
+                url: '#',
+                replies: [],
+              },
+            ]
+          : [],
+      },
+      {
+        id: 'demo-tc2',
+        author: 'marcusleroy',
+        body: 'Could be the `system_neutral1_*` read happening on the wrong context.',
+        createdAt: ago(20),
+        url: '#',
+        isAnswer: discussion,
+        replies: [],
+      },
+    ],
+    moreComments: 0,
+  };
+}
+
+export function demoRepoInfo(repo: string): RepoInfo {
+  return {
+    nameWithOwner: repo,
+    description: 'Make your own GitHub history worth looking at.',
+    url: `https://github.com/${repo}`,
+    defaultBranch: 'main',
+    stars: 214,
+    forks: 12,
+    isPrivate: false,
+    language: { name: 'TypeScript', color: '#3178c6' },
+    permission: repo.startsWith(`${DEMO_LOGIN}/`) ? 'ADMIN' : 'READ',
+    openIssues: 3,
+    discussionsEnabled: true,
+  };
+}
+
+export function demoEntries(path: string): Entry[] {
+  if (path === 'src') {
+    return [
+      { name: 'lib', path: 'src/lib', type: 'dir', size: 0 },
+      { name: 'screens', path: 'src/screens', type: 'dir', size: 0 },
+      { name: 'theme.ts', path: 'src/theme.ts', type: 'file', size: 2210 },
+    ];
+  }
+  if (path.startsWith('src/')) {
+    return [{ name: 'widgetBridge.ts', path: `${path}/widgetBridge.ts`, type: 'file', size: 1320 }];
+  }
+  return [
+    { name: '.github', path: '.github', type: 'dir', size: 0 },
+    { name: 'src', path: 'src', type: 'dir', size: 0 },
+    { name: 'README.md', path: 'README.md', type: 'file', size: 812 },
+    { name: 'package.json', path: 'package.json', type: 'file', size: 1135 },
+  ];
+}
+
+export function demoFile(path: string): RepoFile {
+  const text = path.endsWith('README.md')
+    ? '# git-huh\n\nMake your own GitHub history worth looking at.\n\nThe numbers GitHub already has about you, rendered as printed artefacts\nrather than as a dashboard. Paste a token, read your year.\n\n## Build\n\n    npm install\n    npx expo run:android\n\nTeh widget lives in `android/`.\n'
+    : [
+        "import { nothingWidgetColors } from 'nothing-mtui';",
+        '',
+        'export function widgetPayload(model: WidgetModel) {',
+        "  const modes = ['light', 'dark'] as const;",
+        '  const colours = modes.map((mode) => nothingWidgetColors(null, mode));',
+        '  return {',
+        '    days: model.columns.flat().map((day) => day.level),',
+        '    today: model.todayCount,',
+        '    colours,',
+        '  };',
+        '}',
+        '',
+      ].join('\n');
+  return { path, sha: 'demo-blob', size: text.length, ref: 'main', text };
+}
+
+export function demoSearch(terms: string): { total: number; hits: CodeHit[] } {
+  return {
+    total: 3,
+    hits: [
+      {
+        repo: `${DEMO_LOGIN}/git-huh`,
+        path: 'src/lib/widgetBridge.ts',
+        fragments: [`export function widgetPayload(model: WidgetModel) — ${terms}`],
+      },
+      {
+        repo: `${DEMO_LOGIN}/git-huh`,
+        path: 'README.md',
+        fragments: [`The widget lives in android/ · ${terms}`],
+      },
+      {
+        repo: `${DEMO_LOGIN}/nothing-mtui`,
+        path: 'src/index.ts',
+        fragments: [`export function nothingWidgetColors(palette, mode) · ${terms}`],
+      },
+    ],
+  };
+}
+
+export function demoReleases(): Release[] {
+  return [
+    {
+      id: 3,
+      name: 'dev-3.0.0',
+      tag: 'dev-3.0.0',
+      body: 'Five sections instead of thirteen pages.\n\n- **today** — you · now · weather · hours\n- **inbox** — the feed, with a count on the tab\n- **lab** — where experiments live',
+      publishedAt: ago(20),
+      prerelease: true,
+      draft: false,
+      url: '#',
+      assets: 1,
+    },
+    {
+      id: 2,
+      name: 'dev-2.9.0',
+      tag: 'dev-2.9.0',
+      body: 'The strip moves a width at a time, even where animations do not run.',
+      publishedAt: ago(70),
+      prerelease: true,
+      draft: false,
+      url: '#',
+      assets: 1,
+    },
+  ];
+}
+
+export function demoIssues(): IssueRow[] {
+  return [
+    {
+      number: 401,
+      title: 'Widget stops updating after a theme change',
+      author: 'devonwrites',
+      comments: 2,
+      createdAt: ago(52),
+      labels: [{ name: 'bug', color: 'd73a4a' }],
+    },
+    {
+      number: 398,
+      title: 'Poster year chips overflow on small screens',
+      author: 'annapetrova',
+      comments: 0,
+      createdAt: ago(160),
+      labels: [],
+    },
+  ];
+}
+
+export function demoDiscussions(): DiscussionRow[] {
+  return [
+    {
+      number: 12,
+      title: 'Should the widget follow the wallpaper or the theme?',
+      author: 'devonwrites',
+      comments: 2,
+      category: 'Ideas',
+      updatedAt: ago(20),
+      answered: true,
+    },
+  ];
+}
+
+export function demoAlerts(): Alert[] {
+  return [
+    {
+      number: 7,
+      severity: 'high',
+      pkg: 'semver',
+      ecosystem: 'npm',
+      summary: 'semver vulnerable to Regular Expression Denial of Service',
+      vulnerable: '< 7.5.2',
+      patched: '7.5.2',
+      manifest: 'package-lock.json',
+      url: '#',
+    },
+    {
+      number: 6,
+      severity: 'medium',
+      pkg: 'ws',
+      ecosystem: 'npm',
+      summary: 'ws affected by a DoS when handling a request with many HTTP headers',
+      vulnerable: '>= 8.0.0, < 8.17.1',
+      patched: '8.17.1',
+      manifest: 'package-lock.json',
+      url: '#',
+    },
+  ];
+}
+
+export function demoTemplates(): IssueTemplate[] {
+  return [
+    {
+      file: 'bug.yml',
+      name: 'Bug report',
+      about: 'Something drew the wrong number, or nothing at all.',
+      title: '[bug] ',
+      labels: ['bug'],
+      kind: 'form',
+      body: '',
+      fields: [
+        { type: 'markdown', text: 'Thanks for writing it down. One screen per report, please.' },
+        {
+          type: 'dropdown',
+          id: 'screen',
+          label: 'Which screen',
+          description: '',
+          options: ['today', 'inbox', 'work', 'year', 'widget'],
+          multiple: false,
+          required: true,
+        },
+        {
+          type: 'textarea',
+          id: 'what',
+          label: 'What happened',
+          description: 'What you saw, and what you expected instead.',
+          placeholder: 'The poster showed 2019 twice…',
+          value: '',
+          required: true,
+          render: null,
+        },
+        {
+          type: 'input',
+          id: 'version',
+          label: 'Version',
+          description: 'From the release you installed.',
+          placeholder: 'dev-3.0.0',
+          value: '',
+          required: false,
+          render: null,
+        },
+        {
+          type: 'checkboxes',
+          id: 'checked',
+          label: 'Checks',
+          description: '',
+          options: [{ label: 'I searched the open issues first', required: true }],
+        },
+      ],
+    },
+    {
+      file: 'idea.md',
+      name: 'Idea',
+      about: 'A screen, a pin, a better way to say a number.',
+      title: '',
+      labels: ['idea'],
+      kind: 'markdown',
+      body: '**What it would show**\n\n\n**Which pin it comes from**\n',
+      fields: [],
+    },
+  ];
+}

@@ -222,7 +222,19 @@ export interface ContributionStats {
   years: YearStats[];
 }
 
-export type GitHubErrorKind = 'invalid-token' | 'network' | 'api';
+/**
+ * `forbidden` is a token that is valid but not allowed to do this particular
+ * thing — the missing scope, the repository it cannot write to. It is its
+ * own kind because the fix is different: not "sign in again" but "mint a
+ * token that can". `missing` is GitHub saying the thing is not there, which
+ * for a private repository is also how it says "not for you".
+ */
+export type GitHubErrorKind =
+  | 'invalid-token'
+  | 'network'
+  | 'api'
+  | 'forbidden'
+  | 'missing';
 
 export class GitHubError extends Error {
   readonly kind: GitHubErrorKind;
@@ -236,7 +248,7 @@ export class GitHubError extends Error {
 
 interface GraphQLResponse {
   data?: unknown;
-  errors?: { message: string }[];
+  errors?: { message: string; type?: string }[];
 }
 
 /** Shared by activity.ts, which runs its own queries against the same rules. */
@@ -245,6 +257,7 @@ export async function executeQuery<T>(
   query: string,
   schema: z.ZodType<T>,
   signal?: AbortSignal,
+  variables?: Record<string, unknown>,
 ): Promise<T> {
   let response: Response;
   try {
@@ -254,7 +267,7 @@ export async function executeQuery<T>(
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify(variables ? { query, variables } : { query }),
       signal,
     });
   } catch (error) {
@@ -271,10 +284,15 @@ export async function executeQuery<T>(
 
   const body = (await response.json()) as GraphQLResponse;
   if (body.errors?.length) {
-    const message = body.errors[0]?.message ?? 'Unknown GraphQL error.';
+    const first = body.errors[0];
+    const message = first?.message ?? 'Unknown GraphQL error.';
     const kind: GitHubErrorKind = /bad credentials/i.test(message)
       ? 'invalid-token'
-      : 'api';
+      : first?.type === 'FORBIDDEN' || first?.type === 'INSUFFICIENT_SCOPES'
+        ? 'forbidden'
+        : first?.type === 'NOT_FOUND'
+          ? 'missing'
+          : 'api';
     throw new GitHubError(kind, message);
   }
 

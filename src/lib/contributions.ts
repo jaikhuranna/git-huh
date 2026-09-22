@@ -7,17 +7,6 @@ import type {
   YearStats,
 } from './github';
 
-/**
- * Weeks of history carried to the widgets' dot matrix.
- *
- * Enough for the widest card, not for the tallest: a 4-cell card only two
- * cells high is a very wide, very short box, and it asks for about thirty
- * columns of weeks. At eighteen it ran out of history a third of the way from
- * the right-hand edge, so today stopped being the last column and the rest of
- * the field was empty grid.
- */
-export const GRID_WEEKS = 32;
-
 export type Level = 0 | 1 | 2 | 3 | 4;
 
 export interface GridDay {

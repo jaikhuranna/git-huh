@@ -49,6 +49,23 @@ object TextRenderer {
 
     private val cache = HashMap<Int, Typeface>()
 
+    /**
+     * A paint for a label painted into another renderer's bitmap — the dot
+     * field's "5 wk" over a quiet stretch — in the widget's own mono, at a
+     * size in pixels chosen by the caller to suit its grid.
+     */
+    fun labelPaint(
+        context: Context,
+        sizePx: Float,
+        color: Int,
+        @FontRes font: Int = R.font.ibmplexmono,
+    ): TextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.typeface = typeface(context, font)
+        this.textSize = sizePx
+        this.color = color
+        this.textAlign = Paint.Align.CENTER
+    }
+
     @Synchronized
     private fun typeface(context: Context, @FontRes font: Int): Typeface? =
         cache.getOrPut(font) {

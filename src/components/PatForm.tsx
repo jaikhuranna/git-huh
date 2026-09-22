@@ -23,16 +23,24 @@ import { Wordmark } from './Wordmark';
 interface PatFormProps {
   /** Called with a token GitHub has already accepted. */
   onTokenVerified: (token: string) => void;
+  /** Present when this is a second account being added, which can be abandoned. */
+  onCancel?: () => void;
 }
 
-const TOKEN_SETTINGS_URL =
-  'https://github.com/settings/tokens/new?scopes=read:user,repo&description=git-huh';
+/**
+ * The scopes the app can use, all of them: `repo` for private work and for
+ * writing back, the two discussion scopes for reading and answering
+ * discussions, and `security_events` for Dependabot alerts. Everything still
+ * works on less — each screen says what its missing scope costs.
+ */
+export const TOKEN_SETTINGS_URL =
+  'https://github.com/settings/tokens/new?scopes=read:user,repo,read:discussion,write:discussion,security_events&description=git-huh';
 
 /**
  * Sign-in, given the pin04 treatment: serif greeting, the cross field as
  * texture, and a hairline-underlined mono input. One box, one button.
  */
-export function PatForm({ onTokenVerified }: PatFormProps) {
+export function PatForm({ onTokenVerified, onCancel }: PatFormProps) {
   const { width } = useWindowDimensions();
   const [token, setToken] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +80,13 @@ export function PatForm({ onTokenVerified }: PatFormProps) {
       >
         <View style={styles.header}>
           <Wordmark size={20} />
-          <Label>2.0</Label>
+          {onCancel ? (
+            <Pressable accessibilityRole="button" hitSlop={12} onPress={onCancel}>
+              <Label style={{ color: colors.ink }}>cancel</Label>
+            </Pressable>
+          ) : (
+            <Label>3.1</Label>
+          )}
         </View>
 
         <View style={styles.stack}>
