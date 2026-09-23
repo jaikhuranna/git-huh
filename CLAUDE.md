@@ -45,11 +45,23 @@ hand from this machine:
 ```bash
 # bump versionName / versionCode in android/app/build.gradle and app.json first
 cd android
-ANDROID_HOME=/home/jaikhurana/Android ./gradlew assembleRelease --no-daemon
+ANDROID_HOME=/home/jaikhurana/Android ./gradlew assembleRelease --no-daemon \
+  -PreactNativeArchitectures=arm64-v8a
 gh release create dev-<version> \
   app/build/outputs/apk/release/app-arm64-v8a-release.apk \
   --title "dev-<version>" --prerelease --notes "..."
 ```
+
+**Build one architecture at a time on this machine.** `gradle.properties`
+lists four ABIs, and a four-ABI build of the native modules (reanimated,
+worklets, expo-modules-core) writes tens of thousands of small files. The
+root filesystem is btrfs and its *metadata* is nearly full — a build fails
+with `No space left on device` while `df` still shows gigabytes free. Build
+`-PreactNativeArchitectures=x86_64` for the emulator and `arm64-v8a` for the
+release, and in each build **only the APK for that ABI is usable** — the
+other split comes out without native libraries. If a build dies mid-CMake,
+delete `node_modules/*/android/.cxx` and `android/app/build` (both
+regenerable) before retrying. The real fix, a `btrfs balance`, needs root.
 
 Ship **`app-arm64-v8a-release.apk`** (~47 MB) — that is the one that gets
 installed. The universal APK (~100 MB) is only for an x86_64 emulator and is
