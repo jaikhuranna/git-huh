@@ -649,11 +649,18 @@ Three rules, and all three exist because breaking one was visible on a real phon
    with its length over it in mono — `5 wk`, `4 mo`, `1 yr` — and the columns it would
    have filled go to days that had something in them. A year with one busy spring
    used to be a card of ghost dots with the spring pushed off the left edge; now the
-   spring is on the card and the silence is one line that says how long it was. The
-   threshold is three weeks because a wave is three columns wide: collapsing a
-   stretch can give the card room back but never cost it any. The oldest silence
-   runs out to the card's left edge — quiet since before anything the card can show.
-   Only an account younger than the card leaves ghost dots on the left.
+   spring is on the card and the silence is one line that says how long it was.
+5. **A silence starts and ends as empty days.** Each side of a wave keeps one whole
+   column of the stretch's own empty days, and the newer side finishes the column its
+   marks stopped in first, so the wave sits between two columns of nothing and never
+   against the last commit beside a half-empty column. A stretch folds only
+   when what it hides is more than the wave's three columns once its edges have
+   kept theirs, so a wave never costs the card room — under five weeks or so of
+   nothing stays as dots. The oldest silence runs out to the card's left
+   edge — quiet since before anything the card can show. Only a payload shorter
+   than the card leaves ghost dots on the left: an account younger than the card,
+   or a widget still holding what a pre-3.1 app sent (32 weeks), until the app is
+   next opened.
 
 ### There is no widget B
 

@@ -163,10 +163,13 @@ on-device from the last one.
   `GlyphRenderer`, `DotFieldRenderer`). It is a travelling commit message and
   the dot field, nothing else: no counts, no accent, a plus for today in the
   **bottom-right** corner (the field is a run of days ending today, not a
-  weekday calendar), three weeks or more of nothing drawn as a wave with its
-  length on it, and one 14dp padding on every side. The strip lives in
+  weekday calendar), a long run of nothing drawn as a wave with its
+  length on it and one column of its own empty days on each side, and one 14dp padding on every side. The strip lives in
   `res/layout/widget_strip.xml` and is the one view here that is not painted
-  by Glance. See the widget trap below before touching it.
+  by Glance. See the widget trap below before touching it. The widget draws
+  whatever the *last app that ran* wrote, so after an update it paints the old
+  payload with the new renderer until the app is opened once — a 3.0 payload
+  held 32 weeks, and on a 3.1 card that looked like history cut off.
 - `preview/` — ten of the screens as HTML at 393×852, used to iterate on
   layout in a browser and to build `review.html`. It lags the app.
 - `design/DESIGN.md` — the spec every screen is derived from.

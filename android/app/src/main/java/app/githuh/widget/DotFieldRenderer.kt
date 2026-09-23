@@ -24,7 +24,7 @@ import kotlin.math.sin
  * painted **at the shape of the box it is going into**, the only way the field
  * lines up with the strip above it.
  *
- * Two rules decide what goes where, and both are about reading the card from
+ * Three rules decide what goes where, and all are about reading the card from
  * across a room:
  *
  * 1. **The newest day is the bottom-right mark.** Days run down each column
@@ -39,6 +39,13 @@ import kotlin.math.sin
  *    taken go to days that had something in them. A year with one busy spring
  *    used to be a card of ghost dots with the spring pushed off the left edge;
  *    now the spring is on the card and the silence is one honest line.
+ *
+ * 3. **A silence starts and ends as empty days before it becomes a wave.** Each
+ *    side of the wave keeps one whole column of the stretch's own empty days,
+ *    and the newer side finishes the column its marks stopped in first.
+ *    Without that a wave sat straight against the last commit with a
+ *    half-empty column beside it, and work that stopped read like work that
+ *    was cut off.
  */
 object DotFieldRenderer {
 
@@ -59,19 +66,18 @@ object DotFieldRenderer {
     /** The gap between two marks, as a share of the pitch. */
     private const val GAP_SHARE = 0.30f
 
-    /**
-     * How long a run of empty days has to be before it becomes a wave. Three
-     * weeks is three columns, and a wave is three columns wide, so collapsing
-     * a stretch can never cost the card room — it only ever gives some back.
-     */
+    /** How long a run of empty days has to be before it can become a wave. */
     private const val QUIET_DAYS = 21
     private const val QUIET_COLUMNS = 3
 
-    private sealed interface Piece
-    /** Days to draw as marks, newest first. */
-    private class Marks(val days: List<WidgetState.DayCell>) : Piece
-    /** A stretch with nothing in it, and how many days it lasted. */
-    private class Quiet(val days: Int) : Piece
+    private sealed interface Slot
+    /** One day, drawn as a mark in the next cell. */
+    private class Day(val day: WidgetState.DayCell) : Slot
+    /**
+     * A stretch with nothing in it and how many days it lasted, starting on a
+     * column. [toEdge] when it runs back past the oldest day the app sent.
+     */
+    private class Quiet(val days: Int, val toEdge: Boolean) : Slot
 
     fun render(
         context: Context,
@@ -110,86 +116,104 @@ object DotFieldRenderer {
         // corner that belongs to today until the app next syncs.
         val end = days.indexOfLast { it.isToday }
         val history = if (end >= 0) days.subList(0, end + 1) else days
-        var column = columns
-        val pieces = piecesOf(history)
-        for ((index, piece) in pieces.withIndex()) {
-            if (column <= 0) break
-            when (piece) {
-                is Marks -> {
-                    for ((k, day) in piece.days.withIndex()) {
-                        val col = column - 1 - k / rows
-                        if (col < 0) break
-                        val row = rows - 1 - k % rows
-                        mark(canvas, paint, day, ink,
-                            cx = left + col * pitch + pitch / 2f,
-                            cy = top + row * pitch + pitch / 2f,
-                            cell = cell)
-                    }
-                    column -= ceil(piece.days.size / rows.toFloat()).toInt()
+
+        // Cells are numbered from the bottom-right, up each column and then on
+        // to the one on its left.
+        val capacity = columns * rows
+        val cx = { k: Int -> left + (columns - 1 - k / rows) * pitch + pitch / 2f }
+        val cy = { k: Int -> top + (rows - 1 - k % rows) * pitch + pitch / 2f }
+        var k = 0
+        for (slot in slotsOf(history, rows)) {
+            if (k >= capacity) break
+            when (slot) {
+                is Day -> {
+                    mark(canvas, paint, slot.day, ink, cx(k), cy(k), cell)
+                    k++
                 }
                 is Quiet -> {
                     // The oldest silence runs out to the card's edge: it is
                     // quiet since before anything the card can show.
-                    val last = index == pieces.lastIndex
-                    val span = if (last) column else minOf(QUIET_COLUMNS, column)
-                    if (span < 2) break
-                    quiet(context, canvas, piece.days, ink,
-                        from = left + (column - span) * pitch,
-                        to = left + column * pitch,
+                    val remaining = columns - k / rows
+                    val span = if (slot.toEdge) remaining else minOf(QUIET_COLUMNS, remaining)
+                    if (span < 2) {
+                        // No room left for a wave; the last column is the
+                        // silence's own empty days.
+                        val blank = WidgetState.DayCell(level = 0, isToday = false)
+                        while (k < capacity) {
+                            mark(canvas, paint, blank, ink, cx(k), cy(k), cell)
+                            k++
+                        }
+                        break
+                    }
+                    quiet(context, canvas, slot.days, ink,
+                        from = left + (remaining - span) * pitch,
+                        to = left + remaining * pitch,
                         top = top, pitch = pitch, rows = rows, density = density)
-                    column -= span
+                    k += span * rows
                 }
             }
         }
 
-        // Whatever is left on the left is before the history the app sent —
-        // an account younger than the card. Drawn as the grid's ghost, as it
-        // always was, so it reads as "no days here" rather than as a hole.
-        for (col in 0 until column) {
-            for (row in 0 until rows) {
-                paint.color = withAlpha(ink, emptyAlpha)
-                canvas.drawCircle(
-                    left + col * pitch + pitch / 2f,
-                    top + row * pitch + pitch / 2f,
-                    cell * SCALES[0] / 2f,
-                    paint,
-                )
-            }
+        // Whatever is left is before the history the app sent — an account
+        // younger than the card. Drawn as the grid's ghost, as it always was,
+        // so it reads as "no days here" rather than as a hole.
+        paint.color = withAlpha(ink, emptyAlpha)
+        while (k < capacity) {
+            canvas.drawCircle(cx(k), cy(k), cell * SCALES[0] / 2f, paint)
+            k++
         }
 
         return ImageProvider(bitmap)
     }
 
     /**
-     * The days, newest first, cut into runs of marks and long silences. Today
-     * is always a mark, whatever it holds: the corner it sits in is the one
-     * fixed point on the card.
+     * The days, newest first, as the cells they will take. Today is always a
+     * mark, whatever it holds: the corner it sits in is the one fixed point on
+     * the card.
+     *
+     * A silence folds into a wave only when the days it would hide are more
+     * than the wave's own three columns, after its edges have kept theirs — so
+     * folding one never costs the card room. The newer edge finishes the column
+     * the marks stopped in and then keeps one whole column of empty days, and
+     * the older edge keeps one whole column too, so the wave always sits
+     * between two columns of nothing.
      */
-    private fun piecesOf(days: List<WidgetState.DayCell>): List<Piece> {
-        val pieces = ArrayList<Piece>()
-        val marks = ArrayList<WidgetState.DayCell>()
+    private fun slotsOf(days: List<WidgetState.DayCell>, rows: Int): List<Slot> {
+        val slots = ArrayList<Slot>()
+        var cells = 0
         var i = days.lastIndex
         while (i >= 0) {
             val day = days[i]
             if (day.level > 0 || day.isToday) {
-                marks.add(day)
+                slots.add(Day(day))
+                cells++
                 i--
                 continue
             }
             var j = i
             while (j >= 0 && days[j].level == 0 && !days[j].isToday) j--
             val run = i - j
-            if (run >= QUIET_DAYS) {
-                if (marks.isNotEmpty()) pieces.add(Marks(ArrayList(marks)))
-                marks.clear()
-                pieces.add(Quiet(run))
+            val toEdge = j < 0
+
+            // Finish the column the marks stopped in, then one whole column.
+            val lead = (rows - cells % rows) % rows + rows
+            val trail = if (toEdge) 0 else rows
+            val hidden = run - lead - trail
+            val folds = run >= QUIET_DAYS &&
+                (if (toEdge) hidden > 0 else hidden > QUIET_COLUMNS * rows)
+
+            if (folds) {
+                for (m in i downTo i - lead + 1) slots.add(Day(days[m]))
+                slots.add(Quiet(run, toEdge))
+                for (m in j + trail downTo j + 1) slots.add(Day(days[m]))
+                cells += lead + trail + QUIET_COLUMNS * rows
             } else {
-                for (k in i downTo j + 1) marks.add(days[k])
+                for (m in i downTo j + 1) slots.add(Day(days[m]))
+                cells += run
             }
             i = j
         }
-        if (marks.isNotEmpty()) pieces.add(Marks(marks))
-        return pieces
+        return slots
     }
 
     private fun mark(
