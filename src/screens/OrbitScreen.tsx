@@ -7,7 +7,7 @@ import { Data, Label } from '../components/Type';
 import { useTicker } from '../hooks/useTicker';
 import type { GitHubModel, LanguageShare } from '../lib/contributions';
 import { languageMark } from '../lib/languageMarks';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themed } from '../theme';
 import { onColor, Page, ScreenHead } from './shared';
 
 /** Turns of the spiral from the centre to the outer end. */
@@ -271,26 +271,28 @@ function mark(
   );
 }
 
-const styles = StyleSheet.create({
-  stage: {
-    alignItems: 'center',
-  },
-  legend: {
-    gap: 2,
-    marginTop: 18,
-  },
-  legendRow: {
-    alignItems: 'center',
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 7,
-  },
-  legendName: {
-    flex: 1,
-  },
-  legendShare: {
-    color: colors.ink40,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    stage: {
+      alignItems: 'center',
+    },
+    legend: {
+      gap: 2,
+      marginTop: 18,
+    },
+    legendRow: {
+      alignItems: 'center',
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      paddingVertical: 7,
+    },
+    legendName: {
+      flex: 1,
+    },
+    legendShare: {
+      color: colors.ink40,
+    },
+  }),
+);

@@ -18,7 +18,7 @@ import {
 import { useNav } from '../lib/nav';
 import { explain } from '../lib/rest';
 import { createIssue } from '../lib/writes';
-import { colors, fallbacks, fonts, radii, space } from '../theme';
+import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
 
 const BLANK: IssueTemplate = {
   file: '',
@@ -297,132 +297,134 @@ function Field({
   );
 }
 
-const styles = StyleSheet.create({
-  page: {
-    paddingBottom: 40,
-    paddingHorizontal: space.gutter,
-    paddingTop: 6,
-  },
-  heading: {
-    marginBottom: 12,
-  },
-  template: {
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    gap: 3,
-    paddingVertical: 12,
-  },
-  templateName: {
-    fontSize: 15,
-  },
-  about: {
-    color: colors.ink40,
-    lineHeight: 13,
-  },
-  kind: {
-    color: colors.purple,
-  },
-  fieldLabel: {
-    color: colors.ink,
-    marginBottom: 6,
-    marginTop: 18,
-  },
-  input: {
-    backgroundColor: colors.card,
-    borderColor: colors.hair,
-    borderRadius: radii.tile,
-    borderWidth: 1,
-    color: colors.ink,
-    fontFamily: fonts.sans ?? fallbacks.sans,
-    fontSize: 14,
-    marginTop: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  area: {
-    minHeight: 110,
-  },
-  code: {
-    fontFamily: fonts.mono ?? fallbacks.mono,
-    fontSize: 12,
-  },
-  prose: {
-    marginTop: 14,
-  },
-  options: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
-  },
-  option: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  optionOn: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  optionLabelOn: {
-    color: colors.onBlack,
-  },
-  tickRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 6,
-  },
-  tick: {
-    borderColor: colors.ink,
-    borderRadius: 3,
-    borderWidth: 1,
-    height: 16,
-    width: 16,
-  },
-  tickOn: {
-    backgroundColor: colors.black,
-  },
-  tickText: {
-    flex: 1,
-  },
-  labels: {
-    color: colors.ink40,
-    marginTop: 14,
-  },
-  submitRow: {
-    flexDirection: 'row',
-    marginTop: 20,
-  },
-  solid: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  solidLabel: {
-    color: colors.onBlack,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-  missing: {
-    color: colors.ink40,
-    marginTop: 10,
-  },
-  failed: {
-    color: colors.red,
-    marginTop: 10,
-  },
-  sent: {
-    color: colors.green,
-    marginTop: 10,
-  },
-  note: {
-    marginTop: 10,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    page: {
+      paddingBottom: 40,
+      paddingHorizontal: space.gutter,
+      paddingTop: 6,
+    },
+    heading: {
+      marginBottom: 12,
+    },
+    template: {
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      gap: 3,
+      paddingVertical: 12,
+    },
+    templateName: {
+      fontSize: 15,
+    },
+    about: {
+      color: colors.ink40,
+      lineHeight: 13,
+    },
+    kind: {
+      color: colors.purple,
+    },
+    fieldLabel: {
+      color: colors.ink,
+      marginBottom: 6,
+      marginTop: 18,
+    },
+    input: {
+      backgroundColor: colors.card,
+      borderColor: colors.hair,
+      borderRadius: radii.tile,
+      borderWidth: 1,
+      color: colors.ink,
+      fontFamily: fonts.sans ?? fallbacks.sans,
+      fontSize: 14,
+      marginTop: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    area: {
+      minHeight: 110,
+    },
+    code: {
+      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontSize: 12,
+    },
+    prose: {
+      marginTop: 14,
+    },
+    options: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 4,
+    },
+    option: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    optionOn: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    optionLabelOn: {
+      color: colors.onBlack,
+    },
+    tickRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 10,
+      paddingVertical: 6,
+    },
+    tick: {
+      borderColor: colors.ink,
+      borderRadius: 3,
+      borderWidth: 1,
+      height: 16,
+      width: 16,
+    },
+    tickOn: {
+      backgroundColor: colors.black,
+    },
+    tickText: {
+      flex: 1,
+    },
+    labels: {
+      color: colors.ink40,
+      marginTop: 14,
+    },
+    submitRow: {
+      flexDirection: 'row',
+      marginTop: 20,
+    },
+    solid: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+    },
+    solidLabel: {
+      color: colors.onBlack,
+    },
+    disabled: {
+      opacity: 0.4,
+    },
+    missing: {
+      color: colors.ink40,
+      marginTop: 10,
+    },
+    failed: {
+      color: colors.red,
+      marginTop: 10,
+    },
+    sent: {
+      color: colors.green,
+      marginTop: 10,
+    },
+    note: {
+      marginTop: 10,
+    },
+  }),
+);

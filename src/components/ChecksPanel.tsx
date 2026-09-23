@@ -17,16 +17,16 @@ import {
 import { demoChecks, demoLog, demoPending } from '../lib/demo';
 import { useNav } from '../lib/nav';
 import { explain } from '../lib/rest';
-import { colors, fallbacks, fonts, radii } from '../theme';
+import { colors, fallbacks, fonts, radii, themed } from '../theme';
 import { Data, Label, Micro } from './Type';
 
-const TONE: Record<CheckTone, string> = {
+const TONE = themed<Record<CheckTone, string>>(() => ({
   fail: colors.red,
   waiting: colors.yellow,
   running: colors.blue,
   pass: colors.green,
   neutral: colors.ink40,
-};
+}));
 
 const WORD: Record<CheckTone, string> = {
   fail: 'failed',
@@ -285,133 +285,135 @@ function Log({ repo, jobId, url }: { repo: string; jobId: number; url: string })
   );
 }
 
-const styles = StyleSheet.create({
-  tally: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 14,
-    marginBottom: 12,
-  },
-  tallyItem: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  dot: {
-    borderRadius: 4,
-    height: 8,
-    width: 8,
-  },
-  tallyText: {
-    fontSize: 11,
-  },
-  actions: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  deploy: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  waitingNote: {
-    color: colors.ink40,
-  },
-  run: {
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-  },
-  runHead: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 10,
-  },
-  rule: {
-    borderRadius: 2,
-    width: 3,
-  },
-  runBody: {
-    flex: 1,
-    gap: 3,
-  },
-  runTop: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
-  },
-  runName: {
-    flex: 1,
-    fontSize: 12,
-  },
-  word: {
-    fontFamily: fonts.monoMedium,
-  },
-  summary: {
-    color: colors.ink70,
-  },
-  more: {
-    color: colors.ink,
-    textDecorationLine: 'underline',
-  },
-  log: {
-    backgroundColor: colors.recess,
-    borderRadius: radii.tile,
-    gap: 2,
-    marginBottom: 10,
-    padding: 10,
-  },
-  errorLine: {
-    color: colors.red,
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  tailLine: {
-    color: colors.ink70,
-    fontFamily: fonts.mono ?? fallbacks.mono,
-    fontSize: 9,
-    lineHeight: 13,
-  },
-  logNote: {
-    color: colors.ink40,
-    marginBottom: 10,
-  },
-  solid: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  solidLabel: {
-    color: colors.onBlack,
-  },
-  ghost: {
-    alignSelf: 'flex-start',
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  ghostLabel: {
-    color: colors.ink,
-  },
-  sent: {
-    color: colors.green,
-    marginBottom: 10,
-  },
-  failed: {
-    color: colors.red,
-    marginBottom: 10,
-  },
-  note: {
-    marginTop: 16,
-  },
-  error: {
-    color: colors.red,
-    marginTop: 16,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    tally: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 14,
+      marginBottom: 12,
+    },
+    tallyItem: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    dot: {
+      borderRadius: 4,
+      height: 8,
+      width: 8,
+    },
+    tallyText: {
+      fontSize: 11,
+    },
+    actions: {
+      gap: 8,
+      marginBottom: 12,
+    },
+    deploy: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    waitingNote: {
+      color: colors.ink40,
+    },
+    run: {
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+    },
+    runHead: {
+      flexDirection: 'row',
+      gap: 10,
+      paddingVertical: 10,
+    },
+    rule: {
+      borderRadius: 2,
+      width: 3,
+    },
+    runBody: {
+      flex: 1,
+      gap: 3,
+    },
+    runTop: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      gap: 10,
+      justifyContent: 'space-between',
+    },
+    runName: {
+      flex: 1,
+      fontSize: 12,
+    },
+    word: {
+      fontFamily: fonts.monoMedium,
+    },
+    summary: {
+      color: colors.ink70,
+    },
+    more: {
+      color: colors.ink,
+      textDecorationLine: 'underline',
+    },
+    log: {
+      backgroundColor: colors.recess,
+      borderRadius: radii.tile,
+      gap: 2,
+      marginBottom: 10,
+      padding: 10,
+    },
+    errorLine: {
+      color: colors.red,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    tailLine: {
+      color: colors.ink70,
+      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    logNote: {
+      color: colors.ink40,
+      marginBottom: 10,
+    },
+    solid: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    solidLabel: {
+      color: colors.onBlack,
+    },
+    ghost: {
+      alignSelf: 'flex-start',
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    ghostLabel: {
+      color: colors.ink,
+    },
+    sent: {
+      color: colors.green,
+      marginBottom: 10,
+    },
+    failed: {
+      color: colors.red,
+      marginBottom: 10,
+    },
+    note: {
+      marginTop: 16,
+    },
+    error: {
+      color: colors.red,
+      marginTop: 16,
+    },
+  }),
+);

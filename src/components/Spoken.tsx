@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ago } from '../screens/shared';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themed } from '../theme';
 import { Markdown } from './Markdown';
 import { Squiggle } from './Squiggle';
 import { Data, Micro } from './Type';
@@ -66,32 +66,34 @@ export function Spoken({
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  reply: {
-    marginTop: 12,
-  },
-  body: {
-    flex: 1,
-  },
-  byline: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 2,
-  },
-  author: {
-    color: colors.ink,
-    fontSize: 12,
-  },
-  kind: {
-    fontFamily: fonts.monoMedium,
-  },
-  when: {
-    color: colors.ink40,
-    marginLeft: 'auto',
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    reply: {
+      marginTop: 12,
+    },
+    body: {
+      flex: 1,
+    },
+    byline: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 2,
+    },
+    author: {
+      color: colors.ink,
+      fontSize: 12,
+    },
+    kind: {
+      fontFamily: fonts.monoMedium,
+    },
+    when: {
+      color: colors.ink40,
+      marginLeft: 'auto',
+    },
+  }),
+);

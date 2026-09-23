@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { colors, fallbacks, fonts } from '../theme';
+import { colors, fallbacks, fonts, themed } from '../theme';
 import { Text } from 'react-native';
 
 /**
@@ -23,18 +23,20 @@ export function Wordmark({ size = 20 }: { size?: number }) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    gap: 7,
-  },
-  mark: {
-    color: colors.ink,
-    fontFamily: fonts.serif,
-    letterSpacing: -0.2,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    row: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      gap: 7,
+    },
+    mark: {
+      color: colors.ink,
+      fontFamily: fonts.serif,
+      letterSpacing: -0.2,
+    },
+  }),
+);
 
 /** Platform fallback if Instrument Serif never loads. */
 Wordmark.fallbackFamily = fallbacks.serif;

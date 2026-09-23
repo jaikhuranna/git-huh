@@ -94,6 +94,34 @@ words, a velocity is tinted *and* has an arrow pointing the right way.
 Language colours are the exception that proves it: those are GitHub's own
 colour for the language, not ours, and they are always paired with the name.
 
+### Night
+
+The app follows the system: `useColorScheme` in `app/_layout.tsx` picks the
+palette, and every token has a night value in `src/theme/index.ts`. It is the
+same paper at night, not an inverted screenshot:
+
+| token | night | |
+|---|---|---|
+| `canvas` | `#141312` | warm near-black — the board's ink, lifted a step |
+| `card` · `recess` | `#1E1D1B` · `#282724` | a card still sits *on* the page |
+| `ink` → `ink20` | `#F2F0EB` → `#45433F` | the day's paper is the night's ink |
+| `black` · `onBlack` | `#F2F0EB` · `#111110` | the solid surface inverts with everything else |
+
+`black` means "the solid surface" — a selected pill, a filing tab, the
+`now` ruler — so at night it is the light one, and still the strongest thing
+on the page. The brights keep their hue; blue, red and green lift a step so
+they hold their contrast on dark. `klein` does not change: the loading page is
+that blue in any light.
+
+Two rules make this work, and both are mechanical:
+
+- **Read a colour at render, never at import.** `colors.x` is a getter on the
+  palette in force. A module-level style sheet is `themed(() =>
+  StyleSheet.create({...}))`, which rebuilds after the scheme changes; a
+  module-level lookup table of colours is wrapped the same way.
+- **The screens remount when the scheme changes.** The session sits above the
+  keyed tree, so the account, the year and any pushed page survive it.
+
 ## 4. Type
 
 Three voices, from `src/components/Type.tsx`. Screens use the primitives;
@@ -168,7 +196,8 @@ then lets go.
 ## 7. Patterns
 
 **Navigation is two levels and both are visible.** A bar of five sections at
-the bottom (`TabBar`, filled black pill = the section you are in) and a
+the bottom — the platform's own tab bar (Liquid Glass on iOS 26, Material 3's
+navigation bar on Android, where the selected pill is filled black) — and a
 segmented control at the top for the views inside one section (`Segments`,
 2px ink rule = the view you are in). Nothing lives behind a menu, a drawer or
 a scrolling list of names; if a screen exists, one tap and at most one swipe

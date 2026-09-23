@@ -9,7 +9,7 @@ import Svg, {
 
 import { Body, Data, Heading, Label, Numeral } from '../components/Type';
 import { insights, type GitHubModel } from '../lib/contributions';
-import { colors, radii } from '../theme';
+import { colors, radii, themed } from '../theme';
 import { fmt } from './shared';
 
 /**
@@ -177,112 +177,114 @@ const ICONS = {
 
 type IconName = keyof typeof ICONS;
 
-const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: colors.canvas,
-    flex: 1,
-  },
-  gradient: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-  },
-  content: {
-    alignItems: 'center',
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
-  place: {
-    fontSize: 18,
-  },
-  stamp: {
-    color: colors.ink70,
-    marginTop: 4,
-  },
-  condition: {
-    color: colors.ink70,
-    marginTop: 26,
-  },
-  hero: {
-    fontSize: 124,
-    lineHeight: 132,
-  },
-  heroRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    marginTop: 2,
-  },
-  unit: {
-    color: colors.ink70,
-    marginTop: 30,
-  },
-  range: {
-    flexDirection: 'row',
-    gap: 26,
-    marginTop: 2,
-  },
-  rangeText: {
-    color: colors.ink70,
-  },
-  rangeValue: {
-    color: colors.ink,
-  },
-  frosted: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderRadius: radii.card,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 28,
-    paddingVertical: 14,
-    width: '100%',
-  },
-  stat: {
-    alignItems: 'center',
-    gap: 5,
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 16,
-  },
-  divider: {
-    backgroundColor: colors.hair,
-    height: 34,
-    width: 1,
-  },
-  weekCard: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderRadius: radii.card,
-    gap: 10,
-    marginTop: 26,
-    paddingBottom: 12,
-    paddingTop: 12,
-    width: '100%',
-  },
-  weekStrip: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  weekCol: {
-    alignItems: 'center',
-    gap: 5,
-  },
-  weekBar: {
-    backgroundColor: 'rgba(17,16,16,0.30)',
-    borderRadius: 3,
-    width: 16,
-  },
-  weekBarToday: {
-    backgroundColor: colors.ink,
-  },
-  weekDay: {
-    color: colors.ink70,
-  },
-  weekLabel: {
-    color: colors.ink,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    screen: {
+      backgroundColor: colors.canvas,
+      flex: 1,
+    },
+    gradient: {
+      bottom: 0,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+    },
+    content: {
+      alignItems: 'center',
+      flex: 1,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+    },
+    place: {
+      fontSize: 18,
+    },
+    stamp: {
+      color: colors.ink70,
+      marginTop: 4,
+    },
+    condition: {
+      color: colors.ink70,
+      marginTop: 26,
+    },
+    hero: {
+      fontSize: 124,
+      lineHeight: 132,
+    },
+    heroRow: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      marginTop: 2,
+    },
+    unit: {
+      color: colors.ink70,
+      marginTop: 30,
+    },
+    range: {
+      flexDirection: 'row',
+      gap: 26,
+      marginTop: 2,
+    },
+    rangeText: {
+      color: colors.ink70,
+    },
+    rangeValue: {
+      color: colors.ink,
+    },
+    frosted: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.55)',
+      borderRadius: radii.card,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      marginTop: 28,
+      paddingVertical: 14,
+      width: '100%',
+    },
+    stat: {
+      alignItems: 'center',
+      gap: 5,
+      flex: 1,
+    },
+    statValue: {
+      fontSize: 16,
+    },
+    divider: {
+      backgroundColor: colors.hair,
+      height: 34,
+      width: 1,
+    },
+    weekCard: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.55)',
+      borderRadius: radii.card,
+      gap: 10,
+      marginTop: 26,
+      paddingBottom: 12,
+      paddingTop: 12,
+      width: '100%',
+    },
+    weekStrip: {
+      alignItems: 'flex-end',
+      flexDirection: 'row',
+      gap: 10,
+    },
+    weekCol: {
+      alignItems: 'center',
+      gap: 5,
+    },
+    weekBar: {
+      backgroundColor: 'rgba(17,16,16,0.30)',
+      borderRadius: 3,
+      width: 16,
+    },
+    weekBarToday: {
+      backgroundColor: colors.ink,
+    },
+    weekDay: {
+      color: colors.ink70,
+    },
+    weekLabel: {
+      color: colors.ink,
+    },
+  }),
+);

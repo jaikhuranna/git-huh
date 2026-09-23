@@ -16,11 +16,18 @@ import {
 } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
+import { useColorScheme, View } from 'react-native';
 
-import { colors } from '../src/theme';
+import { SessionProvider } from '../src/shell/session';
+import { colors, setScheme } from '../src/theme';
 
 export default function RootLayout() {
+  // Set before anything below renders, so every sheet and every inline colour
+  // reads the scheme the system is in. The tree under the session is keyed on
+  // it: a change of scheme remounts the screens, the session does not move.
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  setScheme(scheme);
+
   // A font failure must not block the app: Type.tsx declares a platform
   // fallback on every primitive, so we render either way.
   const [loaded, error] = useFonts({
@@ -40,14 +47,15 @@ export default function RootLayout() {
   }
 
   return (
-    <>
-      <StatusBar style="dark" />
+    <SessionProvider>
+      <StatusBar style="auto" />
       <Stack
+        key={scheme}
         screenOptions={{
           contentStyle: { backgroundColor: colors.canvas },
           headerShown: false,
         }}
       />
-    </>
+    </SessionProvider>
   );
 }

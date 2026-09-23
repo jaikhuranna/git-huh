@@ -4,7 +4,7 @@ import Svg, { Circle, G, Line, Rect } from 'react-native-svg';
 import { LanguageChip } from '../components/LanguageChip';
 import { Label, Title } from '../components/Type';
 import { insights, type GitHubModel } from '../lib/contributions';
-import { colors, radii } from '../theme';
+import { colors, radii, themed } from '../theme';
 import { fmt, Page } from './shared';
 
 /**
@@ -247,48 +247,50 @@ function Ruler({ model, width }: { model: GitHubModel; width: number }) {
   );
 }
 
-const styles = StyleSheet.create({
-  subTitle: {
-    color: colors.ink40,
-    marginTop: -2,
-  },
-  hero: {
-    alignItems: 'center',
-    marginTop: 18,
-  },
-  heroCaption: {
-    marginTop: 10,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 22,
-  },
-  tile: {
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: radii.card,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    padding: TILE_PADDING,
-  },
-  caption: {
-    height: CAPTION_ROW,
-    lineHeight: CAPTION_ROW,
-    textAlign: 'center',
-  },
-  dockGrid: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: DOCK_GAP,
-    justifyContent: 'center',
-  },
-  ruler: {
-    alignItems: 'center',
-    marginTop: 22,
-  },
-  rulerLabel: {
-    marginTop: 8,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    subTitle: {
+      color: colors.ink40,
+      marginTop: -2,
+    },
+    hero: {
+      alignItems: 'center',
+      marginTop: 18,
+    },
+    heroCaption: {
+      marginTop: 10,
+    },
+    row: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 22,
+    },
+    tile: {
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: radii.card,
+      justifyContent: 'center',
+      overflow: 'hidden',
+      padding: TILE_PADDING,
+    },
+    caption: {
+      height: CAPTION_ROW,
+      lineHeight: CAPTION_ROW,
+      textAlign: 'center',
+    },
+    dockGrid: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: DOCK_GAP,
+      justifyContent: 'center',
+    },
+    ruler: {
+      alignItems: 'center',
+      marginTop: 22,
+    },
+    rulerLabel: {
+      marginTop: 8,
+    },
+  }),
+);

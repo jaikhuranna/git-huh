@@ -4,7 +4,7 @@ import Svg, { Circle, Polyline, Text as SvgText } from 'react-native-svg';
 
 import { Label } from '../components/Type';
 import { insights, type GitHubModel } from '../lib/contributions';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themed } from '../theme';
 import { fmt, hash, Page, ScreenHead } from './shared';
 
 /**
@@ -123,8 +123,10 @@ export function DotsScreen({ model }: { model: GitHubModel }) {
   );
 }
 
-const styles = StyleSheet.create({
-  footer: {
-    marginTop: 14,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    footer: {
+      marginTop: 14,
+    },
+  }),
+);

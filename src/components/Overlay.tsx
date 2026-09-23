@@ -3,7 +3,7 @@ import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { savedAge } from '../lib/store';
-import { colors, space } from '../theme';
+import { colors, space, themed } from '../theme';
 import { Data, Label, Micro } from './Type';
 
 /**
@@ -47,33 +47,35 @@ export function OverlayFrame({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: colors.canvas,
-    flex: 1,
-  },
-  chrome: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 14,
-    paddingBottom: 6,
-    paddingHorizontal: space.gutter,
-    paddingTop: 10,
-  },
-  back: {
-    color: colors.ink,
-    paddingVertical: 4,
-  },
-  where: {
-    color: colors.ink40,
-    flex: 1,
-    fontSize: 10,
-    textAlign: 'right',
-  },
-  body: {
-    flex: 1,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    screen: {
+      backgroundColor: colors.canvas,
+      flex: 1,
+    },
+    chrome: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 14,
+      paddingBottom: 6,
+      paddingHorizontal: space.gutter,
+      paddingTop: 10,
+    },
+    back: {
+      color: colors.ink,
+      paddingVertical: 4,
+    },
+    where: {
+      color: colors.ink40,
+      flex: 1,
+      fontSize: 10,
+      textAlign: 'right',
+    },
+    body: {
+      flex: 1,
+    },
+  }),
+);
 
 /**
  * The age of what is on screen, when it is not fresh. Offline, it says so;
@@ -90,10 +92,12 @@ export function SavedNote({
   return <Micro style={noteStyles.note}>offline · saved {savedAge(savedAt)}</Micro>;
 }
 
-const noteStyles = StyleSheet.create({
-  note: {
-    color: colors.ink40,
-    paddingBottom: 6,
-    paddingHorizontal: space.gutter,
-  },
-});
+const noteStyles = themed(() =>
+  StyleSheet.create({
+    note: {
+      color: colors.ink40,
+      paddingBottom: 6,
+      paddingHorizontal: space.gutter,
+    },
+  }),
+);

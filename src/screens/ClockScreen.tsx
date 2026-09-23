@@ -7,7 +7,7 @@ import {
   ledger,
   type Activity,
 } from '../lib/activity';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themed } from '../theme';
 import { fmt, Page, ScreenHead } from './shared';
 
 /**
@@ -180,48 +180,50 @@ function Dial({
   );
 }
 
-const styles = StyleSheet.create({
-  stage: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  verdict: {
-    marginTop: 18,
-  },
-  verdictSub: {
-    marginTop: 4,
-  },
-  ledger: {
-    marginTop: 22,
-  },
-  ledgerRow: {
-    alignItems: 'baseline',
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 9,
-  },
-  plus: {
-    color: colors.green,
-    fontSize: 16,
-    minWidth: 92,
-  },
-  minus: {
-    color: colors.red,
-    fontSize: 16,
-    minWidth: 92,
-  },
-  net: {
-    fontSize: 16,
-    minWidth: 92,
-  },
-  ledgerName: {
-    color: colors.ink70,
-    flex: 1,
-  },
-  note: {
-    marginTop: 24,
-    textAlign: 'center',
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    stage: {
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    verdict: {
+      marginTop: 18,
+    },
+    verdictSub: {
+      marginTop: 4,
+    },
+    ledger: {
+      marginTop: 22,
+    },
+    ledgerRow: {
+      alignItems: 'baseline',
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      gap: 12,
+      paddingVertical: 9,
+    },
+    plus: {
+      color: colors.green,
+      fontSize: 16,
+      minWidth: 92,
+    },
+    minus: {
+      color: colors.red,
+      fontSize: 16,
+      minWidth: 92,
+    },
+    net: {
+      fontSize: 16,
+      minWidth: 92,
+    },
+    ledgerName: {
+      color: colors.ink70,
+      flex: 1,
+    },
+    note: {
+      marginTop: 24,
+      textAlign: 'center',
+    },
+  }),
+);

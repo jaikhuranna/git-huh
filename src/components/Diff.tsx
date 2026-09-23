@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Composer } from './Composer';
 import { Data, Label, Micro } from './Type';
 import type { DiffFile, DiffLine } from '../lib/pullDetail';
-import { colors, fonts, radii } from '../theme';
+import { colors, fonts, radii, themed } from '../theme';
 
 /** Where a line comment lands: GitHub numbers new lines on the right, old on the left. */
 export interface LineTarget {
@@ -271,129 +271,131 @@ function clip(text: string): string {
   return text.length > MAX_COLUMNS ? `${text.slice(0, MAX_COLUMNS)}…` : text;
 }
 
-const styles = StyleSheet.create({
-  stack: {
-    gap: 12,
-  },
-  file: {
-    backgroundColor: colors.card,
-    borderColor: colors.hair,
-    borderRadius: radii.tile,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  fileHead: {
-    alignItems: 'center',
-    backgroundColor: colors.recess,
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  path: {
-    flex: 1,
-    fontSize: 11,
-  },
-  counts: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  add: {
-    color: colors.green,
-  },
-  del: {
-    color: colors.red,
-  },
-  status: {
-    color: colors.ink40,
-  },
-  chevron: {
-    color: colors.ink,
-    fontSize: 12,
-    width: 10,
-  },
-  row: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    paddingVertical: 1,
-  },
-  addRow: {
-    backgroundColor: 'rgba(31,154,83,0.12)',
-  },
-  delRow: {
-    backgroundColor: 'rgba(232,65,43,0.12)',
-  },
-  // Found lines keep their add/delete band underneath the mark, so a find
-  // never hides what kind of line it landed on.
-  foundRow: {
-    borderLeftColor: colors.yellow,
-    borderLeftWidth: 3,
-  },
-  pickedRow: {
-    backgroundColor: 'rgba(47,127,224,0.16)',
-  },
-  hits: {
-    color: colors.ink,
-    fontFamily: fonts.monoMedium,
-  },
-  findNote: {
-    color: colors.ink40,
-  },
-  tapHint: {
-    color: colors.ink40,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  lineComposer: {
-    paddingBottom: 10,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-  },
-  quoted: {
-    color: colors.ink70,
-    fontSize: 10,
-  },
-  metaRow: {
-    backgroundColor: colors.recess,
-    paddingVertical: 3,
-  },
-  metaText: {
-    color: colors.ink40,
-    paddingLeft: 10,
-  },
-  lineNo: {
-    color: colors.ink20,
-    fontSize: 9,
-    textAlign: 'right',
-    width: 24,
-  },
-  sign: {
-    color: colors.ink40,
-    fontSize: 9,
-    textAlign: 'center',
-    width: 10,
-  },
-  code: {
-    color: colors.ink,
-    fontFamily: fonts.mono,
-    fontSize: CODE_SIZE,
-    lineHeight: 15,
-  },
-  truncated: {
-    color: colors.ink40,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  binary: {
-    color: colors.ink40,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  empty: {
-    marginTop: 12,
-  },
-  more: {
-    marginTop: 2,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    stack: {
+      gap: 12,
+    },
+    file: {
+      backgroundColor: colors.card,
+      borderColor: colors.hair,
+      borderRadius: radii.tile,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    fileHead: {
+      alignItems: 'center',
+      backgroundColor: colors.recess,
+      flexDirection: 'row',
+      gap: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    path: {
+      flex: 1,
+      fontSize: 11,
+    },
+    counts: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    add: {
+      color: colors.green,
+    },
+    del: {
+      color: colors.red,
+    },
+    status: {
+      color: colors.ink40,
+    },
+    chevron: {
+      color: colors.ink,
+      fontSize: 12,
+      width: 10,
+    },
+    row: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      paddingVertical: 1,
+    },
+    addRow: {
+      backgroundColor: 'rgba(31,154,83,0.12)',
+    },
+    delRow: {
+      backgroundColor: 'rgba(232,65,43,0.12)',
+    },
+    // Found lines keep their add/delete band underneath the mark, so a find
+    // never hides what kind of line it landed on.
+    foundRow: {
+      borderLeftColor: colors.yellow,
+      borderLeftWidth: 3,
+    },
+    pickedRow: {
+      backgroundColor: 'rgba(47,127,224,0.16)',
+    },
+    hits: {
+      color: colors.ink,
+      fontFamily: fonts.monoMedium,
+    },
+    findNote: {
+      color: colors.ink40,
+    },
+    tapHint: {
+      color: colors.ink40,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    lineComposer: {
+      paddingBottom: 10,
+      paddingHorizontal: 12,
+      paddingTop: 8,
+    },
+    quoted: {
+      color: colors.ink70,
+      fontSize: 10,
+    },
+    metaRow: {
+      backgroundColor: colors.recess,
+      paddingVertical: 3,
+    },
+    metaText: {
+      color: colors.ink40,
+      paddingLeft: 10,
+    },
+    lineNo: {
+      color: colors.ink20,
+      fontSize: 9,
+      textAlign: 'right',
+      width: 24,
+    },
+    sign: {
+      color: colors.ink40,
+      fontSize: 9,
+      textAlign: 'center',
+      width: 10,
+    },
+    code: {
+      color: colors.ink,
+      fontFamily: fonts.mono,
+      fontSize: CODE_SIZE,
+      lineHeight: 15,
+    },
+    truncated: {
+      color: colors.ink40,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    binary: {
+      color: colors.ink40,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    empty: {
+      marginTop: 12,
+    },
+    more: {
+      marginTop: 2,
+    },
+  }),
+);

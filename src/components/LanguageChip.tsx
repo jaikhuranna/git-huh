@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { G, Path } from 'react-native-svg';
 
 import { languageMark } from '../lib/languageMarks';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themed } from '../theme';
 import { Heading } from './Type';
 
 /** White or ink, whichever stays legible on `background`. */
@@ -82,9 +82,11 @@ export function LanguageChip({
   );
 }
 
-const styles = StyleSheet.create({
-  chip: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    chip: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  }),
+);

@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GitHubError, verifyToken } from '../lib/github';
 import { DEMO_TOKEN } from '../lib/token';
-import { colors, fallbacks, fonts, radii, space } from '../theme';
+import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
 
 import { CrossField } from './CrossField';
 import { Body, Display, Label, Serif } from './Type';
@@ -157,87 +157,89 @@ export function PatForm({ onTokenVerified, onCancel }: PatFormProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: colors.canvas,
-    flex: 1,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: 24,
-  },
-  header: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    left: 0,
-    paddingHorizontal: space.gutter,
-    position: 'absolute',
-    right: 0,
-    top: 14,
-  },
-  stack: {
-    gap: 14,
-    paddingHorizontal: space.gutter,
-  },
-  sub: {
-    color: colors.ink70,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  field: {
-    marginBottom: 4,
-  },
-  input: {
-    borderBottomColor: colors.hairStrong,
-    borderBottomWidth: 1,
-    color: colors.ink,
-    fontFamily: fonts.mono,
-    fontSize: 15,
-    paddingBottom: 10,
-    paddingTop: 6,
-  },
-  hint: {
-    lineHeight: 16,
-  },
-  error: {
-    color: colors.red,
-    fontSize: 12,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-  },
-  pill: {
-    alignItems: 'center',
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 11,
-  },
-  pillLabel: {
-    color: colors.ink,
-  },
-  solid: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-    minWidth: 108,
-  },
-  solidLabel: {
-    color: colors.onBlack,
-  },
-  muted: {
-    opacity: 0.4,
-  },
-  link: {
-    color: colors.ink70,
-    marginTop: 2,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    screen: {
+      backgroundColor: colors.canvas,
+      flex: 1,
+    },
+    center: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingBottom: 24,
+    },
+    header: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      left: 0,
+      paddingHorizontal: space.gutter,
+      position: 'absolute',
+      right: 0,
+      top: 14,
+    },
+    stack: {
+      gap: 14,
+      paddingHorizontal: space.gutter,
+    },
+    sub: {
+      color: colors.ink70,
+      fontSize: 16,
+      lineHeight: 22,
+    },
+    field: {
+      marginBottom: 4,
+    },
+    input: {
+      borderBottomColor: colors.hairStrong,
+      borderBottomWidth: 1,
+      color: colors.ink,
+      fontFamily: fonts.mono,
+      fontSize: 15,
+      paddingBottom: 10,
+      paddingTop: 6,
+    },
+    hint: {
+      lineHeight: 16,
+    },
+    error: {
+      color: colors.red,
+      fontSize: 12,
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    pill: {
+      alignItems: 'center',
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 11,
+    },
+    pillLabel: {
+      color: colors.ink,
+    },
+    solid: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+      minWidth: 108,
+    },
+    solidLabel: {
+      color: colors.onBlack,
+    },
+    muted: {
+      opacity: 0.4,
+    },
+    link: {
+      color: colors.ink70,
+      marginTop: 2,
+    },
+  }),
+);
 
 /** Kept next to the input so the fallback family is discoverable here. */
 PatForm.monoFallback = fallbacks.mono;

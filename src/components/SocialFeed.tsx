@@ -19,7 +19,7 @@ import {
 } from '../lib/social';
 import { stateOf, type TriageState } from '../lib/triage';
 import { ago } from '../screens/shared';
-import { colors, radii } from '../theme';
+import { colors, radii, themed } from '../theme';
 
 // The feed has a section to itself, so it lists what it has rather than the
 // dozen rows that fitted under the greeting.
@@ -309,129 +309,131 @@ function FeedRow({
   );
 }
 
-const styles = StyleSheet.create({
-  section: {
-    marginTop: 2,
-  },
-  chips: {
-    // Wrapped rather than scrolled: the feed sits inside a horizontal pager,
-    // and a nested horizontal scroller there fights the page swipe.
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
-  chip: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  chipOn: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  chipLabelOn: {
-    color: colors.onBlack,
-  },
-  // Folders are where rows went, not kinds of row: dashed, so the two ends
-  // of the chip row do not read as the same kind of filter.
-  folder: {
-    borderStyle: 'dashed',
-  },
-  hint: {
-    color: colors.ink40,
-    marginTop: 12,
-  },
-  swipe: {
-    overflow: 'hidden',
-  },
-  under: {
-    alignItems: 'center',
-    backgroundColor: colors.recess,
-    bottom: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    left: 0,
-    paddingHorizontal: 14,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  underLeft: {
-    color: colors.ink,
-  },
-  underRight: {
-    color: colors.ink,
-  },
-  over: {
-    backgroundColor: colors.canvas,
-  },
-  row: {
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 11,
-  },
-  rule: {
-    borderRadius: 2,
-    marginTop: 3,
-    width: 3,
-  },
-  rowBody: {
-    flex: 1,
-    gap: 3,
-  },
-  rowTop: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'space-between',
-  },
-  actor: {
-    color: colors.ink,
-    flex: 1,
-    fontSize: 11,
-  },
-  age: {
-    color: colors.ink40,
-  },
-  title: {
-    fontSize: 14,
-    lineHeight: 19,
-  },
-  quote: {
-    color: colors.ink70,
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  rowFoot: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 1,
-  },
-  repo: {
-    color: colors.ink40,
-    flex: 1,
-  },
-  statusChip: {
-    backgroundColor: colors.ink20,
-    borderRadius: 3,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  statusText: {
-    color: colors.ink70,
-  },
-  note: {
-    marginTop: 16,
-  },
-  error: {
-    color: colors.red,
-    lineHeight: 16,
-    marginTop: 16,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    section: {
+      marginTop: 2,
+    },
+    chips: {
+      // Wrapped rather than scrolled: the feed sits inside a horizontal pager,
+      // and a nested horizontal scroller there fights the page swipe.
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 12,
+    },
+    chip: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    chipOn: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    chipLabelOn: {
+      color: colors.onBlack,
+    },
+    // Folders are where rows went, not kinds of row: dashed, so the two ends
+    // of the chip row do not read as the same kind of filter.
+    folder: {
+      borderStyle: 'dashed',
+    },
+    hint: {
+      color: colors.ink40,
+      marginTop: 12,
+    },
+    swipe: {
+      overflow: 'hidden',
+    },
+    under: {
+      alignItems: 'center',
+      backgroundColor: colors.recess,
+      bottom: 0,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      left: 0,
+      paddingHorizontal: 14,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+    },
+    underLeft: {
+      color: colors.ink,
+    },
+    underRight: {
+      color: colors.ink,
+    },
+    over: {
+      backgroundColor: colors.canvas,
+    },
+    row: {
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      paddingVertical: 11,
+    },
+    rule: {
+      borderRadius: 2,
+      marginTop: 3,
+      width: 3,
+    },
+    rowBody: {
+      flex: 1,
+      gap: 3,
+    },
+    rowTop: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'space-between',
+    },
+    actor: {
+      color: colors.ink,
+      flex: 1,
+      fontSize: 11,
+    },
+    age: {
+      color: colors.ink40,
+    },
+    title: {
+      fontSize: 14,
+      lineHeight: 19,
+    },
+    quote: {
+      color: colors.ink70,
+      fontSize: 12,
+      lineHeight: 17,
+    },
+    rowFoot: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 1,
+    },
+    repo: {
+      color: colors.ink40,
+      flex: 1,
+    },
+    statusChip: {
+      backgroundColor: colors.ink20,
+      borderRadius: 3,
+      paddingHorizontal: 5,
+      paddingVertical: 1,
+    },
+    statusText: {
+      color: colors.ink70,
+    },
+    note: {
+      marginTop: 16,
+    },
+    error: {
+      color: colors.red,
+      lineHeight: 16,
+      marginTop: 16,
+    },
+  }),
+);

@@ -4,7 +4,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { routeForUrl, useNav } from '../lib/nav';
 import { Body, Data, Serif } from './Type';
 import { Squiggle } from './Squiggle';
-import { colors, fonts, radii } from '../theme';
+import { colors, fonts, radii, themed } from '../theme';
 
 /**
  * Just enough Markdown to read a pull request.
@@ -361,87 +361,89 @@ function parse(source: string, limit?: number): Block[] {
   return blocks;
 }
 
-const styles = StyleSheet.create({
-  empty: {
-    color: colors.ink40,
-    fontStyle: 'italic',
-  },
-  headingBlock: {
-    gap: 2,
-    marginBottom: 6,
-    marginTop: 16,
-  },
-  heading: {
-    fontFamily: fonts.serif,
-    fontSize: 19,
-    lineHeight: 24,
-  },
-  headingSmall: {
-    fontSize: 16,
-    lineHeight: 21,
-  },
-  paragraph: {
-    color: colors.ink70,
-    marginTop: 8,
-  },
-  rule: {
-    marginVertical: 14,
-  },
-  code: {
-    backgroundColor: colors.recess,
-    borderRadius: radii.tile,
-    gap: 4,
-    marginTop: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  codeLang: {
-    color: colors.ink40,
-    fontSize: 9,
-  },
-  codeText: {
-    color: colors.ink,
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  quote: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 10,
-  },
-  quoteText: {
-    color: colors.ink40,
-    flex: 1,
-    fontStyle: 'italic',
-  },
-  listRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 6,
-  },
-  bullet: {
-    color: colors.ink40,
-    minWidth: 14,
-  },
-  listText: {
-    color: colors.ink70,
-    flex: 1,
-  },
-  inlineCode: {
-    backgroundColor: colors.recess,
-    color: colors.ink,
-    fontFamily: fonts.mono,
-    fontSize: 12,
-  },
-  bold: {
-    color: colors.ink,
-    fontFamily: fonts.sansSemi,
-  },
-  italic: {
-    fontStyle: 'italic',
-  },
-  link: {
-    color: colors.blue,
-    textDecorationLine: 'underline',
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    empty: {
+      color: colors.ink40,
+      fontStyle: 'italic',
+    },
+    headingBlock: {
+      gap: 2,
+      marginBottom: 6,
+      marginTop: 16,
+    },
+    heading: {
+      fontFamily: fonts.serif,
+      fontSize: 19,
+      lineHeight: 24,
+    },
+    headingSmall: {
+      fontSize: 16,
+      lineHeight: 21,
+    },
+    paragraph: {
+      color: colors.ink70,
+      marginTop: 8,
+    },
+    rule: {
+      marginVertical: 14,
+    },
+    code: {
+      backgroundColor: colors.recess,
+      borderRadius: radii.tile,
+      gap: 4,
+      marginTop: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    codeLang: {
+      color: colors.ink40,
+      fontSize: 9,
+    },
+    codeText: {
+      color: colors.ink,
+      fontSize: 11,
+      lineHeight: 16,
+    },
+    quote: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 10,
+    },
+    quoteText: {
+      color: colors.ink40,
+      flex: 1,
+      fontStyle: 'italic',
+    },
+    listRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 6,
+    },
+    bullet: {
+      color: colors.ink40,
+      minWidth: 14,
+    },
+    listText: {
+      color: colors.ink70,
+      flex: 1,
+    },
+    inlineCode: {
+      backgroundColor: colors.recess,
+      color: colors.ink,
+      fontFamily: fonts.mono,
+      fontSize: 12,
+    },
+    bold: {
+      color: colors.ink,
+      fontFamily: fonts.sansSemi,
+    },
+    italic: {
+      fontStyle: 'italic',
+    },
+    link: {
+      color: colors.blue,
+      textDecorationLine: 'underline',
+    },
+  }),
+);

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { colors, space } from '../theme';
+import { colors, space, themed } from '../theme';
 import { Label } from './Type';
 
 /**
@@ -48,27 +48,29 @@ export function Segments({
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 18,
-    paddingBottom: 10,
-    paddingHorizontal: space.gutter,
-    paddingTop: 2,
-  },
-  item: {
-    borderBottomColor: 'transparent',
-    borderBottomWidth: 2,
-    paddingBottom: 4,
-  },
-  itemOn: {
-    borderBottomColor: colors.ink,
-  },
-  label: {
-    color: colors.ink40,
-  },
-  labelOn: {
-    color: colors.ink,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 18,
+      paddingBottom: 10,
+      paddingHorizontal: space.gutter,
+      paddingTop: 2,
+    },
+    item: {
+      borderBottomColor: 'transparent',
+      borderBottomWidth: 2,
+      paddingBottom: 4,
+    },
+    itemOn: {
+      borderBottomColor: colors.ink,
+    },
+    label: {
+      color: colors.ink40,
+    },
+    labelOn: {
+      color: colors.ink,
+    },
+  }),
+);

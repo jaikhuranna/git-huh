@@ -1,0 +1,277 @@
+import { useEffect, useRef } from 'react';
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { TOKEN_SETTINGS_URL } from '../components/PatForm';
+import { Segments } from '../components/Segments';
+import { Label } from '../components/Type';
+import { Wordmark } from '../components/Wordmark';
+import { savedAge } from '../lib/store';
+import { DEMO_TOKEN } from '../lib/token';
+import { ArchiveScreen } from '../screens/ArchiveScreen';
+import { BriefScreen } from '../screens/BriefScreen';
+import { CardsScreen } from '../screens/CardsScreen';
+import { ClockScreen } from '../screens/ClockScreen';
+import { DotsScreen } from '../screens/DotsScreen';
+import { FlowScreen } from '../screens/FlowScreen';
+import { HeyScreen } from '../screens/HeyScreen';
+import { InboxScreen } from '../screens/InboxScreen';
+import { IndexScreen } from '../screens/IndexScreen';
+import { NowScreen } from '../screens/NowScreen';
+import { OrbitScreen } from '../screens/OrbitScreen';
+import { PosterScreen } from '../screens/PosterScreen';
+import { ReviewScreen } from '../screens/ReviewScreen';
+import { WeatherScreen } from '../screens/WeatherScreen';
+import { colors, space, themed } from '../theme';
+import { SECTIONS, type ScreenName, type SectionView } from './sections';
+import { useSession } from './session';
+
+/**
+ * The one thing the app cannot fix for you.
+ *
+ * A token without `repo` gets the public half of your year and nothing says
+ * so: the grid comes back flat, today reads zero and the flow diagram adds up
+ * to a handful of contributions. Silence is the worst possible answer, so
+ * this strip names the cause and links to a token that has the scope.
+ */
+function ScopeNotice() {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => Linking.openURL(TOKEN_SETTINGS_URL).catch(() => {})}
+      style={styles.notice}
+    >
+      <View style={styles.noticeDot} />
+      <Label style={styles.noticeText}>
+        this token has no repo scope · private work is invisible to it
+      </Label>
+    </Pressable>
+  );
+}
+
+/**
+ * One section's segmented control and the pager holding its views.
+ *
+ * The pager stops at the section's own edges. A swipe never crosses into
+ * another section — sections are chosen from the bar, deliberately, and a
+ * horizontal drag that can land you three destinations away is the fault the
+ * old thirteen-page rail had.
+ */
+function SectionPager({
+  views,
+  page,
+  onPage,
+  active,
+  width,
+  render,
+}: {
+  views: readonly SectionView[];
+  page: number;
+  onPage: (index: number) => void;
+  active: boolean;
+  width: number;
+  render: (name: ScreenName, live: boolean) => React.ReactNode;
+}) {
+  const pager = useRef<ScrollView>(null);
+  const shown = useRef(page);
+
+  // Also runs when the section comes back into view: a pager that has been
+  // off screen cannot be trusted to have kept its offset, and landing on view
+  // one while the control says view three is worse than a jump.
+  useEffect(() => {
+    if (!active) return;
+    pager.current?.scrollTo({ animated: shown.current !== page, x: page * width });
+    shown.current = page;
+  }, [active, page, width]);
+
+  return (
+    <>
+      {views.length > 1 && (
+        <Segments
+          current={page}
+          items={views.map((view) => view.label)}
+          onSelect={onPage}
+        />
+      )}
+      <ScrollView
+        horizontal
+        keyboardDismissMode="on-drag"
+        onMomentumScrollEnd={(event) => {
+          const next = Math.round(event.nativeEvent.contentOffset.x / width);
+          shown.current = next;
+          onPage(next);
+        }}
+        pagingEnabled
+        ref={pager}
+        // A one-view section has nothing to page to, and a pager that still
+        // claims horizontal drags would eat the inbox's swipe actions.
+        scrollEnabled={views.length > 1}
+        showsHorizontalScrollIndicator={false}
+        style={styles.pager}
+      >
+        {views.map((view, index) => (
+          <View key={view.name} style={{ width }}>
+            {render(view.name, active && index === page)}
+          </View>
+        ))}
+      </ScrollView>
+    </>
+  );
+}
+
+/** A tab: the wordmark, the scope strip if it applies, and the section. */
+export function SectionScreen({ index }: { index: number }) {
+  const session = useSession();
+  const { width } = useWindowDimensions();
+  const {
+    activity,
+    activityState,
+    contributions,
+    model,
+    nav,
+    pages,
+    prs,
+    social,
+    stack,
+    tab,
+    token,
+    triage,
+  } = session;
+  const section = SECTIONS[index];
+  const loadingActivity = activityState.status === 'loading';
+
+  const render = (name: ScreenName, live: boolean) => {
+    if (!model) return null;
+    switch (name) {
+      case 'hey':
+        return (
+          <HeyScreen
+            accounts={session.accounts}
+            demo={token === DEMO_TOKEN}
+            model={model}
+            onAdd={() => nav.open({ kind: 'add-account' })}
+            onDisconnect={session.disconnect}
+            onSwitch={(account) => session.switchTo(account.token)}
+          />
+        );
+      case 'now':
+        return <NowScreen model={model} />;
+      case 'weather':
+        return <WeatherScreen model={model} />;
+      case 'clock':
+        return <ClockScreen activity={activity} loading={loadingActivity} />;
+      case 'inbox':
+        return <InboxScreen onOpen={session.openEvent} state={social} triage={triage} />;
+      case 'index':
+        return (
+          <IndexScreen
+            onOpen={(pr) => nav.open({ kind: 'pull', repo: pr.repo, number: pr.number })}
+            state={prs}
+          />
+        );
+      case 'brief':
+        return (
+          <BriefScreen
+            activity={activity}
+            loading={loadingActivity}
+            onOpen={(pr) => nav.open({ kind: 'pull', repo: pr.repo, number: pr.number })}
+          />
+        );
+      case 'review':
+        return <ReviewScreen activity={activity} loading={loadingActivity} />;
+      case 'cards':
+        return <CardsScreen activity={activity} model={model} />;
+      case 'poster':
+        return <PosterScreen model={model} />;
+      case 'flow':
+        return <FlowScreen model={model} />;
+      case 'orbit':
+        return <OrbitScreen active={live} model={model} />;
+      case 'archive':
+        return <ArchiveScreen model={model} />;
+      case 'dots':
+        return <DotsScreen model={model} />;
+    }
+  };
+
+  return (
+    <SafeAreaView edges={['top']} style={styles.screen}>
+      <View style={styles.chrome}>
+        <Wordmark size={20} />
+        <Label style={styles.handle}>
+          {contributions.status === 'ready' && contributions.offline && contributions.savedAt != null
+            ? `offline · saved ${savedAge(contributions.savedAt)}`
+            : model
+              ? `~${model.login.toLowerCase()}`
+              : ''}
+        </Label>
+      </View>
+
+      {session.scopes === 'limited' && <ScopeNotice />}
+
+      <View style={styles.body}>
+        <SectionPager
+          active={index === tab && stack.length === 0}
+          onPage={(page) => session.goToPage(index, page)}
+          page={pages[index]}
+          render={render}
+          views={section.views}
+          width={width}
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = themed(() =>
+  StyleSheet.create({
+    screen: {
+      backgroundColor: colors.canvas,
+      flex: 1,
+    },
+    chrome: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingBottom: 10,
+      paddingHorizontal: space.gutter,
+      paddingTop: 14,
+    },
+    handle: {
+      color: colors.ink40,
+    },
+    notice: {
+      alignItems: 'center',
+      backgroundColor: colors.recess,
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 6,
+      marginHorizontal: space.gutter,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    noticeDot: {
+      backgroundColor: colors.red,
+      borderRadius: 3,
+      height: 6,
+      width: 6,
+    },
+    noticeText: {
+      color: colors.ink70,
+      flex: 1,
+    },
+    body: {
+      flex: 1,
+    },
+    pager: {
+      flex: 1,
+    },
+  }),
+);

@@ -4,7 +4,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 
 import { Data, Heading, Label, Title } from '../components/Type';
 import type { GitHubModel } from '../lib/contributions';
-import { colors } from '../theme';
+import { colors, themed } from '../theme';
 import { fmt, Page, ScreenHead } from './shared';
 
 /**
@@ -37,13 +37,13 @@ import { fmt, Page, ScreenHead } from './shared';
  */
 
 /** One bright per kind of work; the grey is not a colour, it is an absence. */
-const CATEGORY_COLORS = {
+const CATEGORY_COLORS = themed(() => ({
   commits: colors.blue,
   'pull requests': colors.purple,
   reviews: colors.green,
   issues: colors.yellow,
   private: colors.ink40,
-} as const;
+}));
 
 const CHART_HEIGHT = 300;
 const GAP = 8;
@@ -306,46 +306,48 @@ function shorten(nameWithOwner: string): string {
   return name.length > 22 ? `${name.slice(0, 21)}…` : name;
 }
 
-const styles = StyleSheet.create({
-  trunkRow: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-  },
-  trunkValue: {
-    color: colors.ink40,
-  },
-  legend: {
-    marginTop: 10,
-  },
-  legendRow: {
-    alignItems: 'center',
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 8,
-  },
-  swatch: {
-    height: 10,
-    width: 10,
-  },
-  pct: {
-    fontSize: 15,
-    minWidth: 58,
-  },
-  legendName: {
-    flex: 1,
-  },
-  legendValue: {
-    color: colors.ink40,
-  },
-  footnote: {
-    color: colors.ink40,
-    marginTop: 8,
-  },
-  repoHead: {
-    marginTop: 18,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    trunkRow: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 12,
+    },
+    trunkValue: {
+      color: colors.ink40,
+    },
+    legend: {
+      marginTop: 10,
+    },
+    legendRow: {
+      alignItems: 'center',
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      paddingVertical: 8,
+    },
+    swatch: {
+      height: 10,
+      width: 10,
+    },
+    pct: {
+      fontSize: 15,
+      minWidth: 58,
+    },
+    legendName: {
+      flex: 1,
+    },
+    legendValue: {
+      color: colors.ink40,
+    },
+    footnote: {
+      color: colors.ink40,
+      marginTop: 8,
+    },
+    repoHead: {
+      marginTop: 18,
+    },
+  }),
+);

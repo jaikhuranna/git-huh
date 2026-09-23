@@ -5,7 +5,7 @@ import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { Label } from '../components/Type';
 import { Wordmark } from '../components/Wordmark';
 import type { GitHubModel } from '../lib/contributions';
-import { colors, fonts, radii } from '../theme';
+import { colors, fonts, radii, themed } from '../theme';
 import { fmt, hash } from './shared';
 
 const AXIS = 18;
@@ -241,47 +241,49 @@ function monthTicks(months: number[]): { month: number; column: number }[] {
   return ticks;
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: colors.canvasFlat,
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 4,
-  },
-  head: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingBottom: 14,
-  },
-  headLabel: {
-    color: colors.ink,
-  },
-  stage: {
-    flex: 1,
-  },
-  caption: {
-    marginTop: 10,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingBottom: 6,
-    paddingTop: 14,
-  },
-  chip: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  chipOn: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  chipLabelOn: {
-    color: colors.onBlack,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    screen: {
+      backgroundColor: colors.canvasFlat,
+      flex: 1,
+      paddingHorizontal: 20,
+      paddingTop: 4,
+    },
+    head: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingBottom: 14,
+    },
+    headLabel: {
+      color: colors.ink,
+    },
+    stage: {
+      flex: 1,
+    },
+    caption: {
+      marginTop: 10,
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      paddingBottom: 6,
+      paddingTop: 14,
+    },
+    chip: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+    },
+    chipOn: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    chipLabelOn: {
+      color: colors.onBlack,
+    },
+  }),
+);

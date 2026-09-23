@@ -2,15 +2,20 @@
   "expo": {
     "name": "git-huh?",
     "slug": "git-huh",
-    "version": "3.1.0",
+    "version": "3.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "githuh",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#F2F0EB",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.githuh"
+      "bundleIdentifier": "app.githuh",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.app.githuh"
+        ]
+      }
     },
     "android": {
       "package": "app.githuh",
@@ -24,7 +29,8 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      "@bacons/apple-targets"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",

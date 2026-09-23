@@ -1,8 +1,9 @@
 {
   "name": "git-huh",
-  "version": "2.6.0",
+  "version": "3.2.0",
   "main": "index.js",
   "dependencies": {
+    "@bacons/apple-targets": "^5.0.0",
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
     "@expo-google-fonts/instrument-serif": "^0.4.1",
     "@expo-google-fonts/inter": "^0.4.1",
@@ -17,6 +18,7 @@
     "expo-router": "~57.0.21",
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
+    "expo-symbols": "~57.0.3",
     "expo-task-manager": "~57.0.0",
     "nothing-mtui": "github:jaikhuranna/nothing-mtui",
     "react": "19.2.3",

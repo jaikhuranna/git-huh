@@ -3,7 +3,7 @@ import Svg, { Circle, Line, Rect } from 'react-native-svg';
 
 import { Data, Heading, Label, Serif } from '../components/Type';
 import { cycleStats, type Activity } from '../lib/activity';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themed } from '../theme';
 import { Page, ScreenHead } from './shared';
 
 const ROW = 30;
@@ -160,52 +160,54 @@ function duration(hours: number): string {
   return `${Math.round(hours / 24)}d`;
 }
 
-const styles = StyleSheet.create({
-  summary: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  stat: {
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    flex: 1,
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  statValue: {
-    fontSize: 18,
-  },
-  rows: {
-    marginTop: 10,
-  },
-  row: {
-    alignItems: 'baseline',
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 7,
-  },
-  number: {
-    fontFamily: fonts.serifItalic,
-    fontSize: 13,
-    minWidth: 46,
-  },
-  repo: {
-    color: colors.ink70,
-    flex: 1,
-  },
-  took: {
-    color: colors.ink,
-  },
-  legend: {
-    lineHeight: 16,
-    marginTop: 14,
-  },
-  note: {
-    marginTop: 24,
-    textAlign: 'center',
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    summary: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 20,
+    },
+    stat: {
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      flex: 1,
+      gap: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+    statValue: {
+      fontSize: 18,
+    },
+    rows: {
+      marginTop: 10,
+    },
+    row: {
+      alignItems: 'baseline',
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      paddingVertical: 7,
+    },
+    number: {
+      fontFamily: fonts.serifItalic,
+      fontSize: 13,
+      minWidth: 46,
+    },
+    repo: {
+      color: colors.ink70,
+      flex: 1,
+    },
+    took: {
+      color: colors.ink,
+    },
+    legend: {
+      lineHeight: 16,
+      marginTop: 14,
+    },
+    note: {
+      marginTop: 24,
+      textAlign: 'center',
+    },
+  }),
+);

@@ -504,10 +504,13 @@ to. `STORIES.md` is why the grouping is this grouping.
 | `year` | `weeks` · `split` · `languages` · `years` | what was the year |
 | `lab` | `join the dots` | not finished yet |
 
-- **Bar** (`TabBar`): five equal fifths on canvas with a top hairline, mono
-  labels, selected is a filled black pill — which is what filled black means
-  everywhere else. The whole fifth is the tap target; the pill only hugs the
-  word. `inbox` carries a count of the events addressed to you (review
+- **Bar**: the system's own tab bar, through expo-router's `NativeTabs`
+  (`app/(tabs)/_layout.tsx`). On iOS it is `UITabBarController` — Liquid Glass
+  on iOS 26, with SF Symbols and the system's own type, minimising as you
+  scroll down. On Android it is Material 3's navigation bar on canvas, mono
+  labels, Material Symbols, and the selected indicator filled black — which is
+  what filled black means everywhere else. It used to be drawn in JavaScript
+  (`TabBar`), which could never look like either system. `inbox` carries a count of the events addressed to you (review
   requests, mentions, changes requested), which is the honest version of a
   badge: it is computed from the rows that are actually there.
 - **Segments** (`Segments`): mono labels with a 2px ink rule under the

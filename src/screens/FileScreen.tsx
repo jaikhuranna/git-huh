@@ -19,7 +19,7 @@ import { useNav } from '../lib/nav';
 import { explain } from '../lib/rest';
 import { fetchFile, type RepoFile } from '../lib/repo';
 import { commitDirect, encodePath, proposeChange, type ProposalResult } from '../lib/writes';
-import { colors, fallbacks, fonts, radii, space } from '../theme';
+import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
 
 /** IBM Plex Mono at 11pt, measured — the width of one column of code. */
 const CHAR = 6.62;
@@ -384,183 +384,185 @@ function Editor({
   );
 }
 
-const styles = StyleSheet.create({
-  reader: {
-    flex: 1,
-  },
-  findRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    paddingBottom: 8,
-    paddingHorizontal: space.gutter,
-  },
-  find: {
-    backgroundColor: colors.card,
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    color: colors.ink,
-    flex: 1,
-    fontFamily: fonts.mono ?? fallbacks.mono,
-    fontSize: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  count: {
-    color: colors.ink40,
-    minWidth: 40,
-    textAlign: 'right',
-  },
-  step: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  stepLabel: {
-    color: colors.ink,
-  },
-  line: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    height: ROW,
-    paddingLeft: space.gutter - 12,
-  },
-  lineOn: {
-    backgroundColor: 'rgba(245,180,38,0.22)',
-  },
-  lineNo: {
-    color: colors.ink20,
-    fontSize: 9,
-    marginRight: 10,
-    textAlign: 'right',
-    width: GUTTER - 10,
-  },
-  code: {
-    color: colors.ink,
-    fontFamily: fonts.mono ?? fallbacks.mono,
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  hitText: {
-    backgroundColor: 'rgba(245,180,38,0.55)',
-    color: colors.ink,
-  },
-  editPage: {
-    paddingBottom: 30,
-    paddingHorizontal: space.gutter,
-  },
-  editor: {
-    backgroundColor: colors.card,
-    borderColor: colors.hair,
-    borderRadius: radii.tile,
-    borderWidth: 1,
-    color: colors.ink,
-    fontFamily: fonts.mono ?? fallbacks.mono,
-    fontSize: 11,
-    lineHeight: 16,
-    minHeight: 280,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-  },
-  commit: {
-    borderTopColor: colors.ink,
-    borderTopWidth: 1,
-    gap: 10,
-    marginTop: 18,
-    paddingTop: 12,
-  },
-  commitHead: {
-    color: colors.ink,
-  },
-  message: {
-    backgroundColor: colors.card,
-    borderColor: colors.hair,
-    borderRadius: radii.tile,
-    borderWidth: 1,
-    color: colors.ink,
-    fontFamily: fonts.sans ?? fallbacks.sans,
-    fontSize: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  modes: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  mode: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  modeOn: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  modeLabelOn: {
-    color: colors.onBlack,
-  },
-  explain: {
-    color: colors.ink40,
-    lineHeight: 13,
-  },
-  footer: {
-    alignItems: 'center',
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    paddingBottom: 8,
-    paddingHorizontal: space.gutter,
-    paddingTop: 10,
-  },
-  footNote: {
-    color: colors.ink40,
-    flex: 1,
-  },
-  solid: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-  },
-  solidLabel: {
-    color: colors.onBlack,
-  },
-  ghost: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-  },
-  ghostLabel: {
-    color: colors.ink,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-  failed: {
-    color: colors.red,
-  },
-  sent: {
-    color: colors.green,
-  },
-  note: {
-    marginTop: 26,
-    textAlign: 'center',
-  },
-  error: {
-    color: colors.red,
-    marginTop: 26,
-    paddingHorizontal: space.gutter,
-    textAlign: 'center',
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    reader: {
+      flex: 1,
+    },
+    findRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 6,
+      paddingBottom: 8,
+      paddingHorizontal: space.gutter,
+    },
+    find: {
+      backgroundColor: colors.card,
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      color: colors.ink,
+      flex: 1,
+      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontSize: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+    },
+    count: {
+      color: colors.ink40,
+      minWidth: 40,
+      textAlign: 'right',
+    },
+    step: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    stepLabel: {
+      color: colors.ink,
+    },
+    line: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      height: ROW,
+      paddingLeft: space.gutter - 12,
+    },
+    lineOn: {
+      backgroundColor: 'rgba(245,180,38,0.22)',
+    },
+    lineNo: {
+      color: colors.ink20,
+      fontSize: 9,
+      marginRight: 10,
+      textAlign: 'right',
+      width: GUTTER - 10,
+    },
+    code: {
+      color: colors.ink,
+      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontSize: 11,
+      lineHeight: 15,
+    },
+    hitText: {
+      backgroundColor: 'rgba(245,180,38,0.55)',
+      color: colors.ink,
+    },
+    editPage: {
+      paddingBottom: 30,
+      paddingHorizontal: space.gutter,
+    },
+    editor: {
+      backgroundColor: colors.card,
+      borderColor: colors.hair,
+      borderRadius: radii.tile,
+      borderWidth: 1,
+      color: colors.ink,
+      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontSize: 11,
+      lineHeight: 16,
+      minHeight: 280,
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+    },
+    commit: {
+      borderTopColor: colors.ink,
+      borderTopWidth: 1,
+      gap: 10,
+      marginTop: 18,
+      paddingTop: 12,
+    },
+    commitHead: {
+      color: colors.ink,
+    },
+    message: {
+      backgroundColor: colors.card,
+      borderColor: colors.hair,
+      borderRadius: radii.tile,
+      borderWidth: 1,
+      color: colors.ink,
+      fontFamily: fonts.sans ?? fallbacks.sans,
+      fontSize: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    modes: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    mode: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    modeOn: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    modeLabelOn: {
+      color: colors.onBlack,
+    },
+    explain: {
+      color: colors.ink40,
+      lineHeight: 13,
+    },
+    footer: {
+      alignItems: 'center',
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      paddingBottom: 8,
+      paddingHorizontal: space.gutter,
+      paddingTop: 10,
+    },
+    footNote: {
+      color: colors.ink40,
+      flex: 1,
+    },
+    solid: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+    },
+    solidLabel: {
+      color: colors.onBlack,
+    },
+    ghost: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+    },
+    ghostLabel: {
+      color: colors.ink,
+    },
+    disabled: {
+      opacity: 0.4,
+    },
+    failed: {
+      color: colors.red,
+    },
+    sent: {
+      color: colors.green,
+    },
+    note: {
+      marginTop: 26,
+      textAlign: 'center',
+    },
+    error: {
+      color: colors.red,
+      marginTop: 26,
+      paddingHorizontal: space.gutter,
+      textAlign: 'center',
+    },
+  }),
+);

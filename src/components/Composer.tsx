@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { explain } from '../lib/rest';
-import { colors, fallbacks, fonts, radii } from '../theme';
+import { colors, fallbacks, fonts, radii, themed } from '../theme';
 import { Label, Micro } from './Type';
 
 export interface ComposerAction {
@@ -110,64 +110,66 @@ export function Composer({
   );
 }
 
-const styles = StyleSheet.create({
-  box: {
-    borderTopColor: colors.ink,
-    borderTopWidth: 1,
-    gap: 10,
-    marginTop: 22,
-    paddingTop: 12,
-  },
-  compact: {
-    borderTopColor: colors.hair,
-    marginTop: 6,
-    paddingTop: 8,
-  },
-  input: {
-    backgroundColor: colors.card,
-    borderColor: colors.hair,
-    borderRadius: radii.tile,
-    borderWidth: 1,
-    color: colors.ink,
-    fontFamily: fonts.sans ?? fallbacks.sans,
-    fontSize: 14,
-    lineHeight: 20,
-    minHeight: 84,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  inputCompact: {
-    minHeight: 60,
-  },
-  actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  pill: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  primary: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-  label: {
-    color: colors.ink,
-  },
-  primaryLabel: {
-    color: colors.onBlack,
-  },
-  sent: {
-    color: colors.green,
-  },
-  failed: {
-    color: colors.red,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    box: {
+      borderTopColor: colors.ink,
+      borderTopWidth: 1,
+      gap: 10,
+      marginTop: 22,
+      paddingTop: 12,
+    },
+    compact: {
+      borderTopColor: colors.hair,
+      marginTop: 6,
+      paddingTop: 8,
+    },
+    input: {
+      backgroundColor: colors.card,
+      borderColor: colors.hair,
+      borderRadius: radii.tile,
+      borderWidth: 1,
+      color: colors.ink,
+      fontFamily: fonts.sans ?? fallbacks.sans,
+      fontSize: 14,
+      lineHeight: 20,
+      minHeight: 84,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    inputCompact: {
+      minHeight: 60,
+    },
+    actions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    pill: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    primary: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    disabled: {
+      opacity: 0.4,
+    },
+    label: {
+      color: colors.ink,
+    },
+    primaryLabel: {
+      color: colors.onBlack,
+    },
+    sent: {
+      color: colors.green,
+    },
+    failed: {
+      color: colors.red,
+    },
+  }),
+);

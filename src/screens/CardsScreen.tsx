@@ -17,7 +17,7 @@ import { useRemote } from '../hooks/useRemote';
 import { demoSearch } from '../lib/demo';
 import { useNav } from '../lib/nav';
 import { searchCode } from '../lib/repo';
-import { colors, fonts, radii } from '../theme';
+import { colors, fonts, radii, themed } from '../theme';
 import { SearchField, SearchResults } from './RepoScreen';
 import { ago, fmt, hash, Page, ScreenHead } from './shared';
 
@@ -370,53 +370,55 @@ function Sigil({ seed, size }: { seed: number; size: number }) {
   return <>{parts}</>;
 }
 
-const styles = StyleSheet.create({
-  deck: {
-    alignItems: 'center',
-    paddingBottom: 30,
-    paddingTop: 14,
-  },
-  hidden: {
-    display: 'none',
-  },
-  card: {
-    backgroundColor: colors.black,
-    borderRadius: radii.card,
-    height: CARD_HEIGHT,
-    padding: 18,
-    // A hairline of canvas around every card, so the seams stay visible even
-    // where two cards sit almost flush.
-    borderColor: colors.canvas,
-    borderWidth: 2,
-  },
-  cardHead: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 4,
-  },
-  handle: {
-    color: colors.onBlack,
-    flex: 1,
-    fontSize: 13,
-  },
-  headCount: {
-    color: colors.onBlack55,
-    fontSize: 9,
-  },
-  meta: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-  },
-  metaText: {
-    color: colors.onBlack55,
-    fontSize: 10,
-  },
-  langRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 5,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    deck: {
+      alignItems: 'center',
+      paddingBottom: 30,
+      paddingTop: 14,
+    },
+    hidden: {
+      display: 'none',
+    },
+    card: {
+      backgroundColor: colors.black,
+      borderRadius: radii.card,
+      height: CARD_HEIGHT,
+      padding: 18,
+      // A hairline of canvas around every card, so the seams stay visible even
+      // where two cards sit almost flush.
+      borderColor: colors.canvas,
+      borderWidth: 2,
+    },
+    cardHead: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 4,
+    },
+    handle: {
+      color: colors.onBlack,
+      flex: 1,
+      fontSize: 13,
+    },
+    headCount: {
+      color: colors.onBlack55,
+      fontSize: 9,
+    },
+    meta: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 4,
+    },
+    metaText: {
+      color: colors.onBlack55,
+      fontSize: 10,
+    },
+    langRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 5,
+    },
+  }),
+);

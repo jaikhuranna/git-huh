@@ -5,7 +5,7 @@ import Svg, { G, Line, Rect } from 'react-native-svg';
 import { Body, Data, Label } from '../components/Type';
 import { prAge, type PullRequest } from '../lib/prs';
 import type { PrsState } from '../hooks/useOpenPrs';
-import { colors, space } from '../theme';
+import { colors, space, themed } from '../theme';
 
 type Filter = 'open' | 'draft';
 
@@ -279,138 +279,140 @@ function Floor({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    paddingHorizontal: space.gutter,
-    paddingTop: 4,
-  },
-  masthead: {
-    alignItems: 'baseline',
-    borderBottomColor: colors.ink,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingBottom: 8,
-  },
-  chapter: {
-    color: colors.ink70,
-    fontSize: 11,
-  },
-  title: {
-    fontSize: 12,
-    letterSpacing: 1.6,
-  },
-  tabs: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 14,
-  },
-  filterTab: {
-    borderColor: colors.hair,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-  },
-  filterTabOn: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  filterLabelOn: {
-    color: colors.onBlack,
-  },
-  drawerScroll: {
-    flex: 1,
-  },
-  drawer: {
-    paddingBottom: 6,
-    paddingTop: 12,
-  },
-  folder: {
-    marginBottom: 14,
-  },
-  folderHead: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-  },
-  folderTab: {
-    alignItems: 'center',
-    backgroundColor: colors.black,
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
-    flexDirection: 'row',
-    gap: 10,
-    maxWidth: '80%',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  folderName: {
-    color: colors.onBlack,
-    flexShrink: 1,
-    fontSize: 11,
-  },
-  folderCount: {
-    color: colors.onBlack55,
-    fontSize: 10,
-  },
-  folderRule: {
-    backgroundColor: colors.ink,
-    flex: 1,
-    height: 2,
-  },
-  card: {
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderColor: colors.hairStrong,
-    borderTopWidth: 0,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    marginLeft: CARD_STEP,
-    paddingRight: 10,
-    paddingVertical: 8,
-  },
-  numberTab: {
-    alignSelf: 'stretch',
-    backgroundColor: colors.black,
-    justifyContent: 'center',
-    marginLeft: -1,
-    marginVertical: -8,
-    paddingHorizontal: 8,
-  },
-  numberText: {
-    color: colors.onBlack,
-    fontSize: 11,
-  },
-  cardTitle: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 17,
-  },
-  cardAge: {
-    color: colors.ink40,
-    fontSize: 10,
-  },
-  lip: {
-    backgroundColor: colors.ink,
-    height: 2,
-  },
-  figure: {
-    color: colors.ink70,
-    fontSize: 11,
-    paddingBottom: 6,
-    paddingTop: 10,
-    textAlign: 'center',
-  },
-  note: {
-    marginTop: 18,
-    textAlign: 'center',
-  },
-  error: {
-    color: colors.red,
-    marginTop: 18,
-    textAlign: 'center',
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      paddingHorizontal: space.gutter,
+      paddingTop: 4,
+    },
+    masthead: {
+      alignItems: 'baseline',
+      borderBottomColor: colors.ink,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingBottom: 8,
+    },
+    chapter: {
+      color: colors.ink70,
+      fontSize: 11,
+    },
+    title: {
+      fontSize: 12,
+      letterSpacing: 1.6,
+    },
+    tabs: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 14,
+    },
+    filterTab: {
+      borderColor: colors.hair,
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
+      borderWidth: 1,
+      paddingHorizontal: 16,
+      paddingVertical: 7,
+    },
+    filterTabOn: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    filterLabelOn: {
+      color: colors.onBlack,
+    },
+    drawerScroll: {
+      flex: 1,
+    },
+    drawer: {
+      paddingBottom: 6,
+      paddingTop: 12,
+    },
+    folder: {
+      marginBottom: 14,
+    },
+    folderHead: {
+      alignItems: 'flex-end',
+      flexDirection: 'row',
+    },
+    folderTab: {
+      alignItems: 'center',
+      backgroundColor: colors.black,
+      borderTopLeftRadius: 3,
+      borderTopRightRadius: 3,
+      flexDirection: 'row',
+      gap: 10,
+      maxWidth: '80%',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    folderName: {
+      color: colors.onBlack,
+      flexShrink: 1,
+      fontSize: 11,
+    },
+    folderCount: {
+      color: colors.onBlack55,
+      fontSize: 10,
+    },
+    folderRule: {
+      backgroundColor: colors.ink,
+      flex: 1,
+      height: 2,
+    },
+    card: {
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderColor: colors.hairStrong,
+      borderTopWidth: 0,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      marginLeft: CARD_STEP,
+      paddingRight: 10,
+      paddingVertical: 8,
+    },
+    numberTab: {
+      alignSelf: 'stretch',
+      backgroundColor: colors.black,
+      justifyContent: 'center',
+      marginLeft: -1,
+      marginVertical: -8,
+      paddingHorizontal: 8,
+    },
+    numberText: {
+      color: colors.onBlack,
+      fontSize: 11,
+    },
+    cardTitle: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 17,
+    },
+    cardAge: {
+      color: colors.ink40,
+      fontSize: 10,
+    },
+    lip: {
+      backgroundColor: colors.ink,
+      height: 2,
+    },
+    figure: {
+      color: colors.ink70,
+      fontSize: 11,
+      paddingBottom: 6,
+      paddingTop: 10,
+      textAlign: 'center',
+    },
+    note: {
+      marginTop: 18,
+      textAlign: 'center',
+    },
+    error: {
+      color: colors.red,
+      marginTop: 18,
+      textAlign: 'center',
+    },
+  }),
+);

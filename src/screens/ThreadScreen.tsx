@@ -13,7 +13,7 @@ import { GitHubError } from '../lib/github';
 import { useNav } from '../lib/nav';
 import { fetchThread } from '../lib/thread';
 import { addComment, addDiscussionComment, setIssueState } from '../lib/writes';
-import { colors, radii, space } from '../theme';
+import { colors, radii, space, themed } from '../theme';
 import { ago } from './shared';
 
 /**
@@ -203,77 +203,79 @@ export function ThreadScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  page: {
-    paddingBottom: 30,
-    paddingHorizontal: space.gutter,
-    paddingTop: 6,
-  },
-  titleRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  title: {
-    flex: 1,
-    fontSize: 18,
-    lineHeight: 24,
-  },
-  state: {
-    borderRadius: radii.pill,
-    paddingHorizontal: 11,
-    paddingVertical: 3,
-  },
-  stateText: {
-    color: colors.onBlack,
-    fontSize: 10,
-  },
-  meta: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 9,
-  },
-  metaText: {
-    color: colors.ink70,
-    fontSize: 11,
-  },
-  label: {
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 1,
-  },
-  rule: {
-    marginBottom: 6,
-    marginTop: 10,
-  },
-  gap: {
-    height: 18,
-  },
-  between: {
-    marginVertical: 14,
-  },
-  more: {
-    marginBottom: 14,
-  },
-  note: {
-    marginTop: 26,
-    textAlign: 'center',
-  },
-  errorStack: {
-    alignItems: 'center',
-    gap: 14,
-    marginTop: 30,
-    paddingHorizontal: space.gutter,
-  },
-  error: {
-    color: colors.red,
-    textAlign: 'center',
-  },
-  underline: {
-    color: colors.ink,
-    textDecorationLine: 'underline',
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    page: {
+      paddingBottom: 30,
+      paddingHorizontal: space.gutter,
+      paddingTop: 6,
+    },
+    titleRow: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      gap: 10,
+    },
+    title: {
+      flex: 1,
+      fontSize: 18,
+      lineHeight: 24,
+    },
+    state: {
+      borderRadius: radii.pill,
+      paddingHorizontal: 11,
+      paddingVertical: 3,
+    },
+    stateText: {
+      color: colors.onBlack,
+      fontSize: 10,
+    },
+    meta: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginTop: 9,
+    },
+    metaText: {
+      color: colors.ink70,
+      fontSize: 11,
+    },
+    label: {
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 8,
+      paddingVertical: 1,
+    },
+    rule: {
+      marginBottom: 6,
+      marginTop: 10,
+    },
+    gap: {
+      height: 18,
+    },
+    between: {
+      marginVertical: 14,
+    },
+    more: {
+      marginBottom: 14,
+    },
+    note: {
+      marginTop: 26,
+      textAlign: 'center',
+    },
+    errorStack: {
+      alignItems: 'center',
+      gap: 14,
+      marginTop: 30,
+      paddingHorizontal: space.gutter,
+    },
+    error: {
+      color: colors.red,
+      textAlign: 'center',
+    },
+    underline: {
+      color: colors.ink,
+      textDecorationLine: 'underline',
+    },
+  }),
+);

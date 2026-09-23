@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Label } from '../components/Type';
-import { colors, space } from '../theme';
+import { colors, space, themed } from '../theme';
 
 /**
  * Every screen opens with the same two-part caption — a name on the left and
@@ -83,21 +83,23 @@ export function onColor(background: string): string {
   return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? colors.ink : colors.onBlack;
 }
 
-const styles = StyleSheet.create({
-  head: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingBottom: 14,
-  },
-  headLeft: {
-    color: colors.ink,
-  },
-  page: {
-    paddingBottom: 28,
-    paddingTop: 4,
-  },
-  fill: {
-    flexGrow: 1,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    head: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingBottom: 14,
+    },
+    headLeft: {
+      color: colors.ink,
+    },
+    page: {
+      paddingBottom: 28,
+      paddingTop: 4,
+    },
+    fill: {
+      flexGrow: 1,
+    },
+  }),
+);

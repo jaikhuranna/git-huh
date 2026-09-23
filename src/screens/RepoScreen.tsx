@@ -36,7 +36,7 @@ import {
   type CodeHit,
   type RepoInfo,
 } from '../lib/repo';
-import { colors, fallbacks, fonts, radii, space } from '../theme';
+import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
 import { ago, fmt } from './shared';
 
 type Tab = 'code' | 'issues' | 'releases' | 'discussions' | 'security';
@@ -504,12 +504,12 @@ function Discussions({ repo, info }: { repo: string; info: RepoInfo | null }) {
 
 // --- security ----------------------------------------------------------------
 
-const SEVERITY: Record<string, string> = {
+const SEVERITY = themed<Record<string, string>>(() => ({
   critical: colors.red,
   high: colors.red,
   medium: colors.yellow,
   low: colors.ink40,
-};
+}));
 
 function Security({ repo }: { repo: string }) {
   const nav = useNav();
@@ -570,269 +570,271 @@ function Security({ repo }: { repo: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  page: {
-    paddingBottom: 30,
-    paddingHorizontal: space.gutter,
-    paddingTop: 4,
-  },
-  title: {
-    fontSize: 22,
-    lineHeight: 28,
-  },
-  description: {
-    color: colors.ink70,
-    marginTop: 4,
-  },
-  stats: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginTop: 10,
-  },
-  stat: {
-    color: colors.ink70,
-    fontSize: 11,
-  },
-  lang: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 5,
-  },
-  swatch: {
-    borderRadius: 4,
-    height: 8,
-    width: 8,
-  },
-  tabs: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
-    marginTop: 18,
-  },
-  chip: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  chipOn: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  chipLabelOn: {
-    color: colors.onBlack,
-  },
-  searchRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  search: {
-    backgroundColor: colors.card,
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    color: colors.ink,
-    flex: 1,
-    fontFamily: fonts.mono ?? fallbacks.mono,
-    fontSize: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  crumbs: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 6,
-    marginTop: 14,
-  },
-  crumbPair: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-  },
-  crumb: {
-    color: colors.ink40,
-    fontSize: 12,
-    textDecorationLine: 'underline',
-  },
-  crumbOn: {
-    color: colors.ink,
-    fontSize: 12,
-  },
-  crumbSlash: {
-    color: colors.ink20,
-    fontSize: 12,
-    marginHorizontal: 4,
-  },
-  entry: {
-    alignItems: 'baseline',
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  dir: {
-    color: colors.ink,
-    fontFamily: fonts.monoMedium,
-    fontSize: 12,
-  },
-  file: {
-    color: colors.ink70,
-    fontSize: 12,
-  },
-  size: {
-    color: colors.ink40,
-  },
-  hint: {
-    color: colors.ink40,
-    marginBottom: 6,
-    marginTop: 12,
-  },
-  hit: {
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    gap: 3,
-    paddingVertical: 10,
-  },
-  hitPath: {
-    color: colors.ink,
-    fontSize: 12,
-  },
-  hitRepo: {
-    color: colors.ink40,
-  },
-  fragment: {
-    backgroundColor: colors.recess,
-    borderRadius: 6,
-    color: colors.ink70,
-    fontSize: 10,
-    lineHeight: 14,
-    marginTop: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  row: {
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    gap: 3,
-    paddingVertical: 11,
-  },
-  rowTop: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  number: {
-    color: colors.ink,
-    fontSize: 11,
-  },
-  age: {
-    color: colors.ink40,
-  },
-  by: {
-    color: colors.ink40,
-  },
-  newIssue: {
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-  },
-  release: {
-    paddingBottom: 12,
-  },
-  releaseHead: {
-    gap: 4,
-    paddingVertical: 8,
-  },
-  releaseName: {
-    fontSize: 15,
-  },
-  releaseMeta: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  fold: {
-    color: colors.ink,
-    fontSize: 12,
-    marginLeft: 'auto',
-  },
-  releaseBody: {
-    paddingBottom: 12,
-  },
-  alert: {
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 11,
-  },
-  alertRule: {
-    borderRadius: 2,
-    width: 3,
-  },
-  alertBody: {
-    flex: 1,
-    gap: 3,
-  },
-  alertSummary: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  scope: {
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  note: {
-    marginTop: 16,
-  },
-  error: {
-    color: colors.red,
-    lineHeight: 16,
-    marginTop: 14,
-  },
-  footer: {
-    alignItems: 'center',
-    borderTopColor: colors.hair,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    paddingBottom: 8,
-    paddingHorizontal: space.gutter,
-    paddingTop: 10,
-  },
-  branch: {
-    color: colors.ink40,
-    flex: 1,
-    fontSize: 10,
-  },
-  ghost: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  ghostLabel: {
-    color: colors.ink,
-  },
-  solid: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  solidLabel: {
-    color: colors.onBlack,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    page: {
+      paddingBottom: 30,
+      paddingHorizontal: space.gutter,
+      paddingTop: 4,
+    },
+    title: {
+      fontSize: 22,
+      lineHeight: 28,
+    },
+    description: {
+      color: colors.ink70,
+      marginTop: 4,
+    },
+    stats: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginTop: 10,
+    },
+    stat: {
+      color: colors.ink70,
+      fontSize: 11,
+    },
+    lang: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 5,
+    },
+    swatch: {
+      borderRadius: 4,
+      height: 8,
+      width: 8,
+    },
+    tabs: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 14,
+      marginTop: 18,
+    },
+    chip: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    chipOn: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    chipLabelOn: {
+      color: colors.onBlack,
+    },
+    searchRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    search: {
+      backgroundColor: colors.card,
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      color: colors.ink,
+      flex: 1,
+      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontSize: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    crumbs: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: 6,
+      marginTop: 14,
+    },
+    crumbPair: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+    },
+    crumb: {
+      color: colors.ink40,
+      fontSize: 12,
+      textDecorationLine: 'underline',
+    },
+    crumbOn: {
+      color: colors.ink,
+      fontSize: 12,
+    },
+    crumbSlash: {
+      color: colors.ink20,
+      fontSize: 12,
+      marginHorizontal: 4,
+    },
+    entry: {
+      alignItems: 'baseline',
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 10,
+    },
+    dir: {
+      color: colors.ink,
+      fontFamily: fonts.monoMedium,
+      fontSize: 12,
+    },
+    file: {
+      color: colors.ink70,
+      fontSize: 12,
+    },
+    size: {
+      color: colors.ink40,
+    },
+    hint: {
+      color: colors.ink40,
+      marginBottom: 6,
+      marginTop: 12,
+    },
+    hit: {
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      gap: 3,
+      paddingVertical: 10,
+    },
+    hitPath: {
+      color: colors.ink,
+      fontSize: 12,
+    },
+    hitRepo: {
+      color: colors.ink40,
+    },
+    fragment: {
+      backgroundColor: colors.recess,
+      borderRadius: 6,
+      color: colors.ink70,
+      fontSize: 10,
+      lineHeight: 14,
+      marginTop: 3,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
+    row: {
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      gap: 3,
+      paddingVertical: 11,
+    },
+    rowTop: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    number: {
+      color: colors.ink,
+      fontSize: 11,
+    },
+    age: {
+      color: colors.ink40,
+    },
+    by: {
+      color: colors.ink40,
+    },
+    newIssue: {
+      alignSelf: 'flex-start',
+      marginBottom: 12,
+    },
+    release: {
+      paddingBottom: 12,
+    },
+    releaseHead: {
+      gap: 4,
+      paddingVertical: 8,
+    },
+    releaseName: {
+      fontSize: 15,
+    },
+    releaseMeta: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    fold: {
+      color: colors.ink,
+      fontSize: 12,
+      marginLeft: 'auto',
+    },
+    releaseBody: {
+      paddingBottom: 12,
+    },
+    alert: {
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      paddingVertical: 11,
+    },
+    alertRule: {
+      borderRadius: 2,
+      width: 3,
+    },
+    alertBody: {
+      flex: 1,
+      gap: 3,
+    },
+    alertSummary: {
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    scope: {
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    note: {
+      marginTop: 16,
+    },
+    error: {
+      color: colors.red,
+      lineHeight: 16,
+      marginTop: 14,
+    },
+    footer: {
+      alignItems: 'center',
+      borderTopColor: colors.hair,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      gap: 12,
+      paddingBottom: 8,
+      paddingHorizontal: space.gutter,
+      paddingTop: 10,
+    },
+    branch: {
+      color: colors.ink40,
+      flex: 1,
+      fontSize: 10,
+    },
+    ghost: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    ghostLabel: {
+      color: colors.ink,
+    },
+    solid: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    solidLabel: {
+      color: colors.onBlack,
+    },
+    disabled: {
+      opacity: 0.4,
+    },
+  }),
+);

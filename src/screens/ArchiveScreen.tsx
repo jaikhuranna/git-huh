@@ -3,7 +3,7 @@ import Svg, { Circle, Line, Rect, Text as SvgText } from 'react-native-svg';
 
 import { Serif } from '../components/Type';
 import type { GitHubModel, YearSummary } from '../lib/contributions';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themed } from '../theme';
 import { fmt, Page, ScreenHead } from './shared';
 
 const ROW_HEIGHT = 44;
@@ -181,24 +181,26 @@ function Row({
   );
 }
 
-const styles = StyleSheet.create({
-  heads: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingBottom: 8,
-  },
-  headYear: {
-    color: colors.ink70,
-    fontFamily: fonts.serifItalic,
-    fontSize: 12,
-  },
-  headToday: {
-    color: colors.ink70,
-    fontSize: 12,
-  },
-  headSplit: {
-    color: colors.ink70,
-    fontFamily: fonts.serifItalic,
-    fontSize: 12,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    heads: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingBottom: 8,
+    },
+    headYear: {
+      color: colors.ink70,
+      fontFamily: fonts.serifItalic,
+      fontSize: 12,
+    },
+    headToday: {
+      color: colors.ink70,
+      fontSize: 12,
+    },
+    headSplit: {
+      color: colors.ink70,
+      fontFamily: fonts.serifItalic,
+      fontSize: 12,
+    },
+  }),
+);

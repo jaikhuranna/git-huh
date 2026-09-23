@@ -23,7 +23,7 @@ import { useNav } from '../lib/nav';
 import { parsePatch, type PullComment, type PullDetailFull } from '../lib/pullDetail';
 import { explain } from '../lib/rest';
 import { addComment, commentOnLine, submitReview } from '../lib/writes';
-import { colors, fallbacks, fonts, radii, space } from '../theme';
+import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
 import { ago, fmt } from './shared';
 
 type Tab = 'brief' | 'talk' | 'diff' | 'checks';
@@ -317,11 +317,11 @@ function Conversation({ pull, width }: { pull: PullDetailFull; width: number }) 
   );
 }
 
-const TONE: Record<string, string> = {
+const TONE = themed<Record<string, string>>(() => ({
   APPROVED: colors.green,
   CHANGES_REQUESTED: colors.red,
   COMMENTED: colors.blue,
-};
+}));
 
 function Comment({
   comment,
@@ -424,230 +424,232 @@ function Hunk({ hunk }: { hunk: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: colors.canvas,
-    flex: 1,
-  },
-  chrome: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 14,
-    paddingHorizontal: space.gutter,
-    paddingTop: 10,
-  },
-  back: {
-    paddingVertical: 4,
-  },
-  backLabel: {
-    color: colors.ink,
-  },
-  chromeRepoHit: {
-    flex: 1,
-  },
-  chromeRepo: {
-    color: colors.ink40,
-    fontSize: 10,
-    textAlign: 'right',
-    textDecorationLine: 'underline',
-  },
-  find: {
-    backgroundColor: colors.card,
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    color: colors.ink,
-    fontFamily: fonts.mono ?? fallbacks.mono,
-    fontSize: 12,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  header: {
-    paddingHorizontal: space.gutter,
-    paddingTop: 10,
-  },
-  titleRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  title: {
-    flex: 1,
-    fontSize: 18,
-    lineHeight: 24,
-  },
-  stateChip: {
-    borderRadius: radii.pill,
-    paddingHorizontal: 11,
-    paddingVertical: 3,
-  },
-  stateText: {
-    color: colors.onBlack,
-    fontSize: 10,
-  },
-  diffTrack: {
-    borderRadius: 2,
-    flexDirection: 'row',
-    gap: 2,
-    height: 5,
-    marginTop: 14,
-    overflow: 'hidden',
-  },
-  diffAdd: {
-    backgroundColor: colors.green,
-  },
-  diffDel: {
-    backgroundColor: colors.red,
-  },
-  statRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginTop: 9,
-  },
-  add: {
-    color: colors.green,
-    fontSize: 11,
-  },
-  del: {
-    color: colors.red,
-    fontSize: 11,
-  },
-  stat: {
-    color: colors.ink70,
-    fontSize: 11,
-  },
-  headerRule: {
-    marginTop: 10,
-  },
-  tabs: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: space.gutter,
-    paddingTop: 4,
-  },
-  tab: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  tabOn: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  tabLabelOn: {
-    color: colors.onBlack,
-  },
-  page: {
-    paddingBottom: 26,
-    paddingHorizontal: space.gutter,
-    paddingTop: 10,
-  },
-  between: {
-    marginVertical: 14,
-  },
-  comment: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  reply: {
-    marginTop: 12,
-    opacity: 0.92,
-  },
-  commentBody: {
-    flex: 1,
-  },
-  byline: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  author: {
-    color: colors.ink,
-    fontSize: 12,
-  },
-  kind: {
-    fontFamily: fonts.monoMedium,
-  },
-  when: {
-    color: colors.ink40,
-    marginLeft: 'auto',
-  },
-  anchor: {
-    color: colors.ink40,
-    fontSize: 10,
-    marginTop: 5,
-  },
-  hunk: {
-    backgroundColor: colors.recess,
-    borderRadius: radii.tile,
-    marginTop: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  hunkLine: {
-    color: colors.ink70,
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  hunkAdd: {
-    color: colors.green,
-  },
-  hunkDel: {
-    color: colors.red,
-  },
-  footer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    paddingBottom: 8,
-    paddingHorizontal: space.gutter,
-    paddingTop: 12,
-  },
-  footerRule: {
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  pill: {
-    alignItems: 'center',
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  solid: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  solidLabel: {
-    color: colors.onBlack,
-  },
-  branch: {
-    color: colors.ink40,
-    flex: 1,
-    fontSize: 10,
-  },
-  note: {
-    marginTop: 26,
-    textAlign: 'center',
-  },
-  errorStack: {
-    alignItems: 'center',
-    gap: 14,
-    marginTop: 30,
-  },
-  error: {
-    color: colors.red,
-  },
-  underline: {
-    color: colors.ink,
-    textDecorationLine: 'underline',
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    screen: {
+      backgroundColor: colors.canvas,
+      flex: 1,
+    },
+    chrome: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 14,
+      paddingHorizontal: space.gutter,
+      paddingTop: 10,
+    },
+    back: {
+      paddingVertical: 4,
+    },
+    backLabel: {
+      color: colors.ink,
+    },
+    chromeRepoHit: {
+      flex: 1,
+    },
+    chromeRepo: {
+      color: colors.ink40,
+      fontSize: 10,
+      textAlign: 'right',
+      textDecorationLine: 'underline',
+    },
+    find: {
+      backgroundColor: colors.card,
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      color: colors.ink,
+      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontSize: 12,
+      marginBottom: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+    },
+    header: {
+      paddingHorizontal: space.gutter,
+      paddingTop: 10,
+    },
+    titleRow: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      gap: 10,
+    },
+    title: {
+      flex: 1,
+      fontSize: 18,
+      lineHeight: 24,
+    },
+    stateChip: {
+      borderRadius: radii.pill,
+      paddingHorizontal: 11,
+      paddingVertical: 3,
+    },
+    stateText: {
+      color: colors.onBlack,
+      fontSize: 10,
+    },
+    diffTrack: {
+      borderRadius: 2,
+      flexDirection: 'row',
+      gap: 2,
+      height: 5,
+      marginTop: 14,
+      overflow: 'hidden',
+    },
+    diffAdd: {
+      backgroundColor: colors.green,
+    },
+    diffDel: {
+      backgroundColor: colors.red,
+    },
+    statRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginTop: 9,
+    },
+    add: {
+      color: colors.green,
+      fontSize: 11,
+    },
+    del: {
+      color: colors.red,
+      fontSize: 11,
+    },
+    stat: {
+      color: colors.ink70,
+      fontSize: 11,
+    },
+    headerRule: {
+      marginTop: 10,
+    },
+    tabs: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: space.gutter,
+      paddingTop: 4,
+    },
+    tab: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+    },
+    tabOn: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    tabLabelOn: {
+      color: colors.onBlack,
+    },
+    page: {
+      paddingBottom: 26,
+      paddingHorizontal: space.gutter,
+      paddingTop: 10,
+    },
+    between: {
+      marginVertical: 14,
+    },
+    comment: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    reply: {
+      marginTop: 12,
+      opacity: 0.92,
+    },
+    commentBody: {
+      flex: 1,
+    },
+    byline: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    author: {
+      color: colors.ink,
+      fontSize: 12,
+    },
+    kind: {
+      fontFamily: fonts.monoMedium,
+    },
+    when: {
+      color: colors.ink40,
+      marginLeft: 'auto',
+    },
+    anchor: {
+      color: colors.ink40,
+      fontSize: 10,
+      marginTop: 5,
+    },
+    hunk: {
+      backgroundColor: colors.recess,
+      borderRadius: radii.tile,
+      marginTop: 7,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    hunkLine: {
+      color: colors.ink70,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    hunkAdd: {
+      color: colors.green,
+    },
+    hunkDel: {
+      color: colors.red,
+    },
+    footer: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 12,
+      paddingBottom: 8,
+      paddingHorizontal: space.gutter,
+      paddingTop: 12,
+    },
+    footerRule: {
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+    },
+    pill: {
+      alignItems: 'center',
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+    },
+    solid: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    solidLabel: {
+      color: colors.onBlack,
+    },
+    branch: {
+      color: colors.ink40,
+      flex: 1,
+      fontSize: 10,
+    },
+    note: {
+      marginTop: 26,
+      textAlign: 'center',
+    },
+    errorStack: {
+      alignItems: 'center',
+      gap: 14,
+      marginTop: 30,
+    },
+    error: {
+      color: colors.red,
+    },
+    underline: {
+      color: colors.ink,
+      textDecorationLine: 'underline',
+    },
+  }),
+);

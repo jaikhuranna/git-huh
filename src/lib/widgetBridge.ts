@@ -1,3 +1,4 @@
+import { ExtensionStorage } from '@bacons/apple-targets';
 import { NativeModules, Platform } from 'react-native';
 import { nothingWidgetColors, type MaterialYouPalette } from 'nothing-mtui';
 
@@ -29,6 +30,39 @@ const bridge = NativeModules.GitHuhWidgetBridge as WidgetBridge | undefined;
 const isAvailable = Platform.OS === 'android' && bridge != null;
 
 /**
+ * iOS has no bridge of ours: the WidgetKit extension in `targets/widget/`
+ * reads the same JSON out of this App Group's UserDefaults, and
+ * ExtensionStorage (from @bacons/apple-targets) writes it and reloads the
+ * timeline. The group has to match app.json and `appGroup` in Payload.swift.
+ */
+const APP_GROUP = 'group.app.githuh';
+const PAYLOAD_KEY = 'payload';
+const ios = Platform.OS === 'ios';
+const storage = ios ? new ExtensionStorage(APP_GROUP) : null;
+
+/**
+ * Keep the last payload's commit subjects when this one carries none, for the
+ * same account — what WidgetState.write does on Android. A sync routinely
+ * lands before the pool is read back, and a card with no line is a card
+ * with no masthead.
+ */
+function withKeptLines(payload: { login: string; lines: unknown[] }): string {
+  if (payload.lines.length === 0 && storage) {
+    try {
+      const previous = JSON.parse(storage.get(PAYLOAD_KEY) ?? 'null') as
+        | { login?: string; lines?: unknown[] }
+        | null;
+      if (previous?.login === payload.login && previous.lines?.length) {
+        return JSON.stringify({ ...payload, lines: previous.lines });
+      }
+    } catch {
+      // A payload that does not parse is the same as none.
+    }
+  }
+  return JSON.stringify(payload);
+}
+
+/**
  * How many commit subjects travel to the widget as its masthead pool — the
  * whole cache, which is capped at 40 lines and under 2 KB.
  *
@@ -52,7 +86,7 @@ export async function syncWidget(
   model: GitHubModel,
   lines: readonly CommitLine[] = [],
 ): Promise<void> {
-  if (!isAvailable) return;
+  if (!isAvailable && !storage) return;
 
   /**
    * Every day of the year, in order, ending on today.
@@ -74,43 +108,54 @@ export async function syncWidget(
   }));
 
   // Re-read every sync rather than caching: the palette follows the
-  // wallpaper, which the user can change while the app is running.
-  const palette = await bridge.materialYouPalette().catch(() => null);
+  // wallpaper, which the user can change while the app is running. iOS has
+  // no Material You, so it gets nothing-mtui's static tones.
+  const palette =
+    isAvailable && bridge ? await bridge.materialYouPalette().catch(() => null) : null;
   const light = nothingWidgetColors(palette, 'light');
   const dark = nothingWidgetColors(palette, 'dark');
 
-  await bridge.sync(
-    JSON.stringify({
-      login: model.login,
-      total: model.total,
-      todayCount: model.todayCount,
-      todayCommits: model.todayCommits,
-      totalCommits: model.totalCommits,
-      openPrs: model.openPrs,
-      mtui: {
-        light: {
-          bg: light.widgetBg,
-          elements: light.widgetElements,
-          food: light.widgetFood,
-        },
-        dark: {
-          bg: dark.widgetBg,
-          elements: dark.widgetElements,
-          food: dark.widgetFood,
-        },
+  const payload = {
+    login: model.login,
+    total: model.total,
+    todayCount: model.todayCount,
+    todayCommits: model.todayCommits,
+    totalCommits: model.totalCommits,
+    openPrs: model.openPrs,
+    mtui: {
+      light: {
+        bg: light.widgetBg,
+        elements: light.widgetElements,
+        food: light.widgetFood,
       },
-      /** Legacy flat key, read by widgets installed before 2.0.1. */
-      bg: dark.widgetBg,
-      days,
-      lines: lines
-        .slice(0, WIDGET_LINES)
-        .map((line) => ({ m: line.message, r: line.repo })),
-    }),
-  );
+      dark: {
+        bg: dark.widgetBg,
+        elements: dark.widgetElements,
+        food: dark.widgetFood,
+      },
+    },
+    /** Legacy flat key, read by widgets installed before 2.0.1. */
+    bg: dark.widgetBg,
+    days,
+    lines: lines
+      .slice(0, WIDGET_LINES)
+      .map((line) => ({ m: line.message, r: line.repo })),
+  };
+
+  if (storage) {
+    storage.set(PAYLOAD_KEY, withKeptLines(payload));
+    ExtensionStorage.reloadWidget();
+    return;
+  }
+  if (bridge) await bridge.sync(JSON.stringify(payload));
 }
 
 /** Reset every placed widget to its empty state (called on disconnect). */
 export async function clearWidget(): Promise<void> {
-  if (!isAvailable) return;
-  await bridge.clear();
+  if (storage) {
+    storage.remove(PAYLOAD_KEY);
+    ExtensionStorage.reloadWidget();
+    return;
+  }
+  if (isAvailable && bridge) await bridge.clear();
 }

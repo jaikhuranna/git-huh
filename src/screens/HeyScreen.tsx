@@ -16,13 +16,13 @@ import {
   type NotifySettings,
   type NotifyStatus,
 } from '../lib/notify';
-import { colors, fonts, radii } from '../theme';
+import { colors, fonts, radii, themed } from '../theme';
 import { fmt, Page } from './shared';
 
 /**
  * pin04 — Pantom's landing page. A serif greeting, a field of plus glyphs
- * standing in for the contribution year, and one sentence that carries five
- * statistics in five colours.
+ * standing in for the contribution year, and one sentence that carries the
+ * year's figures in five colours.
  *
  * This is also where the account lives: the handle, the link out, and the
  * one destructive action in the app. The activity feed used to sit under all
@@ -65,14 +65,7 @@ export function HeyScreen({
         width={width - 40}
       />
 
-      <Body style={styles.sentence}>
-        You shipped <Text style={styles.blue}>{fmt(model.breakdown.commits)}</Text>{' '}
-        commits across <Text style={styles.green}>{fmt(model.repoCount)}</Text>{' '}
-        repos. <Text style={styles.red}>{fmt(model.openPrs)}</Text> pull requests
-        are open, <Text style={styles.yellow}>{fmt(model.stars)}</Text> stars
-        landed, and <Text style={styles.purple}>{fmt(model.followers)}</Text>{' '}
-        people follow along.
-      </Body>
+      <Sentence derived={derived} model={model} />
 
       <Serif style={styles.since}>
         since {model.since} · {fmt(derived.activeDays)} active days ·{' '}
@@ -111,6 +104,67 @@ export function HeyScreen({
         </Pressable>
       </View>
     </Page>
+  );
+}
+
+/**
+ * pin04's one sentence, five figures in five colours — all of them about the
+ * same year the crosses above it draw. It used to set this year's commits
+ * against every repository the account had ever owned, and to report stars
+ * "landed" and followers "following along"; it read like a template filled
+ * in. Now it says what you did, where, how steadily, when, and what is still
+ * open, and a figure with nothing in it drops out rather than printing a zero.
+ */
+function Sentence({
+  model,
+  derived,
+}: {
+  model: GitHubModel;
+  derived: ReturnType<typeof insights>;
+}) {
+  const top = model.topRepos.find((repo) => repo.nameWithOwner.includes('/'));
+  const repo = top?.nameWithOwner.split('/')[1];
+
+  if (model.total === 0) {
+    return (
+      <Body style={styles.sentence}>
+        Nothing on the calendar in the last year. The first commit will show up
+        here as a cross.
+      </Body>
+    );
+  }
+
+  const weekday =
+    derived.busiestWeekday.charAt(0).toUpperCase() + derived.busiestWeekday.slice(1);
+
+  return (
+    <Body style={styles.sentence}>
+      You made <Text style={styles.blue}>{fmt(model.total)}</Text>{' '}
+      {model.total === 1 ? 'contribution' : 'contributions'} in the last year
+      {repo ? (
+        <>
+          , more of them to <Text style={styles.green}>{repo}</Text> than
+          anywhere else
+        </>
+      ) : null}
+      . You work most on <Text style={styles.yellow}>{weekday}s</Text>
+      {derived.longestStreak > 1 ? (
+        <>
+          , and your longest run was{' '}
+          <Text style={styles.purple}>{fmt(derived.longestStreak)}</Text> days
+          in a row
+        </>
+      ) : null}
+      .{' '}
+      {model.openPrs > 0 ? (
+        <>
+          You have <Text style={styles.red}>{fmt(model.openPrs)}</Text>{' '}
+          {model.openPrs === 1 ? 'pull request' : 'pull requests'} still open.
+        </>
+      ) : (
+        'Nothing of yours is waiting to merge.'
+      )}
+    </Body>
   );
 }
 
@@ -264,93 +318,95 @@ function bucket(levels: number[], size: number): number[] {
   return out;
 }
 
-const styles = StyleSheet.create({
-  handle: {
-    marginTop: -6,
-  },
-  field: {
-    alignSelf: 'center',
-    marginBottom: 20,
-    marginTop: 18,
-  },
-  sentence: {
-    fontSize: 17,
-    lineHeight: 26,
-  },
-  blue: { color: colors.blue },
-  green: { color: colors.green },
-  red: { color: colors.red },
-  yellow: { color: colors.yellow },
-  purple: { color: colors.purple },
-  since: {
-    color: colors.ink40,
-    fontFamily: fonts.serifItalic,
-    fontSize: 13,
-    marginTop: 16,
-  },
-  block: {
-    marginTop: 24,
-  },
-  blockHead: {
-    color: colors.ink,
-    marginBottom: 8,
-  },
-  blockNote: {
-    color: colors.ink40,
-    lineHeight: 13,
-    marginTop: 8,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  chipOn: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  chipLabel: {
-    color: colors.ink,
-  },
-  chipLabelOn: {
-    color: colors.onBlack,
-  },
-  dashed: {
-    borderStyle: 'dashed',
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
-    // Pushed to the foot of the page: with the feed gone this screen is a
-    // title page, and a title page's buttons sit on the bottom margin
-    // rather than halfway up an empty sheet.
-    marginTop: 'auto',
-    paddingTop: 26,
-  },
-  pill: {
-    alignItems: 'center',
-    borderColor: colors.hair,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 11,
-  },
-  pillLabel: {
-    color: colors.ink,
-  },
-  solid: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  solidLabel: {
-    color: colors.onBlack,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    handle: {
+      marginTop: -6,
+    },
+    field: {
+      alignSelf: 'center',
+      marginBottom: 20,
+      marginTop: 18,
+    },
+    sentence: {
+      fontSize: 17,
+      lineHeight: 26,
+    },
+    blue: { color: colors.blue },
+    green: { color: colors.green },
+    red: { color: colors.red },
+    yellow: { color: colors.yellow },
+    purple: { color: colors.purple },
+    since: {
+      color: colors.ink40,
+      fontFamily: fonts.serifItalic,
+      fontSize: 13,
+      marginTop: 16,
+    },
+    block: {
+      marginTop: 24,
+    },
+    blockHead: {
+      color: colors.ink,
+      marginBottom: 8,
+    },
+    blockNote: {
+      color: colors.ink40,
+      lineHeight: 13,
+      marginTop: 8,
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    chip: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    chipOn: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    chipLabel: {
+      color: colors.ink,
+    },
+    chipLabelOn: {
+      color: colors.onBlack,
+    },
+    dashed: {
+      borderStyle: 'dashed',
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: 10,
+      // Pushed to the foot of the page: with the feed gone this screen is a
+      // title page, and a title page's buttons sit on the bottom margin
+      // rather than halfway up an empty sheet.
+      marginTop: 'auto',
+      paddingTop: 26,
+    },
+    pill: {
+      alignItems: 'center',
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 11,
+    },
+    pillLabel: {
+      color: colors.ink,
+    },
+    solid: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    solidLabel: {
+      color: colors.onBlack,
+    },
+  }),
+);

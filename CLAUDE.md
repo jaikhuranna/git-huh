@@ -8,7 +8,9 @@ you — a year of contributions, the languages, the repos, the pull requests
 and the arguments in them — rendered as a set of printed artefacts rather
 than as a dashboard: fourteen screens, each one a pin from the "nothing
 github" Pinterest board (`design/board/`), grouped into five sections, plus
-one Android home-screen widget.
+one home-screen widget — a Glance widget on Android and a WidgetKit one on
+iOS, drawing the same card from the same payload. It follows the system into
+dark mode.
 
 Since 3.1 it also *acts*, because that is what the lists in
 `design/STORIES.md` asked for: an inbox you can put things away in,
@@ -70,6 +72,24 @@ usually not worth attaching.
 Always bump `versionName` and `versionCode` so a new build is distinguishable
 on-device from the last one.
 
+## iOS
+
+`ios/` is **not** committed — it is generated (Continuous Native Generation)
+from `app.json` and the config plugins, unlike `android/`. Building needs a
+Mac with Xcode 26 (for Liquid Glass) and CocoaPods:
+
+```bash
+npx expo prebuild -p ios --clean   # adds the widget target from targets/widget
+npx expo run:ios                   # or open ios/githuh.xcworkspace
+```
+
+Set `ios.appleTeamId` in `app.json` (or the team in Xcode) before signing —
+the widget and the app share an App Group, which needs a real team. Nothing
+iOS can be compiled on this Linux machine: `npx expo prebuild -p ios
+--no-install` works here and is the check that the widget target, the App
+Group and the entitlements are generated, but the Swift has only ever been
+compiled on a Mac.
+
 ## Build requirements
 
 - **Node 20+.** Node 18 cannot bundle React Native 0.86 — Metro's config
@@ -89,8 +109,8 @@ on-device from the last one.
   `Archive`, `Dots`, plus `Loading` (pin11, shown while the first request is
   in flight), and the pushed pages: `Pull`, `Thread` (issue or discussion),
   `Repo`, `File`, `NewIssue`.
-- **Pushed pages are a stack** (`src/lib/nav.tsx`, rendered at the bottom of
-  `app/index.tsx`). Screens reach it with `useNav()`, which also carries the
+- **Pushed pages are a stack** (`src/lib/nav.tsx`, rendered over the tabs in
+  `app/(tabs)/_layout.tsx`). Screens reach it with `useNav()`, which also carries the
   token, the login and whether this is the demo — do not thread those
   through props. `routeForUrl` turns a github.com link into a page; rendered
   Markdown uses it so links stay in the app.
@@ -112,14 +132,19 @@ on-device from the last one.
   trap below.
 - `src/lib/accounts.ts` — the list of accounts in the keystore; the current
   token is still `tokenStore`.
-- **Navigation is five sections, and it lives in `app/index.tsx`.**
-  `SECTIONS` is the whole map: `today` (you · now · weather · hours),
+- **Navigation is five sections on the native tab bar.** Each section is a
+  route in `app/(tabs)/` (`index` is `today`), all five render
+  `src/shell/SectionScreen.tsx`, and the bar is expo-router's `NativeTabs` in
+  `app/(tabs)/_layout.tsx` — Liquid Glass on iOS 26, Material 3 on Android.
+  **The app's state is not in a screen**: `src/shell/session.tsx`
+  (`SessionProvider`, `useSession`) holds the token, the year, the inbox and
+  the pushed pages above the navigator, and reads which section is open from
+  the path. `src/shell/sections.ts` `SECTIONS` is the whole map: `today` (you · now · weather · hours),
   `inbox` (recent), `work` (pulls · brief · cycle · repos), `year` (weeks ·
   split · languages · years) and `lab` (join the dots), which is where an
   unfinished artefact lives until it earns a place in one of the other four.
-  The bar is `src/components/TabBar.tsx`, the in-section switcher is
-  `src/components/Segments.tsx`, and the thirteen-name scrolling `Rail` they
-  replaced is gone. Apple's HIG is the reference: three to five persistent
+  The in-section switcher is `src/components/Segments.tsx`; the JavaScript
+  `TabBar` and the thirteen-name scrolling `Rail` before it are gone. Apple's HIG is the reference: three to five persistent
   labelled destinations, no drawer, no hamburger, segmented control for views
   of one subject. **Do not add a sixth section**, and do not put an action in
   the bar.
@@ -151,13 +176,18 @@ on-device from the last one.
   from the REST commit-search endpoint — GraphQL has no commit search, and
   `activity.ts` only ever sees the last few days.
 - `src/hooks/useTokenScopes.ts` — reads `x-oauth-scopes` off a REST call and
-  drives the "no repo scope" strip in `app/index.tsx`. See the trap below.
+  drives the "no repo scope" strip in `src/shell/SectionScreen.tsx`. See the trap below.
 - `src/lib/pullDetail.ts` — one pull request in full: GraphQL for the object,
   its comments and its review threads, REST for the file patches (GraphQL's
   `files` connection carries no patch text), plus the unified-diff parser.
 - `src/lib/` — GitHub GraphQL, the `GitHubModel` view model, seeded demo data.
-- `src/theme/index.ts` — every colour, font and radius. Use these tokens; do
-  not invent values in screens.
+- `src/theme/index.ts` — every colour, font and radius, in a day and a night
+  palette. Use these tokens; do not invent values in screens. **Colours are
+  read at render**: `colors.x` is a getter on the palette in force, so a
+  module-level `StyleSheet.create` must be wrapped as `themed(() =>
+  StyleSheet.create({...}))`, and so must any module-level table of colours —
+  otherwise it keeps the palette it was imported under. The root layout
+  remounts the tree under the session when the system scheme changes.
 - `android/app/src/main/java/app/githuh/widget/` — the Glance widget, plus
   the three bitmap renderers it is built from (`TextRenderer`,
   `GlyphRenderer`, `DotFieldRenderer`). It is a travelling commit message and
@@ -170,6 +200,14 @@ on-device from the last one.
   whatever the *last app that ran* wrote, so after an update it paints the old
   payload with the new renderer until the app is opened once — a 3.0 payload
   held 32 weeks, and on a 3.1 card that looked like history cut off.
+- `targets/widget/` — the **iOS widget** (WidgetKit + SwiftUI): `Payload.swift`
+  reads the same JSON the Android widget does out of the App Group
+  `group.app.githuh`, and `DotField.swift` is a rule-for-rule port of
+  `DotFieldRenderer`. `@bacons/apple-targets` links it into the Xcode project
+  at `npx expo prebuild -p ios`; the app writes to it through that package's
+  `ExtensionStorage` (`src/lib/widgetBridge.ts`). WidgetKit cannot animate,
+  so the strip is today's line, still. **Change the field on one platform,
+  change it on the other.**
 - `preview/` — ten of the screens as HTML at 393×852, used to iterate on
   layout in a browser and to build `review.html`. It lags the app.
 - `design/DESIGN.md` — the spec every screen is derived from.

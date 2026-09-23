@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import { Label } from '../components/Type';
-import { colors, fallbacks, fonts } from '../theme';
+import { colors, fallbacks, fonts, themed } from '../theme';
 
 const PITCH = 26;
 const FONT = 13;
@@ -238,40 +238,42 @@ const PLACEHOLDER = [
   'SHIP IT',
 ];
 
-const styles = StyleSheet.create({
-  field: {
-    backgroundColor: colors.klein,
-    flex: 1,
-  },
-  block: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  glyph: {
-    color: colors.onBlack,
-    fontFamily: fonts.sansBold,
-    fontSize: FONT,
-    // Android pads text views by the font's own ascent, which would put every
-    // row a few points below where the wave says it is.
-    includeFontPadding: false,
-    left: 0,
-    lineHeight: FONT * 1.3,
-    position: 'absolute',
-  },
-  caption: {
-    bottom: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    left: 0,
-    paddingBottom: 18,
-    paddingHorizontal: MARGIN,
-    position: 'absolute',
-    right: 0,
-  },
-  captionText: {
-    color: colors.onBlack55,
-  },
-});
+const styles = themed(() =>
+  StyleSheet.create({
+    field: {
+      backgroundColor: colors.klein,
+      flex: 1,
+    },
+    block: {
+      bottom: 0,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+    },
+    glyph: {
+      color: colors.onBlack,
+      fontFamily: fonts.sansBold,
+      fontSize: FONT,
+      // Android pads text views by the font's own ascent, which would put every
+      // row a few points below where the wave says it is.
+      includeFontPadding: false,
+      left: 0,
+      lineHeight: FONT * 1.3,
+      position: 'absolute',
+    },
+    caption: {
+      bottom: 0,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      left: 0,
+      paddingBottom: 18,
+      paddingHorizontal: MARGIN,
+      position: 'absolute',
+      right: 0,
+    },
+    captionText: {
+      color: colors.onBlack55,
+    },
+  }),
+);
