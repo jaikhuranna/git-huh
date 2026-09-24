@@ -12,7 +12,7 @@ one home-screen widget — a Glance widget on Android and a WidgetKit one on
 iOS, drawing the same card from the same payload. It follows the system into
 dark mode.
 
-Since 3.1 it also *acts*, because that is what the lists in
+It also *acts*, because that is what the lists in
 `design/STORIES.md` asked for: an inbox you can put things away in,
 notifications without a server, review and reply, line comments, CI with
 re-run and approvals, repositories with code search, files you can edit into
@@ -143,8 +143,7 @@ compiled on a Mac.
   `inbox` (recent), `work` (pulls · brief · cycle · repos), `year` (weeks ·
   split · languages · years) and `lab` (join the dots), which is where an
   unfinished artefact lives until it earns a place in one of the other four.
-  The in-section switcher is `src/components/Segments.tsx`; the JavaScript
-  `TabBar` and the thirteen-name scrolling `Rail` before it are gone. Apple's HIG is the reference: three to five persistent
+  The in-section switcher is `src/components/Segments.tsx`. Apple's HIG is the reference: three to five persistent
   labelled destinations, no drawer, no hamburger, segmented control for views
   of one subject. **Do not add a sixth section**, and do not put an action in
   the bar.
@@ -219,8 +218,7 @@ and do not run `expo prebuild` without checking what it would overwrite.
 ## Design rules
 
 The app deliberately does **not** use the Nothing design language. No
-dot-matrix typeface, no Nothing red (`#D71921`) **anywhere** — it was the
-widget's today mark until 2.8, and today is a plus now — no
+dot-matrix typeface, no Nothing red (`#D71921`) **anywhere**, no
 grey-paper-plus-dot-grid combination. Type is Instrument Serif (display) + Inter (body) + IBM Plex
 Mono (labels and data). Colour is six categorical brights used to distinguish
 categories, never a single brand accent.
@@ -230,8 +228,7 @@ resolves `nothing-mtui`'s `widgetBg` token against the device's live Material
 You palette. That palette is read natively from
 `android.R.color.system_neutral1_*` and handed to JS over the widget bridge —
 calling `nothingWidgetColors(null, …)` returns the package's static fallback
-and silently stops tracking the wallpaper. The second widget (the pin08 board
-card) was deleted in 2.8; there is one widget now.
+and silently stops tracking the wallpaper.
 
 Dots as texture are allowed only where the source pin is built from them:
 `now` (LED numerals), `dots` (the puzzle), `archive` (circle rows). Everywhere else use that pin's own device — crosses, ribbons,
@@ -296,7 +293,7 @@ count inside one canvas; it goes away if either the custom `fontFamily` or
 the shared canvas is removed. It reproduces on the x86_64 emulator and is
 easy to mistake for an emulator-only fault — the arm64 release build happened
 to survive it. If a screen needs a lot of SVG text in a loaded face, split the
-canvases. (The loading screen no longer uses SVG at all; see below.)
+canvases. (The loading screen uses no SVG; see "Animating from JavaScript".)
 
 ### Animating a widget
 
