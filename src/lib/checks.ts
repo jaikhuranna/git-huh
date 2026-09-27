@@ -146,7 +146,7 @@ export async function fetchLogTail(
   return tailOf(text);
 }
 
-export function tailOf(text: string): LogTail {
+function tailOf(text: string): LogTail {
   const lines = text
     .split('\n')
     .map((line) => line.replace(/^\d{4}-\d\d-\d\dT[\d:.]+Z\s?/, '').replace(/\r$/, ''))
@@ -160,10 +160,6 @@ export function tailOf(text: string): LogTail {
 
 export async function rerunFailed(token: string, repo: string, runId: number) {
   await rest(token, `/repos/${repo}/actions/runs/${runId}/rerun-failed-jobs`, { method: 'POST' });
-}
-
-export async function rerunAll(token: string, repo: string, runId: number) {
-  await rest(token, `/repos/${repo}/actions/runs/${runId}/rerun`, { method: 'POST' });
 }
 
 /** A run from a first-time contributor's fork, held until someone lets it run. */

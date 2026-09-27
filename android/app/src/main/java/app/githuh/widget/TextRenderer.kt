@@ -8,7 +8,7 @@ import android.graphics.Path
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
-import androidx.annotation.FontRes
+import android.util.TypedValue
 import androidx.core.content.res.ResourcesCompat
 import androidx.glance.ImageProvider
 import app.githuh.R
@@ -17,17 +17,11 @@ import kotlin.math.ceil
 import kotlin.math.sin
 
 /**
- * RemoteViews cannot be *handed* a Typeface, so widget text is painted onto a
- * bitmap and given over as an image. Bitmaps are rendered fresh at every
- * recomposition, which lets the colour follow the day/night configuration.
- *
- * The exception is widget A's strip, which has to be a real TextView to move:
- * a layout inflated from this package can name the face in XML, and that path
- * does resolve. Everything static stays a bitmap.
- *
- * Both widgets speak IBM Plex Mono — the board's typewriter voice. The
- * dot-matrix face the 2.0 widgets used is gone along with the rest of the
- * Nothing styling.
+ * RemoteViews cannot be *handed* a Typeface, and a layout inflated into the
+ * launcher's process does not resolve `@font` either, so every word on the
+ * card — the strip included — is painted onto a bitmap in IBM Plex Mono and
+ * given over as an image. Bitmaps are painted fresh at every recomposition,
+ * which lets the ink follow the day/night configuration.
  */
 object TextRenderer {
 
@@ -47,43 +41,37 @@ object TextRenderer {
     /** How much of a gap is left clear at each end of the wave. */
     private const val SQUIGGLE_INSET = 0.12f
 
-    private val cache = HashMap<Int, Typeface>()
+    @Volatile
+    private var face: Typeface? = null
 
     /**
      * A paint for a label painted into another renderer's bitmap — the dot
      * field's "5 wk" over a quiet stretch — in the widget's own mono, at a
      * size in pixels chosen by the caller to suit its grid.
      */
-    fun labelPaint(
-        context: Context,
-        sizePx: Float,
-        color: Int,
-        @FontRes font: Int = R.font.ibmplexmono,
-    ): TextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.typeface = typeface(context, font)
-        this.textSize = sizePx
-        this.color = color
-        this.textAlign = Paint.Align.CENTER
-    }
-
-    @Synchronized
-    private fun typeface(context: Context, @FontRes font: Int): Typeface? =
-        cache.getOrPut(font) {
-            ResourcesCompat.getFont(context, font) ?: Typeface.MONOSPACE
+    fun labelPaint(context: Context, sizePx: Float, color: Int): TextPaint =
+        TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = plexMono(context)
+            textSize = sizePx
+            this.color = color
+            textAlign = Paint.Align.CENTER
         }
 
-    private fun paint(
-        context: Context,
-        sizeSp: Float,
-        color: Int,
-        @FontRes font: Int,
-        letterSpacing: Float,
-    ): TextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.typeface = typeface(context, font)
-        this.textSize = sizeSp * context.resources.displayMetrics.scaledDensity
-        this.color = color
-        this.letterSpacing = letterSpacing
-    }
+    /** Loaded once; a font resource does not change while the process lives. */
+    private fun plexMono(context: Context): Typeface =
+        face ?: (ResourcesCompat.getFont(context, R.font.ibmplexmono) ?: Typeface.MONOSPACE)
+            .also { face = it }
+
+    private fun paint(context: Context, sizeSp: Float, color: Int): TextPaint =
+        TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = plexMono(context)
+            textSize = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP,
+                sizeSp,
+                context.resources.displayMetrics,
+            )
+            this.color = color
+        }
 
     /**
      * The strip's loop, painted as one frame per card-width of it.
@@ -98,8 +86,7 @@ object TextRenderer {
      * on the same sentence forever.
      *
      * It also means a turn is one width rather than the whole cycle, so motion
-     * resumes within seconds of anything that resets the flipper, rather than
-     * within a quarter of a minute.
+     * resumes within seconds of anything that resets the flipper.
      */
     fun strip(
         context: Context,
@@ -108,10 +95,9 @@ object TextRenderer {
         ink: Int,
         faint: Int,
         sizeSp: Float,
-        @FontRes font: Int = R.font.ibmplexmono,
     ): List<Bitmap> {
-        val inkPaint = paint(context, sizeSp, ink, font, 0f)
-        val faintPaint = paint(context, sizeSp, faint, font, 0f)
+        val inkPaint = paint(context, sizeSp, ink)
+        val faintPaint = paint(context, sizeSp, faint)
         val metrics = inkPaint.fontMetrics
         val height = ceil(metrics.descent - metrics.ascent).toInt().coerceAtLeast(1)
 
@@ -261,11 +247,9 @@ object TextRenderer {
         text: String,
         sizeSp: Float,
         color: Int,
-        @FontRes font: Int = R.font.ibmplexmono,
-        letterSpacing: Float = 0f,
         maxWidthDp: Float = 0f,
     ): ImageProvider {
-        val paint = paint(context, sizeSp, color, font, letterSpacing)
+        val paint = paint(context, sizeSp, color)
 
         val drawn = if (maxWidthDp > 0f) {
             val limit = maxWidthDp * context.resources.displayMetrics.density

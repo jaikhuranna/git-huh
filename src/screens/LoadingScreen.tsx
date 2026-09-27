@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import { Label } from '../components/Type';
-import { colors, fallbacks, fonts, themed } from '../theme';
+import { colors, fonts, themed } from '../theme';
 
 const PITCH = 26;
 const FONT = 13;
@@ -23,8 +23,9 @@ const BOTTOM = 58;
 const AMPLITUDE = 0.38;
 /** How far the wave slips between one row and the next. */
 const ROW_SLIP = 0.05;
-/** Seconds for the wave to travel one full cycle. */
+/** One full cycle of the wave. */
 const CYCLE_MS = 5000;
+/** Every glyph is placed on its own, so a long message would flatten the wave. */
 const MAX_GLYPHS = 20;
 /**
  * Rows per message. pin11 reads as a wave because it is one phrase over and
@@ -57,12 +58,11 @@ const PHASES = Array.from({ length: SAMPLES + 1 }, (_, i) => i / SAMPLES);
  * UI thread, so the letters keep sliding at the display's refresh rate even
  * while the first GitHub request is parsing on the JS thread.
  *
- * The two versions before this one both animated from JS: a timer stepping a
- * counter (visibly steppy at ~16 fps), then `requestAnimationFrame` (correct
- * timing, still slow). Both re-rendered the whole field every frame and made
- * react-native-svg re-shape thirty rows of text with it, which no amount of
- * scheduling makes cheap. Plain text views and a transform each cost nothing
- * per frame, because per frame there is nothing left to do.
+ * Driving it from JavaScript — a timer or `requestAnimationFrame` — means
+ * re-rendering the whole field every frame, which no scheduling makes cheap
+ * and which stalls exactly when the first response is being parsed. Plain
+ * text views and a transform cost nothing per frame, because per frame there
+ * is nothing left to do.
  */
 export function LoadingScreen({
   lines,
@@ -105,32 +105,28 @@ export function LoadingScreen({
 
   const source = lines.length > 0 ? lines : PLACEHOLDER;
   const rows = Math.max(1, Math.floor((height - TOP - BOTTOM) / PITCH));
-  const field = useMemo(() => build(source, rows, width), [rows, source, width]);
+  // The interpolations are built with the field, not per render, so a new
+  // caption does not hand the native driver five hundred fresh nodes.
+  const field = useMemo(
+    () =>
+      build(source, rows, width).map((glyph) => ({
+        key: glyph.key,
+        char: glyph.char,
+        place: {
+          top: glyph.top,
+          transform: [
+            { translateX: wave.interpolate({ inputRange: PHASES, outputRange: glyph.track }) },
+          ],
+        },
+      })),
+    [rows, source, wave, width],
+  );
 
   return (
     <View style={styles.field}>
       <Animated.View style={[styles.block, { opacity: enter }]}>
         {field.map((glyph) => (
-          <Animated.Text
-            key={glyph.key}
-            style={[
-              // A font-load failure must still draw readable type, the way
-              // every primitive in Type.tsx does.
-              { fontFamily: fallbacks.sans },
-              styles.glyph,
-              {
-                top: glyph.top,
-                transform: [
-                  {
-                    translateX: wave.interpolate({
-                      inputRange: PHASES,
-                      outputRange: glyph.track,
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
+          <Animated.Text key={glyph.key} style={[styles.glyph, glyph.place]}>
             {glyph.char}
           </Animated.Text>
         ))}
@@ -252,7 +248,7 @@ const styles = themed(() =>
       top: 0,
     },
     glyph: {
-      color: colors.onBlack,
+      color: colors.onKlein,
       fontFamily: fonts.sansBold,
       fontSize: FONT,
       // Android pads text views by the font's own ascent, which would put every
@@ -273,7 +269,7 @@ const styles = themed(() =>
       right: 0,
     },
     captionText: {
-      color: colors.onBlack55,
+      color: colors.onKlein55,
     },
   }),
 );

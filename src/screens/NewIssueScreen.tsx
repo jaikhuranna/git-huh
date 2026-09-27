@@ -18,7 +18,7 @@ import {
 import { useNav } from '../lib/nav';
 import { explain } from '../lib/rest';
 import { createIssue } from '../lib/writes';
-import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
+import { colors, fonts, radii, space, themed } from '../theme';
 
 const BLANK: IssueTemplate = {
   file: '',
@@ -334,7 +334,7 @@ const styles = themed(() =>
       borderRadius: radii.tile,
       borderWidth: 1,
       color: colors.ink,
-      fontFamily: fonts.sans ?? fallbacks.sans,
+      fontFamily: fonts.sans,
       fontSize: 14,
       marginTop: 4,
       paddingHorizontal: 12,
@@ -344,7 +344,7 @@ const styles = themed(() =>
       minHeight: 110,
     },
     code: {
-      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontFamily: fonts.mono,
       fontSize: 12,
     },
     prose: {

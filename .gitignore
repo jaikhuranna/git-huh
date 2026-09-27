@@ -37,9 +37,13 @@ yarn-error.*
 *.tsbuildinfo
 
 # generated native folders. `android/` is NOT ignored: this project has
-# hand-written native code (the two Glance widgets), which `expo prebuild`
-# would regenerate away, so the Android project is committed.
+# hand-written native code (the Glance widget), which `expo prebuild` would
+# regenerate away, so the Android project is committed.
 /ios
+
+# JVM crash logs from Gradle
+hs_err_pid*.log
+replay_pid*.log
 
 # Python bytecode from scripts/
 __pycache__/

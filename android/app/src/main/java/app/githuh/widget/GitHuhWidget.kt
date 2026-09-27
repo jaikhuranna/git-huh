@@ -38,33 +38,20 @@ import app.githuh.MainActivity
 import app.githuh.R
 
 /**
- * Widget A — the Material You one.
+ * The home-screen card: **one of your own commit messages, travelling**, and
+ * the field of the days under it. Nothing else — the counts are on every
+ * screen in the app and are the least interesting thing on a home screen.
  *
- * The surface is not hardcoded. JS resolves nothing-mtui's widgetBg token
- * (neutral1/50 light, neutral1/900 dark) against this device's live palette,
- * read back over the bridge from android.R.color.system_*, and ships both
- * modes in the sync payload. So the card tracks the user's wallpaper the way
- * com.nothing.communitywidgets does.
- *
- * Nothing's red is **not** here any more, and now sits nowhere in the project:
- * today is a plus rather than a coloured square, so the field reads through
- * shape like every other mark on it. Only the surface is still the package's.
- *
- * The card is **one of your own commit messages, travelling**, and the field
- * of the days under it. Nothing else: the counts that used to sit between
- * them — `7 today`, `448 this year · 6 prs` — are on every screen in the app
- * and were the least interesting thing on the home screen.
+ * The surface follows the wallpaper ([WidgetSurface]). Today is a plus rather
+ * than a coloured square, so the field reads through shape like every other
+ * mark on it; there is no accent colour anywhere on the card.
  *
  * The strip travels right to left and carries the repository each line was
  * written in after it, in the faint ink, so a line says where the work was as
  * well as what it was. It runs several of your messages in a loop that starts
  * on screen and never empties; see `res/layout/widget_strip.xml` and
- * `TextRenderer.strip` for what that took.
- *
- * The handle is not a fallback for any of it. A card that printed the pool
- * when it had one and the handle when it did not was showing the handle far
- * more often than intended — an empty sync used to erase the pool — so a
- * card with no line to run simply runs none.
+ * `TextRenderer.strip` for what that took. A card with no line to run simply
+ * runs none — the handle is never a stand-in.
  */
 private const val ROWS = 7
 
@@ -76,11 +63,6 @@ private const val STRIP_SP = 11f
 private val STRIP_HEIGHT = 18.dp
 private val STRIP_GAP = 8.dp
 
-/**
- * Bitmap text cannot be swapped by a ColorProvider, so the ink colour has to
- * be decided while composing. The background still gets a day/night provider
- * so the surface itself flips even without a fresh bitmap.
- */
 /** A reported dp measurement in the pixels the bitmap has to be painted in. */
 private fun Dp.toPx(context: Context): Int =
     (value * context.resources.displayMetrics.density).toInt()
@@ -104,27 +86,25 @@ class GitHuhWidget : GlanceAppWidget() {
 @androidx.compose.runtime.Composable
 private fun Content(state: WidgetState?) {
     val context = LocalContext.current
-    val night = isNight(context)
+    val dark = isNight(context)
 
-    // Read live rather than taken from the payload: the payload's copy is a
-    // snapshot from the last sync, so changing the system colour left the card
-    // on its old background until the app was reopened.
-    val light = Color(NothingMtui.widgetBg(context, dark = false, payload = state?.bgLight))
-    val dark = Color(NothingMtui.widgetBg(context, dark = true, payload = state?.bgDark))
+    val day = Color(WidgetSurface.color(context, night = false))
+    val night = Color(WidgetSurface.color(context, night = true))
 
-    // widgetElements: #000000 in light, #ffffff in dark.
-    val ink = if (night) Color(0xFFFFFFFF) else Color(0xFF000000)
-    val faint = if (night) Color(0x8CFFFFFF) else Color(0x8C000000)
+    // Bitmap text cannot be recoloured by a ColorProvider, so the ink is
+    // decided while composing; the surface still gets a day/night provider,
+    // so it flips with the system even before the next redraw.
+    val ink = if (dark) Color(0xFFFFFFFF) else Color(0xFF000000)
+    val faint = if (dark) Color(0x8CFFFFFF) else Color(0x8C000000)
 
-    // Not Scaffold: it pads the sides and the top and bottom by different
-    // amounts, so the card's border was never the same width twice. One
-    // padding, all four sides, and the background drawn here rather than
+    // Not Scaffold: it pads the sides and the ends by different amounts. One
+    // padding on all four sides, and the background drawn here rather than
     // under someone else's insets.
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .appWidgetBackground()
-            .background(ColorProvider(day = light, night = dark))
+            .background(ColorProvider(day = day, night = night))
             .cornerRadius(android.R.dimen.system_app_widget_background_radius)
             .padding(WIDGET_PADDING)
             .clickable(actionStartActivity(MainActivity::class.java)),

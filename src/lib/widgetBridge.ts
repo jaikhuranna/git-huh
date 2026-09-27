@@ -1,33 +1,26 @@
 import { ExtensionStorage } from '@bacons/apple-targets';
 import { NativeModules, Platform } from 'react-native';
-import { nothingWidgetColors, type MaterialYouPalette } from 'nothing-mtui';
 
 import type { GitHubModel } from './contributions';
 import type { CommitLine } from './messageCache';
 
 /**
- * Widget A's surface comes from nothing-mtui — the token map lifted from
- * com.nothing.communitywidgets. The package is the owner of the *mapping*
- * (widgetBg is neutral1/50 in light, neutral1/900 in dark); the device is the
- * owner of the *palette*, since those tones resolve from the wallpaper and
- * only Android can read them. So JS asks the bridge for the live palette and
- * resolves the tokens against it — passing null, as this used to, silently
- * returns the package's static fallbacks and the widget stops tracking the
- * user's theme entirely.
- *
- * Both modes travel in the payload so the widget can flip with the system
- * theme without another round trip into JS.
+ * The home-screen widget draws from one JSON payload written here: the days
+ * of the year and a pool of your own commit subjects. It carries no colours —
+ * the card's surface follows the wallpaper, so each platform resolves it
+ * where the card is drawn, at the moment it is drawn.
  */
 
 interface WidgetBridge {
   sync(payload: string): Promise<void>;
   clear(): Promise<void>;
-  materialYouPalette(): Promise<MaterialYouPalette | null>;
 }
 
-const bridge = NativeModules.GitHuhWidgetBridge as WidgetBridge | undefined;
-
-const isAvailable = Platform.OS === 'android' && bridge != null;
+/** Android: `WidgetBridgeModule.kt`, which stores the payload and redraws. */
+const bridge =
+  Platform.OS === 'android'
+    ? (NativeModules.GitHuhWidgetBridge as WidgetBridge | undefined)
+    : undefined;
 
 /**
  * iOS has no bridge of ours: the WidgetKit extension in `targets/widget/`
@@ -37,8 +30,28 @@ const isAvailable = Platform.OS === 'android' && bridge != null;
  */
 const APP_GROUP = 'group.app.githuh';
 const PAYLOAD_KEY = 'payload';
-const ios = Platform.OS === 'ios';
-const storage = ios ? new ExtensionStorage(APP_GROUP) : null;
+const storage = Platform.OS === 'ios' ? new ExtensionStorage(APP_GROUP) : null;
+
+/**
+ * The whole message cache travels — it is capped at 40 lines, under 2 KB. The
+ * widget holds one line for a whole day, which only works if it is picking
+ * from the same pool every time the app syncs, not a fresh shuffle of it.
+ */
+const WIDGET_LINES = 40;
+
+/**
+ * Read by `WidgetState.kt` on Android and `Payload.swift` on iOS. `todayCount`
+ * is the calendar's (private work included), for the card's accessibility
+ * label; the card itself prints no numbers.
+ */
+interface Payload {
+  login: string;
+  todayCount: number;
+  /** Every day of the year up to today: `l` its level, `t` whether it is today. */
+  days: { l: number; t: boolean }[];
+  /** Commit subjects: `m` the message, `r` the repository it was written in. */
+  lines: { m: string; r: string }[];
+}
 
 /**
  * Keep the last payload's commit subjects when this one carries none, for the
@@ -46,12 +59,10 @@ const storage = ios ? new ExtensionStorage(APP_GROUP) : null;
  * lands before the pool is read back, and a card with no line is a card
  * with no masthead.
  */
-function withKeptLines(payload: { login: string; lines: unknown[] }): string {
+function withKeptLines(payload: Payload): string {
   if (payload.lines.length === 0 && storage) {
     try {
-      const previous = JSON.parse(storage.get(PAYLOAD_KEY) ?? 'null') as
-        | { login?: string; lines?: unknown[] }
-        | null;
+      const previous = JSON.parse(storage.get(PAYLOAD_KEY) ?? 'null') as Partial<Payload> | null;
       if (previous?.login === payload.login && previous.lines?.length) {
         return JSON.stringify({ ...payload, lines: previous.lines });
       }
@@ -63,43 +74,25 @@ function withKeptLines(payload: { login: string; lines: unknown[] }): string {
 }
 
 /**
- * How many commit subjects travel to the widget as its masthead pool — the
- * whole cache, which is capped at 40 lines and under 2 KB.
- *
- * It used to be a slice of a freshly shuffled pool, so every launch sent the
- * widget a *different sixteen*. The widget holds one line for a whole day, and
- * it can only do that if it is looking at the same pool each time.
- */
-const WIDGET_LINES = 40;
-
-/**
- * Push the latest contribution snapshot to any placed home-screen widgets.
- * The widgets render purely from this state; the app owns all API access.
+ * Push the latest snapshot to any placed home-screen widgets. The widgets
+ * render purely from this; the app owns all API access.
  *
  * `lines` is the same pool of your own commit subjects the loading screen is
- * written in, each with the repository it was written in. Widget A runs one
- * of them across the card as a strip, picked by the date and held for the
- * day, so it says something you wrote rather than repeating your handle back
- * at you.
+ * written in. The widget runs one of them across the card, picked by the date
+ * and held for the day, so it says something you wrote rather than repeating
+ * your handle back at you.
  */
 export async function syncWidget(
   model: GitHubModel,
   lines: readonly CommitLine[] = [],
 ): Promise<void> {
-  if (!isAvailable && !storage) return;
+  if (!bridge && !storage) return;
 
-  /**
-   * Every day of the year, in order, ending on today.
-   *
-   * The widget used to be sent weekday-aligned weeks — seven cells a column,
-   * the ragged first and last weeks padded — because it drew GitHub's own
-   * calendar, with today halfway up the last column and the rest of the week
-   * drawn as days that had not happened. It now draws a run of days whose
-   * last mark is always the bottom-right one, and collapses three weeks or more
-   * of nothing into a wave with its length on it; both need the days as they
-   * happened, with no padding in them. The whole year travels, because once
-   * the silences are folded away there is room on the card for older work.
-   */
+  // The days as they happened, ending on today, with no weekday padding: the
+  // card draws a run of days whose last mark is always the bottom-right one,
+  // and folds three weeks or more of nothing into a wave with its length on
+  // it. The whole year travels, because once the silences are folded away
+  // there is room on the card for older work.
   const flat = model.columns.flat();
   const todayAt = flat.findIndex((day) => day.isToday);
   const days = (todayAt >= 0 ? flat.slice(0, todayAt + 1) : flat).map((day) => ({
@@ -107,39 +100,11 @@ export async function syncWidget(
     t: day.isToday,
   }));
 
-  // Re-read every sync rather than caching: the palette follows the
-  // wallpaper, which the user can change while the app is running. iOS has
-  // no Material You, so it gets nothing-mtui's static tones.
-  const palette =
-    isAvailable && bridge ? await bridge.materialYouPalette().catch(() => null) : null;
-  const light = nothingWidgetColors(palette, 'light');
-  const dark = nothingWidgetColors(palette, 'dark');
-
-  const payload = {
+  const payload: Payload = {
     login: model.login,
-    total: model.total,
     todayCount: model.todayCount,
-    todayCommits: model.todayCommits,
-    totalCommits: model.totalCommits,
-    openPrs: model.openPrs,
-    mtui: {
-      light: {
-        bg: light.widgetBg,
-        elements: light.widgetElements,
-        food: light.widgetFood,
-      },
-      dark: {
-        bg: dark.widgetBg,
-        elements: dark.widgetElements,
-        food: dark.widgetFood,
-      },
-    },
-    /** Legacy flat key, read by widgets installed before 2.0.1. */
-    bg: dark.widgetBg,
     days,
-    lines: lines
-      .slice(0, WIDGET_LINES)
-      .map((line) => ({ m: line.message, r: line.repo })),
+    lines: lines.slice(0, WIDGET_LINES).map((line) => ({ m: line.message, r: line.repo })),
   };
 
   if (storage) {
@@ -147,7 +112,7 @@ export async function syncWidget(
     ExtensionStorage.reloadWidget();
     return;
   }
-  if (bridge) await bridge.sync(JSON.stringify(payload));
+  await bridge?.sync(JSON.stringify(payload));
 }
 
 /** Reset every placed widget to its empty state (called on disconnect). */
@@ -157,5 +122,5 @@ export async function clearWidget(): Promise<void> {
     ExtensionStorage.reloadWidget();
     return;
   }
-  if (isAvailable && bridge) await bridge.clear();
+  await bridge?.clear();
 }

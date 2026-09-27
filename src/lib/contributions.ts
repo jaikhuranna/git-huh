@@ -108,9 +108,6 @@ export interface GitHubModel {
   weeks: number[];
 }
 
-/** Back-compat alias — the type used to be called this everywhere. */
-export type WidgetModel = GitHubModel;
-
 /** Local calendar date as YYYY-MM-DD, matching GitHub's day strings. */
 export function toISODate(date: Date): string {
   const year = date.getFullYear();
@@ -341,38 +338,6 @@ export interface Insights {
 }
 
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-
-/** Totals per weekday over the full year — sunday first. */
-export function weekdayTotals(model: GitHubModel): number[] {
-  const totals = new Array(WEEKDAYS.length).fill(0);
-  for (const day of model.columns.flat()) {
-    totals[new Date(`${day.date}T00:00:00`).getDay()] += day.count;
-  }
-  return totals;
-}
-
-const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-
-export interface MonthBucket {
-  label: string;
-  total: number;
-}
-
-/** Totals per calendar month across the visible year, oldest first. */
-export function monthlyTotals(model: GitHubModel): MonthBucket[] {
-  const byKey = new Map<string, number>();
-  for (const day of model.columns.flat()) {
-    const key = day.date.slice(0, 7); // YYYY-MM
-    byKey.set(key, (byKey.get(key) ?? 0) + day.count);
-  }
-  return [...byKey.entries()]
-    .sort(([a], [b]) => (a < b ? -1 : 1))
-    .slice(-12)
-    .map(([key, total]) => ({
-      label: MONTHS[Number(key.slice(5, 7)) - 1] ?? key,
-      total,
-    }));
-}
 
 /** Streaks, peaks and rhythms derived from the visible window. */
 export function insights(model: GitHubModel): Insights {

@@ -56,15 +56,15 @@ export const demoPullRequests: PullRequest[] = [
     number: 139,
     title: 'fix(widget): today cell timezone drift',
     repo: 'jaikhuranna/git-huh',
-    htmlUrl: 'https://github.com/jaikhuranna/git-huh/pull/142',
+    htmlUrl: 'https://github.com/jaikhuranna/git-huh/pull/139',
     createdAt: '2026-09-14T18:03:00Z',
     draft: false,
   },
   {
     number: 41,
     title: 'docs: release ritual checklist',
-    repo: 'jaikhuranna/nothing-mtui',
-    htmlUrl: 'https://github.com/jaikhuranna/nothing-mtui/pull/41',
+    repo: 'jaikhuranna/paper-tokens',
+    htmlUrl: 'https://github.com/jaikhuranna/paper-tokens/pull/41',
     createdAt: '2026-09-11T09:41:00Z',
     draft: false,
   },
@@ -72,7 +72,7 @@ export const demoPullRequests: PullRequest[] = [
     number: 128,
     title: 'perf: memoize dot matrix columns',
     repo: 'jaikhuranna/git-huh',
-    htmlUrl: 'https://github.com/jaikhuranna/git-huh/pull/142',
+    htmlUrl: 'https://github.com/jaikhuranna/git-huh/pull/128',
     createdAt: '2026-09-08T21:12:00Z',
     draft: true,
   },
@@ -100,7 +100,7 @@ const LANGUAGES = [
 
 const REPO_NAMES = [
   'git-huh',
-  'nothing-mtui',
+  'paper-tokens',
   'dot-tiles',
   'orbit-widget',
   'flux-cli',
@@ -119,7 +119,7 @@ const MONTH_SHAPE = [0.55, 0.5, 0.75, 0.9, 1.05, 1.15, 0.85, 0.7, 1.2, 1.3, 1.0,
 /** Sun=0 .. Sat=6. Wednesday is this demo's clear peak weekday. */
 const WEEKDAY_SHAPE = [0.35, 0.9, 1.0, 1.35, 1.05, 1.15, 0.4];
 
-/** Career-progression curve: quieter early years, busier recently. */
+/** Quieter early years, busier recent ones. */
 function yearActivityBase(yearIndex: number): number {
   return 1.4 + (yearIndex / Math.max(1, YEAR_COUNT - 1)) * 2.6;
 }
@@ -352,9 +352,6 @@ export function demoGitHubModel(now: Date = new Date()): GitHubModel {
   return toGitHubModel(contributions, stats, now);
 }
 
-/** Back-compat alias — the builder used to be called this everywhere. */
-export const demoWidgetModel = demoGitHubModel;
-
 /**
  * Commit timestamps and pull request detail for the demo token. Shaped so
  * the clock has a believable double hump (a working day and a late-evening
@@ -421,7 +418,7 @@ export function demoActivity(): Activity {
   return { commits, pulls };
 }
 
-const DEMO_REPOS = ['git-huh', 'nothing-mtui', 'dot-tiles', 'orbit-widget', 'flux-cli', 'pixel-rain'];
+const DEMO_REPOS = ['git-huh', 'paper-tokens', 'dot-tiles', 'orbit-widget', 'flux-cli', 'pixel-rain'];
 
 const DEMO_MESSAGES = [
   'fix(widget): today cell timezone drift',
@@ -476,9 +473,9 @@ export function demoSocial(): SocialEvent[] {
       kind: 'review-request',
       actor: 'siyakapoor',
       title: 'fix: keystore path on fresh clones',
-      repo: 'nothing-labs/mtui',
+      repo: 'halftone-labs/tokens',
       number: 88,
-      url: 'https://github.com/nothing-labs/mtui/pull/88',
+      url: 'https://github.com/halftone-labs/tokens/pull/88',
       at: hours(11),
       excerpt: 'wants your review',
     },
@@ -487,9 +484,9 @@ export function demoSocial(): SocialEvent[] {
       kind: 'mention',
       actor: 'devonwrites',
       title: 'Widget stops updating after a theme change',
-      repo: 'nothing-labs/mtui',
+      repo: 'halftone-labs/tokens',
       number: 401,
-      url: 'https://github.com/nothing-labs/mtui/issues/401',
+      url: 'https://github.com/halftone-labs/tokens/issues/401',
       at: hours(19),
       excerpt: 'mentioned you',
     },
@@ -849,15 +846,13 @@ export function demoFile(path: string): RepoFile {
   const text = path.endsWith('README.md')
     ? '# git-huh\n\nMake your own GitHub history worth looking at.\n\nThe numbers GitHub already has about you, rendered as printed artefacts\nrather than as a dashboard. Paste a token, read your year.\n\n## Build\n\n    npm install\n    npx expo run:android\n\nTeh widget lives in `android/`.\n'
     : [
-        "import { nothingWidgetColors } from 'nothing-mtui';",
+        "import type { GitHubModel } from './contributions';",
         '',
-        'export function widgetPayload(model: WidgetModel) {',
-        "  const modes = ['light', 'dark'] as const;",
-        '  const colours = modes.map((mode) => nothingWidgetColors(null, mode));',
+        'export function widgetPayload(model: GitHubModel) {',
+        '  const days = model.columns.flat();',
         '  return {',
-        '    days: model.columns.flat().map((day) => day.level),',
+        '    days: days.map((day) => ({ l: day.level, t: day.isToday })),',
         '    today: model.todayCount,',
-        '    colours,',
         '  };',
         '}',
         '',
@@ -872,7 +867,7 @@ export function demoSearch(terms: string): { total: number; hits: CodeHit[] } {
       {
         repo: `${DEMO_LOGIN}/git-huh`,
         path: 'src/lib/widgetBridge.ts',
-        fragments: [`export function widgetPayload(model: WidgetModel) — ${terms}`],
+        fragments: [`export function widgetPayload(model: GitHubModel) — ${terms}`],
       },
       {
         repo: `${DEMO_LOGIN}/git-huh`,
@@ -880,9 +875,9 @@ export function demoSearch(terms: string): { total: number; hits: CodeHit[] } {
         fragments: [`The widget lives in android/ · ${terms}`],
       },
       {
-        repo: `${DEMO_LOGIN}/nothing-mtui`,
+        repo: `${DEMO_LOGIN}/paper-tokens`,
         path: 'src/index.ts',
-        fragments: [`export function nothingWidgetColors(palette, mode) · ${terms}`],
+        fragments: [`export function surfaceColor(palette, mode) · ${terms}`],
       },
     ],
   };

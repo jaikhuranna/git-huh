@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { explain } from '../lib/rest';
-import { colors, fallbacks, fonts, radii, themed } from '../theme';
+import { colors, fonts, radii, themed } from '../theme';
 import { Label, Micro } from './Type';
 
 export interface ComposerAction {
@@ -130,7 +130,7 @@ const styles = themed(() =>
       borderRadius: radii.tile,
       borderWidth: 1,
       color: colors.ink,
-      fontFamily: fonts.sans ?? fallbacks.sans,
+      fontFamily: fonts.sans,
       fontSize: 14,
       lineHeight: 20,
       minHeight: 84,

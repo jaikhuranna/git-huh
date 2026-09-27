@@ -36,7 +36,7 @@ import {
   type CodeHit,
   type RepoInfo,
 } from '../lib/repo';
-import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
+import { colors, fonts, radii, space, themed } from '../theme';
 import { ago, fmt } from './shared';
 
 type Tab = 'code' | 'issues' | 'releases' | 'discussions' | 'security';
@@ -639,7 +639,7 @@ const styles = themed(() =>
       borderWidth: 1,
       color: colors.ink,
       flex: 1,
-      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontFamily: fonts.mono,
       fontSize: 12,
       paddingHorizontal: 14,
       paddingVertical: 8,

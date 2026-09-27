@@ -24,20 +24,9 @@ struct WidgetPayload: Decodable {
         let r: String?
     }
 
-    struct Mode: Decodable {
-        let bg: String?
-    }
-
-    struct Modes: Decodable {
-        let light: Mode?
-        let dark: Mode?
-    }
-
     let login: String
     let days: [Day]
     let lines: [Line]?
-    let mtui: Modes?
-    let bg: String?
 
     static func read() -> WidgetPayload? {
         guard
@@ -48,28 +37,26 @@ struct WidgetPayload: Decodable {
         return try? JSONDecoder().decode(WidgetPayload.self, from: data)
     }
 
-    /// Today's line, held for the whole day. The pick hashes the day against
-    /// each message and takes the highest, so it does not depend on the order
-    /// the app happened to shuffle the pool into — the same rule as Android.
+    /// Today's line, held from local midnight to local midnight. The pick
+    /// hashes the day against each message and takes the highest, so it does
+    /// not depend on the order the app happened to shuffle the pool into —
+    /// the same rule as Android's `WidgetState.lineOfTheDay`.
     func lineOfTheDay(now: Date) -> Line? {
-        let day = Int64(floor(now.timeIntervalSince1970 / 86_400))
+        let local = now.timeIntervalSince1970 + Double(TimeZone.current.secondsFromGMT(for: now))
+        let day = Int64(floor(local / 86_400))
         return (lines ?? [])
             .filter { !$0.m.trimmingCharacters(in: .whitespaces).isEmpty }
             .max { seed(day: day, line: $0.m) < seed(day: day, line: $1.m) }
     }
+}
 
-    /// The card's background for a scheme: nothing-mtui's widgetBg as the app
-    /// resolved it, or the package's own fallback.
-    func background(dark: Bool) -> Color {
-        let hex = dark ? (mtui?.dark?.bg ?? bg) : (mtui?.light?.bg ?? bg)
-        return Color(hex: hex) ?? WidgetPayload.fallback(dark: dark)
-    }
-
-    static func fallback(dark: Bool) -> Color {
-        dark
-            ? Color(red: 0x1B / 255, green: 0x1B / 255, blue: 0x19 / 255)
-            : Color(red: 0xF4 / 255, green: 0xF0 / 255, blue: 0xEA / 255)
-    }
+/// The card's surface. Android draws on the wallpaper's Material You neutral
+/// (tone 50 by day, 900 at night); iOS has no such palette, so it uses the
+/// fixed tones Android falls back to before Android 12 (`WidgetSurface.kt`).
+func widgetSurface(dark: Bool) -> Color {
+    dark
+        ? Color(red: 0x1B / 255, green: 0x1B / 255, blue: 0x1B / 255)
+        : Color(red: 0xE5 / 255, green: 0xE5 / 255, blue: 0xE5 / 255)
 }
 
 /// FNV-1a 64, started from the day rather than the standard basis.
@@ -79,20 +66,4 @@ private func seed(day: Int64, line: String) -> Int64 {
         hash = (hash ^ Int64(unit)) &* 1_099_511_628_211
     }
     return hash
-}
-
-extension Color {
-    /// `#rrggbb`, or nil for anything else.
-    init?(hex: String?) {
-        guard var text = hex?.trimmingCharacters(in: .whitespaces), !text.isEmpty else {
-            return nil
-        }
-        if text.hasPrefix("#") { text.removeFirst() }
-        guard text.count == 6, let value = UInt64(text, radix: 16) else { return nil }
-        self.init(
-            red: Double((value >> 16) & 0xFF) / 255,
-            green: Double((value >> 8) & 0xFF) / 255,
-            blue: Double(value & 0xFF) / 255
-        )
-    }
 }

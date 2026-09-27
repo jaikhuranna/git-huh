@@ -1,5 +1,5 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, G, Line, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Rect } from 'react-native-svg';
 
 import { LanguageChip } from '../components/LanguageChip';
 import { Label, Title } from '../components/Type';

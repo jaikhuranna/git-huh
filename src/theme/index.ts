@@ -67,6 +67,13 @@ const light = {
    * one surface — the loading screen — where it is the whole canvas.
    */
   klein: '#1A50D5',
+  /**
+   * Type on `klein`. The field is the same blue at night, so unlike `onBlack`
+   * these do not invert with the scheme — pin11 is white on ultramarine in
+   * both.
+   */
+  onKlein: '#F4F2ED',
+  onKlein55: 'rgba(244,242,237,0.55)',
 
   /** pin10 rain chart: steel for the "before" column, olive for "after". */
   steel: '#5E86A3',
@@ -117,10 +124,6 @@ export type Scheme = 'light' | 'dark';
 let scheme: Scheme = Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
 /** Bumped on every change of scheme, so `themed` styles know to rebuild. */
 let version = 0;
-
-export function currentScheme(): Scheme {
-  return scheme;
-}
 
 /**
  * Called by the root layout with the system's scheme before anything below it
@@ -190,16 +193,6 @@ export const fonts = {
   /** pin03's typewriter index, pin08's ~names, pin09's IBM caption. */
   mono: 'IBMPlexMono_400Regular',
   monoMedium: 'IBMPlexMono_500Medium',
-} as const;
-
-/**
- * Platform faces to fall back on if a Google font fails to load — the app
- * must still render readable type rather than a blank screen.
- */
-export const fallbacks = {
-  serif: 'serif',
-  sans: 'sans-serif',
-  mono: 'monospace',
 } as const;
 
 export const type = {

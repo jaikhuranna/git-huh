@@ -7,6 +7,9 @@ import { prAge, type PullRequest } from '../lib/prs';
 import type { PrsState } from '../hooks/useOpenPrs';
 import { colors, space, themed } from '../theme';
 
+/** One empty list for every render without data, so memos keyed on it hold. */
+const NO_PRS: PullRequest[] = [];
+
 type Filter = 'open' | 'draft';
 
 /** How far each folder, and each card inside it, steps right. */
@@ -48,7 +51,7 @@ export function IndexScreen({
   const [drawer, setDrawer] = useState({ width: 0, height: 0 });
   const [stack, setStack] = useState(0);
 
-  const all = state.status === 'ready' ? state.prs : [];
+  const all = state.status === 'ready' ? state.prs : NO_PRS;
   const rows = useMemo(
     () => all.filter((pr) => (filter === 'open' ? !pr.draft : pr.draft)),
     [all, filter],

@@ -26,7 +26,7 @@ import { loadMarks, stateOf } from './triage';
  * open is not repeated.
  */
 
-export const TASK = 'githuh-inbox-check';
+const TASK = 'githuh-inbox-check';
 const CHANNEL = 'inbox';
 const SETTINGS_KEY = 'notify-settings';
 /** One launch's worth of notifications; past this they are summed up. */
@@ -109,7 +109,7 @@ function phrase(event: SocialEvent): string {
 }
 
 /** One pass: read the feed, post what is new, remember it. Returns how many were posted. */
-export async function checkInbox(): Promise<number> {
+async function checkInbox(): Promise<number> {
   const settings = await readSettings();
   if (!settings.enabled) return 0;
   const token = await tokenStore.get();

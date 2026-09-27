@@ -60,9 +60,7 @@ struct GitHuhWidgetView: View {
 
     var body: some View {
         content
-            .containerBackground(for: .widget) {
-                entry.payload?.background(dark: dark) ?? WidgetPayload.fallback(dark: dark)
-            }
+            .containerBackground(for: .widget) { widgetSurface(dark: dark) }
             .widgetURL(URL(string: "githuh://"))
     }
 

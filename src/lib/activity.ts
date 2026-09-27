@@ -426,11 +426,6 @@ export function lastCommitAt(
   return latest;
 }
 
-/** Every commit message, newest first. */
-export function commitMessages(commits: CommitSample[]): string[] {
-  return commits.map((commit) => commit.message).filter((m) => m.trim().length > 0);
-}
-
 /**
  * `count` messages spread evenly across the whole history rather than taken
  * off the top, so the loading screen shows work from all over time instead of

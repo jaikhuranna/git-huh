@@ -17,7 +17,7 @@ import {
 import { demoChecks, demoLog, demoPending } from '../lib/demo';
 import { useNav } from '../lib/nav';
 import { explain } from '../lib/rest';
-import { colors, fallbacks, fonts, radii, themed } from '../theme';
+import { colors, fonts, radii, themed } from '../theme';
 import { Data, Label, Micro } from './Type';
 
 const TONE = themed<Record<CheckTone, string>>(() => ({
@@ -369,7 +369,7 @@ const styles = themed(() =>
     },
     tailLine: {
       color: colors.ink70,
-      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontFamily: fonts.mono,
       fontSize: 9,
       lineHeight: 13,
     },

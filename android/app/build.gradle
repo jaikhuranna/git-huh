@@ -105,7 +105,9 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-        // Dev-only release signing; replace with a managed keystore for production.
+        // Release signing comes from ~/.gradle/gradle.properties (GITHUH_UPLOAD_*),
+        // never from this repository. Without it a release build falls back to
+        // the debug key, which is enough for a sideloaded build.
         release {
             if (project.hasProperty('GITHUH_UPLOAD_STORE_FILE')) {
                 storeFile file(GITHUH_UPLOAD_STORE_FILE)

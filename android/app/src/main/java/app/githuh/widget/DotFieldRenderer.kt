@@ -16,36 +16,32 @@ import kotlin.math.sin
 /**
  * The contribution field, painted as one bitmap.
  *
- * It used to be a Glance `Column` of `Row`s of weighted `Box`es, and that
- * layout could not produce a square grid — the pitch came out two and a half
- * times wider than tall, and a launcher that over-reported its height lost the
- * last rows altogether. One bitmap has neither problem: the pitch is equal in
- * both axes by construction, and `ContentScale.Fit` scales it uniformly. It is
- * painted **at the shape of the box it is going into**, the only way the field
- * lines up with the strip above it.
+ * Not a Glance layout of rows of weighted boxes: that cannot produce a square
+ * grid, and a launcher that over-reports its height loses the last rows. In
+ * one bitmap the pitch is equal in both axes by construction, and
+ * `ContentScale.Fit` scales it uniformly. It is painted **at the shape of the
+ * box it is going into**, the only way the field lines up with the strip
+ * above it.
  *
  * Three rules decide what goes where, and all are about reading the card from
  * across a room:
  *
  * 1. **The newest day is the bottom-right mark.** Days run down each column
  *    and then on to the next, oldest top-left, so the last mark on the card is
- *    today — always the same corner, whatever weekday it is. The field used to
- *    keep GitHub's weekday rows, which put today halfway up the last column
- *    with the rest of the week drawn as empty days that had not happened yet.
+ *    today — always the same corner, whatever weekday it is, and never a
+ *    column of days that have not happened yet.
  *
  * 2. **A long quiet stretch is a wave, not a wall of empty dots.** Three weeks
  *    or more without a contribution is drawn as the app's hand-drawn rule with
  *    its length written over it — `5 wk`, `4 mo` — and the columns it would have
  *    taken go to days that had something in them. A year with one busy spring
- *    used to be a card of ghost dots with the spring pushed off the left edge;
- *    now the spring is on the card and the silence is one honest line.
+ *    shows the spring, and the silence after it is one honest line.
  *
  * 3. **A silence starts and ends as empty days before it becomes a wave.** Each
  *    side of the wave keeps one whole column of the stretch's own empty days,
  *    and the newer side finishes the column its marks stopped in first.
- *    Without that a wave sat straight against the last commit with a
- *    half-empty column beside it, and work that stopped read like work that
- *    was cut off.
+ *    Otherwise a wave sits straight against the last commit with a half-empty
+ *    column beside it, and work that stopped reads like work that was cut off.
  */
 object DotFieldRenderer {
 
@@ -109,11 +105,13 @@ object DotFieldRenderer {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        // One rect for every peak mark in this bitmap; cards can render
+        // concurrently, so it belongs to the call rather than to the object.
+        val box = RectF()
 
         // Laid out from the right edge leftwards, newest piece first. Nothing
-        // after today is drawn: a payload written before 3.1 pads today's week
-        // out to seven days, and those blanks would otherwise sit in the
-        // corner that belongs to today until the app next syncs.
+        // after today is drawn, whatever the payload holds: that corner is
+        // today's.
         val end = days.indexOfLast { it.isToday }
         val history = if (end >= 0) days.subList(0, end + 1) else days
 
@@ -127,7 +125,7 @@ object DotFieldRenderer {
             if (k >= capacity) break
             when (slot) {
                 is Day -> {
-                    mark(canvas, paint, slot.day, ink, cx(k), cy(k), cell)
+                    mark(canvas, paint, box, slot.day, ink, cx(k), cy(k), cell)
                     k++
                 }
                 is Quiet -> {
@@ -140,7 +138,7 @@ object DotFieldRenderer {
                         // silence's own empty days.
                         val blank = WidgetState.DayCell(level = 0, isToday = false)
                         while (k < capacity) {
-                            mark(canvas, paint, blank, ink, cx(k), cy(k), cell)
+                            mark(canvas, paint, box, blank, ink, cx(k), cy(k), cell)
                             k++
                         }
                         break
@@ -155,8 +153,8 @@ object DotFieldRenderer {
         }
 
         // Whatever is left is before the history the app sent — an account
-        // younger than the card. Drawn as the grid's ghost, as it always was,
-        // so it reads as "no days here" rather than as a hole.
+        // younger than the card. Drawn as the grid's ghost, so it reads as "no
+        // days here" rather than as a hole.
         paint.color = withAlpha(ink, emptyAlpha)
         while (k < capacity) {
             canvas.drawCircle(cx(k), cy(k), cell * SCALES[0] / 2f, paint)
@@ -219,16 +217,16 @@ object DotFieldRenderer {
     private fun mark(
         canvas: Canvas,
         paint: Paint,
+        box: RectF,
         day: WidgetState.DayCell,
         ink: Int,
         cx: Float,
         cy: Float,
         cell: Float,
     ) {
-        // Today is a plus. It used to be the one red mark in the whole
-        // project, and a single accent colour is the one thing this app's
-        // language does not do — so today reads through shape, in the same
-        // ink as every other day.
+        // Today is a plus: a single accent colour is the one thing this app's
+        // language does not do, so today reads through shape, in the same ink
+        // as every other day.
         if (day.isToday) {
             paint.color = withAlpha(ink, 1f)
             plus(canvas, paint, cx, cy, cell)
@@ -240,7 +238,7 @@ object DotFieldRenderer {
         // A peak day squares off, so intensity is legible in the mark's shape
         // as well as in its size.
         if (level >= 4) {
-            val box = RectF(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
+            box.set(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
             canvas.drawRoundRect(box, size * 0.22f, size * 0.22f, paint)
         } else {
             canvas.drawCircle(cx, cy, size / 2f, paint)

@@ -23,7 +23,7 @@ import { useNav } from '../lib/nav';
 import { parsePatch, type PullComment, type PullDetailFull } from '../lib/pullDetail';
 import { explain } from '../lib/rest';
 import { addComment, commentOnLine, submitReview } from '../lib/writes';
-import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
+import { colors, fonts, radii, space, themed } from '../theme';
 import { ago, fmt } from './shared';
 
 type Tab = 'brief' | 'talk' | 'diff' | 'checks';
@@ -458,7 +458,7 @@ const styles = themed(() =>
       borderRadius: radii.pill,
       borderWidth: 1,
       color: colors.ink,
-      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontFamily: fonts.mono,
       fontSize: 12,
       marginBottom: 10,
       paddingHorizontal: 14,

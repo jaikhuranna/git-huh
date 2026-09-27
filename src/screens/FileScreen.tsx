@@ -19,7 +19,7 @@ import { useNav } from '../lib/nav';
 import { explain } from '../lib/rest';
 import { fetchFile, type RepoFile } from '../lib/repo';
 import { commitDirect, encodePath, proposeChange, type ProposalResult } from '../lib/writes';
-import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
+import { colors, fonts, radii, space, themed } from '../theme';
 
 /** IBM Plex Mono at 11pt, measured — the width of one column of code. */
 const CHAR = 6.62;
@@ -403,7 +403,7 @@ const styles = themed(() =>
       borderWidth: 1,
       color: colors.ink,
       flex: 1,
-      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontFamily: fonts.mono,
       fontSize: 12,
       paddingHorizontal: 14,
       paddingVertical: 7,
@@ -441,7 +441,7 @@ const styles = themed(() =>
     },
     code: {
       color: colors.ink,
-      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontFamily: fonts.mono,
       fontSize: 11,
       lineHeight: 15,
     },
@@ -459,7 +459,7 @@ const styles = themed(() =>
       borderRadius: radii.tile,
       borderWidth: 1,
       color: colors.ink,
-      fontFamily: fonts.mono ?? fallbacks.mono,
+      fontFamily: fonts.mono,
       fontSize: 11,
       lineHeight: 16,
       minHeight: 280,
@@ -482,7 +482,7 @@ const styles = themed(() =>
       borderRadius: radii.tile,
       borderWidth: 1,
       color: colors.ink,
-      fontFamily: fonts.sans ?? fallbacks.sans,
+      fontFamily: fonts.sans,
       fontSize: 14,
       paddingHorizontal: 12,
       paddingVertical: 9,

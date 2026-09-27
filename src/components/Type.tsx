@@ -1,14 +1,14 @@
-import { Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
+import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
 
-import { colors, fallbacks, fonts, type } from '../theme';
+import { colors, fonts, themed, type } from '../theme';
 
 /**
  * The three voices of the board: a display serif (pin04's "Hey,"), a
  * grotesque (pin02's headings and pin07's thin numerals) and a typewriter
  * mono (pin03's index, pin08's ~names, pin09's caption).
  *
- * Every primitive falls back to a platform face, so a failed font download
- * degrades to readable type instead of a blank screen.
+ * A face that failed to load falls back to the platform's own, so a failed
+ * download degrades to readable type rather than a blank screen.
  */
 
 /**
@@ -17,62 +17,36 @@ import { colors, fallbacks, fonts, type } from '../theme';
  */
 type Props = Omit<TextProps, 'style'> & { style?: StyleProp<TextStyle> };
 
-/** `base` is a function so the colour is read at render, in the scheme in force. */
-function make(base: () => TextStyle, fallback: string) {
+/** One primitive per voice, reading its sheet at render so it follows the scheme. */
+function make(voice: keyof typeof voices) {
   return function Voice({ style, ...rest }: Props) {
-    return <Text {...rest} style={[{ fontFamily: fallback }, base(), style]} />;
+    return <Text {...rest} style={[voices[voice], style]} />;
   };
 }
 
 /** pin04 — greetings, hero words, pin10's year labels. */
-export const Display = make(
-  () => ({ ...type.display, color: colors.ink }),
-  fallbacks.serif,
-);
-
-export const DisplaySm = make(
-  () => ({ ...type.displaySm, color: colors.ink }),
-  fallbacks.serif,
-);
-
-export const Serif = make(
-  () => ({ fontFamily: fonts.serif, fontSize: 15, lineHeight: 20, color: colors.ink }),
-  fallbacks.serif,
-);
-
-export const Title = make(
-  () => ({ ...type.title, color: colors.ink }),
-  fallbacks.sans,
-);
-
-export const Heading = make(
-  () => ({ ...type.heading, color: colors.ink }),
-  fallbacks.sans,
-);
-
-export const Body = make(
-  () => ({ ...type.body, color: colors.ink }),
-  fallbacks.sans,
-);
-
+export const Display = make('display');
+export const Serif = make('serif');
+export const Title = make('title');
+export const Heading = make('heading');
+export const Body = make('body');
 /** pin07's 54°F lockup — Inter ExtraLight at poster scale. */
-export const Numeral = make(
-  () => ({ ...type.numeral, color: colors.ink }),
-  fallbacks.sans,
-);
-
+export const Numeral = make('numeral');
 /** Small mono caps-ish label — the app's connective tissue. */
-export const Label = make(
-  () => ({ ...type.label, color: colors.ink40 }),
-  fallbacks.mono,
-);
+export const Label = make('label');
+export const Data = make('data');
+export const Micro = make('micro');
 
-export const Data = make(
-  () => ({ ...type.data, color: colors.ink }),
-  fallbacks.mono,
-);
-
-export const Micro = make(
-  () => ({ ...type.micro, color: colors.ink40 }),
-  fallbacks.mono,
+const voices = themed(() =>
+  StyleSheet.create({
+    display: { ...type.display, color: colors.ink },
+    serif: { fontFamily: fonts.serif, fontSize: 15, lineHeight: 20, color: colors.ink },
+    title: { ...type.title, color: colors.ink },
+    heading: { ...type.heading, color: colors.ink },
+    body: { ...type.body, color: colors.ink },
+    numeral: { ...type.numeral, color: colors.ink },
+    label: { ...type.label, color: colors.ink40 },
+    data: { ...type.data, color: colors.ink },
+    micro: { ...type.micro, color: colors.ink40 },
+  }),
 );

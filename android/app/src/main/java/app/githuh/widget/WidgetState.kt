@@ -3,30 +3,23 @@ package app.githuh.widget
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.TimeZone
 
 /**
- * Contribution snapshot shared between the React Native app and the Glance
- * widget. Written by the JS side (via WidgetBridgeModule), read at every
- * widget recomposition. Days are stored column-major, seven rows per week.
+ * What the app last synced, read at every recomposition. Written by the JS
+ * side through [WidgetBridgeModule]; the shape is `syncWidget`'s payload in
+ * `src/lib/widgetBridge.ts`, which the iOS widget reads too.
  */
 data class WidgetState(
     val login: String,
-    val total: Int,
     val todayCount: Int,
-    val todayCommits: Int,
-    val totalCommits: Int,
-    val openPrs: Int,
-    /** nothing-mtui widgetBg, resolved JS-side against the live Material
-     *  You palette — one hex per mode, so the widget can flip with the
-     *  system theme without a second round trip to JS. */
-    val bgLight: String,
-    val bgDark: String,
+    /** Every day of the year up to today, oldest first, with no weekday padding. */
     val days: List<DayCell>,
     /**
      * A pool of the account's own commit subjects, shared with the loading
-     * screen, each with the repository it was written in. The widget runs one
-     * of them across the card instead of a logo and a handle — the handle is
-     * the one thing on a home screen its owner already knows.
+     * screen, each with the repository it was written in. The card runs them
+     * across its top instead of a logo and a handle — the handle is the one
+     * thing on a home screen its owner already knows.
      */
     val lines: List<Line>,
 ) {
@@ -36,26 +29,24 @@ data class WidgetState(
     data class Line(val message: String, val repo: String)
 
     /**
-     * Today's line. Stable for the whole day — a widget that reshuffled its
-     * own headline at every recomposition would be a distraction rather than
-     * a thing to glance at.
+     * Today's line, stable for the whole day — a card that reshuffled its own
+     * headline at every recomposition would be a distraction rather than a
+     * thing to glance at.
      *
      * The pick hashes the day against each *message* and takes the highest,
-     * rather than indexing the list. The app shuffles the pool on every
-     * launch, so an index pointed at a different commit each time the app was
-     * opened, which is not what "held for the day" was supposed to mean.
-     *
-     * Length is no longer part of the pick. The strip travels, so a subject
-     * too long for the card is read rather than clipped — which is the whole
-     * reason it moves.
+     * rather than indexing the list: the app shuffles the pool on every
+     * launch, and an index would point at a different commit each time.
      */
-    fun lineOfTheDay(now: Long = System.currentTimeMillis()): Line? =
-        lines.maxByOrNull { seed(now / 86_400_000L, it.message) }
+    fun lineOfTheDay(now: Long = System.currentTimeMillis()): Line? {
+        // Days are counted from local midnight, so the line turns over when
+        // the owner's day does rather than at midnight in Greenwich.
+        val day = (now + TimeZone.getDefault().getOffset(now)) / DAY_MS
+        return lines.maxByOrNull { seed(day, it.message) }
+    }
 
     /**
      * The whole pool, turned so that today's line comes first. The strip runs
-     * several of them in a loop rather than the same one over and over, and
-     * which ones they are still moves with the date.
+     * several of them in a loop, and which ones still moves with the date.
      */
     fun linesFromToday(now: Long = System.currentTimeMillis()): List<Line> {
         val first = lineOfTheDay(now) ?: return emptyList()
@@ -66,6 +57,7 @@ data class WidgetState(
     companion object {
         private const val PREFS = "git_huh_widget"
         private const val KEY_PAYLOAD = "payload"
+        private const val DAY_MS = 86_400_000L
 
         fun read(context: Context): WidgetState? {
             val raw = context
@@ -81,8 +73,8 @@ data class WidgetState(
          * The pool is read back off the device while the year is still being
          * fetched, so a sync routinely lands before it — and an account whose
          * commit search is rate-limited has nothing to send at all. Dropping
-         * the lines in either case left the card with no masthead every time
-         * the app was opened. Only carried across for the same account:
+         * the lines in either case would leave the card with no masthead every
+         * time the app was opened. Only carried across for the same account:
          * someone else's commits are not your masthead.
          */
         fun write(context: Context, payload: String) {
@@ -97,13 +89,7 @@ data class WidgetState(
                     .orEmpty()
                 if (kept.isNotEmpty()) {
                     val array = JSONArray()
-                    for (line in kept) {
-                        array.put(
-                            JSONObject()
-                                .put("m", line.message)
-                                .put("r", line.repo),
-                        )
-                    }
+                    for (line in kept) array.put(JSONObject().put("m", line.message).put("r", line.repo))
                     json.put("lines", array)
                 }
             }
@@ -122,58 +108,24 @@ data class WidgetState(
             val daysJson = json.getJSONArray("days")
             val days = List(daysJson.length()) { index ->
                 val day = daysJson.getJSONObject(index)
-                DayCell(
-                    level = day.getInt("l").coerceIn(0, 4),
-                    isToday = day.getBoolean("t"),
-                )
+                DayCell(level = day.getInt("l").coerceIn(0, 4), isToday = day.getBoolean("t"))
             }
-            // Old payloads only ever carried a flat "bg" (dark card only).
-            // New payloads carry both modes under "mtui"; fall back to "bg"
-            // for whichever side is missing so an old JS bundle can't crash
-            // a freshly-updated native widget.
-            val legacyBg = json.optString("bg", "#000000")
-            val mtui = json.optJSONObject("mtui")
-            val bgLight = mtui?.optJSONObject("light")?.optString("bg")
-                ?.takeIf { it.isNotBlank() } ?: legacyBg
-            val bgDark = mtui?.optJSONObject("dark")?.optString("bg")
-                ?.takeIf { it.isNotBlank() } ?: legacyBg
             return WidgetState(
                 login = json.getString("login"),
-                total = json.getInt("total"),
-                todayCount = json.getInt("todayCount"),
-                todayCommits = json.optInt("todayCommits", json.getInt("todayCount")),
-                totalCommits = json.optInt("totalCommits", json.getInt("total")),
-                openPrs = json.optInt("openPrs", 0),
-                bgLight = bgLight,
-                bgDark = bgDark,
+                todayCount = json.optInt("todayCount", 0),
                 days = days,
-                // Absent in payloads written before 2.5; the card then goes
-                // without a masthead until the app syncs again.
                 lines = linesOf(json),
             )
         }
 
-        /**
-         * The commit subjects in a payload, if it has any.
-         *
-         * Payloads written before 2.7 hold bare strings with no repository to
-         * print; they are still perfectly good lines, so they read back with
-         * an empty one rather than being thrown away.
-         */
+        /** The commit subjects in a payload, if it has any. */
         private fun linesOf(json: JSONObject): List<Line> {
             val array = json.optJSONArray("lines") ?: return emptyList()
             return buildList {
                 for (index in 0 until array.length()) {
-                    val entry = array.opt(index)
-                    val line = when (entry) {
-                        is JSONObject -> Line(
-                            message = entry.optString("m"),
-                            repo = entry.optString("r"),
-                        )
-                        is String -> Line(message = entry, repo = "")
-                        else -> null
-                    }
-                    line?.takeIf { it.message.isNotBlank() }?.let(::add)
+                    val entry = array.optJSONObject(index) ?: continue
+                    val line = Line(message = entry.optString("m"), repo = entry.optString("r"))
+                    if (line.message.isNotBlank()) add(line)
                 }
             }
         }
@@ -182,7 +134,8 @@ data class WidgetState(
 
 /**
  * FNV-1a 64, started from the day rather than the standard basis: a pick of
- * one line out of a pool that does not depend on the pool's order.
+ * one line out of a pool that does not depend on the pool's order. The iOS
+ * widget's `seed` in Payload.swift is the same function.
  */
 private const val FNV_BASIS = -3750763034362895579L
 private const val FNV_PRIME = 1099511628211L

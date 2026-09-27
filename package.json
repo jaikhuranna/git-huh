@@ -20,7 +20,6 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "expo-task-manager": "~57.0.0",
-    "nothing-mtui": "github:jaikhuranna/nothing-mtui",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",

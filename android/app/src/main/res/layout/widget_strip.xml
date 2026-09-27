@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Widget A's travelling line, and the one piece of either widget that is not
+  The widget's travelling line, and the one piece of the card that is not
   laid out by Glance — a bitmap on its own cannot move.
 
   It is a ViewFlipper rather than a marquee TextView because a marquee cannot
@@ -11,7 +11,7 @@
   package's own resources, and stops when the screen goes off.
 
   The children are ImageViews rather than TextViews for the same reason every
-  other word on these widgets is a bitmap: a layout inflated into the
+  other word on the card is a bitmap: a layout inflated into the
   launcher's process does not resolve `@font`, and a strip in the launcher's
   own sans is not this app's voice. Their width is set to the painted line's
   width at bind time (`setViewLayoutWidth`), which is what lets the animation

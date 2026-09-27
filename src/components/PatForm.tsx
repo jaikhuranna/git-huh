@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GitHubError, verifyToken } from '../lib/github';
 import { DEMO_TOKEN } from '../lib/token';
-import { colors, fallbacks, fonts, radii, space, themed } from '../theme';
+import { colors, fonts, radii, space, themed } from '../theme';
 
 import { CrossField } from './CrossField';
 import { Body, Display, Label, Serif } from './Type';
@@ -240,6 +240,3 @@ const styles = themed(() =>
     },
   }),
 );
-
-/** Kept next to the input so the fallback family is discoverable here. */
-PatForm.monoFallback = fallbacks.mono;

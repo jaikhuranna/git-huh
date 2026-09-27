@@ -13,8 +13,8 @@ import { executeQuery } from './github';
  * comment and review connections gives the same feed from the scopes the
  * token already has, with the text attached.
  *
- * Nothing here pushes an Android notification — it is a list you read inside
- * the app.
+ * The same feed drives the background check in `notify.ts`, which is how the
+ * app notifies without a server.
  */
 
 const MINE = 15;
@@ -333,17 +333,4 @@ export function filterEvents(
 ): SocialEvent[] {
   const kinds = IN_FILTER[filter];
   return events.filter((event) => kinds.includes(event.kind));
-}
-
-/** How many events each filter would show, for the chip counts. */
-export function filterCounts(
-  events: SocialEvent[],
-): Record<SocialFilter, number> {
-  return SOCIAL_FILTERS.reduce(
-    (counts, filter) => {
-      counts[filter] = filterEvents(events, filter).length;
-      return counts;
-    },
-    {} as Record<SocialFilter, number>,
-  );
 }
