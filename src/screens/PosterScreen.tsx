@@ -1,10 +1,11 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { Label } from '../components/Type';
 import { Wordmark } from '../components/Wordmark';
 import type { GitHubModel } from '../lib/contributions';
+import { howLong, howLongMonths, quietRuns, wavePath, weekOfYear } from '../lib/quiet';
 import { colors, fonts, radii, themed } from '../theme';
 import { fmt, hash } from './shared';
 
@@ -25,11 +26,48 @@ const MONTH_NAMES = [
   'dec',
 ];
 
-interface Series {
+export interface Series {
   values: number[];
   /** Calendar month each column belongs to, for the axis. */
   months: number[];
   unit: 'week' | 'month';
+  /**
+   * Columns that have happened. The rest of this calendar year is zero
+   * because it is the future, and the future is not a silence.
+   */
+  until: number;
+}
+
+/** The poster's columns for one year: its own weeks, else its months, else the trailing window. */
+export function seriesFor(model: GitHubModel, year: number, now: Date = new Date()): Series {
+  const current = year === now.getFullYear();
+  const entry = model.years.find((candidate) => candidate.year === year);
+  if (entry && entry.weeks.length > 0) {
+    return {
+      values: entry.weeks,
+      months: entry.weekMonths,
+      unit: 'week',
+      until: current ? Math.min(entry.weeks.length, weekOfYear(now) + 1) : entry.weeks.length,
+    };
+  }
+  if (entry && entry.months.some((count) => count > 0)) {
+    return {
+      values: entry.months,
+      months: entry.months.map((_, index) => index),
+      unit: 'month',
+      until: current ? now.getMonth() + 1 : 12,
+    };
+  }
+  // No per-year calendar came back (a zeroed stats query): the trailing
+  // window is all there is, and it is at least this year's shape.
+  return {
+    values: model.weeks,
+    months: model.weeks.map((_, index) =>
+      Math.min(11, Math.floor((index / Math.max(1, model.weeks.length)) * 12)),
+    ),
+    unit: 'week',
+    until: model.weeks.length,
+  };
 }
 
 /**
@@ -55,28 +93,7 @@ export function PosterScreen({ model }: { model: GitHubModel }) {
   );
   const active = year ?? years[0] ?? new Date().getFullYear();
 
-  const series = useMemo<Series>(() => {
-    const entry = model.years.find((candidate) => candidate.year === active);
-    if (entry && entry.weeks.length > 0) {
-      return { values: entry.weeks, months: entry.weekMonths, unit: 'week' };
-    }
-    if (entry && entry.months.some((count) => count > 0)) {
-      return {
-        values: entry.months,
-        months: entry.months.map((_, index) => index),
-        unit: 'month',
-      };
-    }
-    // No per-year calendar came back (a zeroed stats query): the trailing
-    // window is all there is, and it is at least this year's shape.
-    return {
-      values: model.weeks,
-      months: model.weeks.map((_, index) =>
-        Math.min(11, Math.floor((index / Math.max(1, model.weeks.length)) * 12)),
-      ),
-      unit: 'week',
-    };
-  }, [active, model.weeks, model.years]);
+  const series = useMemo<Series>(() => seriesFor(model, active), [active, model]);
 
   const total = series.values.reduce((sum, value) => sum + value, 0);
   const peak = Math.max(1, ...series.values);
@@ -147,7 +164,7 @@ export function PosterScreen({ model }: { model: GitHubModel }) {
  * punctuate. A month rule runs under the baseline so a column can be placed
  * in the year without counting.
  */
-function PixelRain({
+export function PixelRain({
   series,
   width,
   height,
@@ -158,7 +175,7 @@ function PixelRain({
   height: number;
   peak: number;
 }) {
-  const { values, months } = series;
+  const { values, months, until, unit } = series;
   const count = Math.max(values.length, 1);
   const pitch = width / count;
   const cell = Math.max(3, Math.min(10, pitch - 1));
@@ -199,9 +216,52 @@ function PixelRain({
     }
   });
 
+  // A month or more of nothing is bridged with the app's wave, sitting on
+  // the baseline where the columns would have stood, with its length over it.
+  const silences = quietRuns(values, unit === 'week' ? 4 : 3, until).map((run) => {
+    const x1 = run.start * pitch + pitch * 0.2;
+    const x2 = (run.end + 1) * pitch - pitch * 0.2;
+    const length = run.end - run.start + 1;
+    return {
+      key: run.start,
+      d: wavePath(x1, x2, height - 7, 2.4, 11),
+      x: (x1 + x2) / 2,
+      label: unit === 'week' ? howLong(length * 7) : howLongMonths(length),
+      // The columns above a silence are empty, so its length always has room.
+      roomy: true,
+    };
+  });
+
   return (
     <>
       {squares}
+      {silences.map((silence) => (
+        <Path
+          d={silence.d}
+          fill="none"
+          key={`w${silence.key}`}
+          opacity={0.5}
+          stroke={colors.ink}
+          strokeLinecap="round"
+          strokeWidth={1.25}
+        />
+      ))}
+      {silences.map((silence) =>
+        silence.roomy ? (
+          <SvgText
+            fill={colors.ink}
+            fontFamily={fonts.mono}
+            fontSize={9}
+            key={`t${silence.key}`}
+            opacity={0.65}
+            textAnchor="middle"
+            x={silence.x}
+            y={height - 16}
+          >
+            {silence.label}
+          </SvgText>
+        ) : null,
+      )}
       <Line
         opacity={0.35}
         stroke={colors.ink}

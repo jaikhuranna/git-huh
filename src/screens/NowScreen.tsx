@@ -1,10 +1,11 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Line, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { LanguageChip } from '../components/LanguageChip';
 import { Label, Title } from '../components/Type';
 import { insights, type GitHubModel } from '../lib/contributions';
-import { colors, radii, themed } from '../theme';
+import { howLong, quietRuns, wavePath } from '../lib/quiet';
+import { colors, fonts, radii, themed } from '../theme';
 import { fmt, Page } from './shared';
 
 /**
@@ -215,18 +216,57 @@ function Dock({ model, size }: { model: GitHubModel; size: number }) {
   );
 }
 
-/** The pin's black ruler strip: the last thirty days as tick heights. */
+/**
+ * The pin's black ruler strip: the last thirty days as tick heights. A week
+ * or more of nothing is one wave across the strip instead of a row of stubs.
+ */
 function Ruler({ model, width }: { model: GitHubModel; width: number }) {
   const days = model.columns.flat().slice(-30);
   const height = 62;
   const step = width / days.length;
   const peak = Math.max(1, ...days.map((day) => day.count));
+  // Today is never part of a silence: it is not over yet.
+  const silences = quietRuns(
+    days.map((day) => day.count),
+    7,
+    days.length - 1,
+  );
+  const silent = (index: number) =>
+    silences.some((run) => index >= run.start && index <= run.end);
 
   return (
     <View style={styles.ruler}>
       <Svg height={height} width={width}>
         <Rect fill={colors.black} height={height} rx={radii.tile} width={width} />
+        {silences.map((run) => (
+          <Path
+            d={wavePath(run.start * step + step * 0.3, (run.end + 1) * step - step * 0.3, height - 20, 2.4, 11)}
+            fill="none"
+            key={`w${run.start}`}
+            opacity={0.6}
+            stroke={colors.onBlack}
+            strokeLinecap="round"
+            strokeWidth={1.25}
+          />
+        ))}
+        {silences.map((run) =>
+          (run.end - run.start + 1) * step >= 40 ? (
+            <SvgText
+              fill={colors.onBlack}
+              fontFamily={fonts.mono}
+              fontSize={9}
+              key={`t${run.start}`}
+              opacity={0.7}
+              textAnchor="middle"
+              x={((run.start + run.end + 1) / 2) * step}
+              y={height - 30}
+            >
+              {howLong(run.end - run.start + 1)}
+            </SvgText>
+          ) : null,
+        )}
         {days.map((day, index) => {
+          if (silent(index)) return null;
           const tick = 8 + (day.count / peak) * 32;
           const x = index * step + step / 2;
           return (

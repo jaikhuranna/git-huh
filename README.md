@@ -45,8 +45,11 @@ It also does the things that usually end with "I'll do it on the laptop":
   notification. Nothing is pushed from anywhere.
 - **Offline.** Every screen draws the last answer it saved, marked with its
   age, before the network replies.
-- **Several accounts**, and a **demo** with generated data if you want to look
-  before pasting a token.
+- **Several accounts**, switched from the avatar in the corner, and added up
+  into one year if your work is split between a work login and your own.
+- **Share a chart** as a 4:3 image, drawn for a timeline rather than cropped
+  from the phone.
+- A **demo** with generated data if you want to look before pasting a token.
 
 The widget is the dot field and a line from your own history, travelling
 across the card: no counts, no badges, today marked with a plus in the corner.

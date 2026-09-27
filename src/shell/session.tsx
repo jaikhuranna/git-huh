@@ -16,12 +16,14 @@ import { useActivity, type ActivityState } from '../hooks/useActivity';
 import { useContributions, type ContributionsState } from '../hooks/useContributions';
 import { useOpenPrs } from '../hooks/useOpenPrs';
 import { useSocial, type SocialState } from '../hooks/useSocial';
+import { useTogether } from '../hooks/useTogether';
 import { useTokenScopes } from '../hooks/useTokenScopes';
 import { useTriage } from '../hooks/useTriage';
 import { accountStore, type Account } from '../lib/accounts';
 import { EMPTY_ACTIVITY, spreadMessages, type Activity } from '../lib/activity';
 import { fetchCommitLines } from '../lib/commitLines';
 import type { GitHubModel } from '../lib/contributions';
+import { DEFAULT_HOME, readHome, type HomeSettings } from '../lib/home';
 import {
   cacheLines,
   clearCachedLines,
@@ -33,6 +35,7 @@ import {
 import { routeForUrl, type Nav, type Route } from '../lib/nav';
 import { markSeen } from '../lib/notify';
 import type { SocialEvent } from '../lib/social';
+import { readSaved, writeSaved } from '../lib/store';
 import { stateOf, type Marks } from '../lib/triage';
 import { DEMO_TOKEN, tokenStore } from '../lib/token';
 import { clearWidget, syncWidget } from '../lib/widgetBridge';
@@ -46,11 +49,28 @@ const POOL_SIZE = 40;
 
 const INBOX = SECTIONS.findIndex((section) => section.key === 'inbox');
 
+const TOGETHER_KEY = 'accounts-together';
+const HOME_KEY = 'home-settings';
+
 export interface Session {
   token: TokenState;
   setToken: (token: string | null) => void;
   contributions: ContributionsState & { reload: () => void };
+  /**
+   * The year every chart draws: the account in use, summed with any others
+   * ticked to be shown together. `contributions` is the account in use alone.
+   */
   model: GitHubModel | null;
+  /** Lowercase logins of the other accounts summed into `model`. */
+  together: string[];
+  toggleTogether: (login: string) => void;
+  /** Ticked accounts that could not be read, and so are not in the sum. */
+  missing: string[];
+  /** What the `you` page lists under the greeting. */
+  home: HomeSettings;
+  setHome: (next: HomeSettings) => void;
+  /** Forget an account that is not the one in use. */
+  forget: (login: string) => Promise<void>;
   scopes: ReturnType<typeof useTokenScopes>;
   prs: ReturnType<typeof useOpenPrs>;
   social: SocialState;
@@ -123,8 +143,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const contributions = useContributions(token ?? null);
   const scopes = useTokenScopes(token ?? null);
-  const model = contributions.status === 'ready' ? contributions.model : null;
-  const login = model?.login ?? null;
+  const own = contributions.status === 'ready' ? contributions.model : null;
+  const login = own?.login ?? null;
   const prs = useOpenPrs(token ?? null, login, section === 'work');
   // The inbox is the reason to open the app, so it is fetched as soon as we
   // know who you are and kept whichever section is open: the count on the
@@ -140,8 +160,61 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     login,
     section === 'work' || view === 'weather' || view === 'clock',
   );
-  const activity =
+  const ownActivity =
     activityState.status === 'ready' ? activityState.activity : EMPTY_ACTIVITY;
+
+  // Accounts ticked to be shown together with the one in use. Kept as logins,
+  // so a refreshed token for the same account stays ticked.
+  const [together, setTogether] = useState<string[]>([]);
+  useEffect(() => {
+    readSaved<string[]>(TOGETHER_KEY)
+      .then((saved) => {
+        if (Array.isArray(saved?.value)) setTogether(saved.value);
+      })
+      .catch(() => {});
+  }, []);
+  const toggleTogether = useCallback((name: string) => {
+    const lower = name.toLowerCase();
+    setTogether((current) => {
+      const next = current.includes(lower)
+        ? current.filter((item) => item !== lower)
+        : [...current, lower];
+      writeSaved(TOGETHER_KEY, next).catch(() => {});
+      return next;
+    });
+  }, []);
+  const others = useMemo(
+    () =>
+      token === DEMO_TOKEN || !login
+        ? []
+        : accounts.filter(
+            (account) =>
+              account.login.toLowerCase() !== login.toLowerCase() &&
+              together.includes(account.login.toLowerCase()),
+          ),
+    [accounts, login, token, together],
+  );
+  const summed = useTogether(
+    own,
+    ownActivity,
+    others,
+    section === 'work' || view === 'weather' || view === 'clock',
+  );
+  const model = summed.model;
+  const activity = summed.activity;
+
+  const [home, setHomeState] = useState<HomeSettings>(DEFAULT_HOME);
+  useEffect(() => {
+    readSaved<unknown>(HOME_KEY)
+      .then((saved) => {
+        if (saved) setHomeState(readHome(saved.value));
+      })
+      .catch(() => {});
+  }, []);
+  const setHome = useCallback((next: HomeSettings) => {
+    setHomeState(next);
+    writeSaved(HOME_KEY, next).catch(() => {});
+  }, []);
 
   const goToTab = useCallback(
     (index: number) => router.navigate(hrefOf(index)),
@@ -370,6 +443,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setTokenState(null);
   }, [accounts, login, resetSession, switchTo, token]);
 
+  const forget = useCallback(
+    async (name: string) => {
+      if (login && name.toLowerCase() === login.toLowerCase()) return;
+      setAccounts(await accountStore.remove(name));
+    },
+    [login],
+  );
+
   const wanting = useMemo(() => wantsYou(social, triage.marks), [social, triage.marks]);
 
   const value = useMemo<Session>(
@@ -378,6 +459,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setToken,
       contributions,
       model,
+      together,
+      toggleTogether,
+      missing: summed.missing,
+      home,
+      setHome,
+      forget,
       scopes,
       prs,
       social,
@@ -403,8 +490,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activityState,
       contributions,
       disconnect,
+      forget,
       goToPage,
       goToTab,
+      home,
       model,
       nav,
       openEvent,
@@ -412,11 +501,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       prs,
       said,
       scopes,
+      setHome,
       setToken,
       social,
       stack,
+      summed.missing,
       switchTo,
       tab,
+      together,
+      toggleTogether,
       token,
       triage,
       wanting,

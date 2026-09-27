@@ -2,7 +2,7 @@
   "expo": {
     "name": "git-huh?",
     "slug": "git-huh",
-    "version": "0.0.1-alpha",
+    "version": "0.0.2-alpha",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "githuh",
@@ -30,7 +30,8 @@
       "expo-router",
       "expo-secure-store",
       "expo-font",
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "expo-sharing"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",

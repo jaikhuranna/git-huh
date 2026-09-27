@@ -126,7 +126,9 @@ compiled on a Mac.
   `Inbox`, `Index`, `Brief`, `Review`, `Cards`, `Poster`, `Flow`, `Orbit`,
   `Archive`, `Dots`, plus `Loading` (pin11, shown while the first request is
   in flight), and the pushed pages: `Pull`, `Thread` (issue or discussion),
-  `Repo`, `File`, `NewIssue`.
+  `Repo`, `File`, `NewIssue`, `Account` (behind the avatar in every section's
+  top-right corner: accounts, which are added together, notifications, what
+  the `you` page lists) and `Share` (a view as a 4:3 image).
 - **Pushed pages are a stack** (`src/lib/nav.tsx`, rendered over the tabs in
   `app/(tabs)/_layout.tsx`). Screens reach it with `useNav()`, which also carries the
   token, the login and whether this is the demo — do not thread those
@@ -149,7 +151,27 @@ compiled on a Mac.
   ~15 min, Android decides) and its local notifications. See the entry-file
   trap below.
 - `src/lib/accounts.ts` — the list of accounts in the keystore; the current
-  token is still `tokenStore`.
+  token is still `tokenStore`. **Accounts ticked `together`** on the account
+  page are summed into the one in use: `src/hooks/useTogether.ts` loads each
+  one's year with its own token and `src/lib/merge.ts` adds them up. The
+  session's `model` (what every chart draws) is that sum; `contributions` is
+  still the account in use alone, and so are the inbox, the pull requests,
+  `login`, `nav.token` and every write — only that token can act. Show a
+  handle with `handleOf(model)`, never `~${model.login}`, or a summed year is
+  labelled with one account's name.
+- `src/lib/home.ts` — what the `you` page lists under the greeting (pull
+  request comments by default), a filter over the inbox's own feed. The menu
+  of kinds is `HOME_BLOCKS`; the choice is saved as `home-settings`.
+- `src/lib/quiet.ts` — **every chart's long silences.** Past a threshold, an
+  empty run is bridged with the app's wave and its length (`quietRuns`,
+  `wavePath`), or folded out of a field the way the widget does (`foldField`,
+  `placeField`, used by `CrossField`). A new chart over time should use it;
+  pass `until` so the unfinished part of this year is not drawn as a silence.
+- `src/components/ShareCard.tsx` + `src/screens/ShareScreen.tsx` — a chart
+  as a 640 × 480 card, captured at 1600 × 1200 (react-native-view-shot) and
+  handed to the share sheet (expo-sharing). Cards are composed for the
+  frame, not scaled screens; the caps that keep any account inside it are in
+  `src/lib/shareData.ts`, which also says which view shares as which card.
 - **Navigation is five sections on the native tab bar.** Each section is a
   route in `app/(tabs)/` (`index` is `today`), all five render
   `src/shell/SectionScreen.tsx`, and the bar is expo-router's `NativeTabs` in

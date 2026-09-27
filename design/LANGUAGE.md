@@ -258,7 +258,11 @@ Nothing in the bar ever pushes.
 - **Bars are ink on paper, not gradients.** Fills are solid; intensity is
   opacity (`levels.alpha`) or size (`levels.scale`), never hue.
 - **A gap in the data is drawn as a gap** — a baseline tick, not a missing
-  bar and not a zero.
+  bar and not a zero. **A long gap is a wave**: past a threshold each chart
+  sets (a month of weeks, three months, a week of days), the empty stretch is
+  bridged with the app's hand-drawn wave, its length written over it where
+  there is room (`6 wk`, `4 mo`). `lib/quiet.ts` holds the rule; the widget
+  was first.
 
 ## 9. Writing
 

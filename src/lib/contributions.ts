@@ -78,6 +78,11 @@ export interface YearSummary {
 
 export interface GitHubModel {
   login: string;
+  /**
+   * Every login summed into this model, when it is several accounts shown
+   * as one (`merge.ts`). Absent on a single account's own model.
+   */
+  accounts?: string[];
   name: string;
   avatarUrl: string;
   bio: string;
@@ -106,6 +111,12 @@ export interface GitHubModel {
   years: YearSummary[];
   /** Weekly totals across the visible year, oldest first. */
   weeks: number[];
+}
+
+/** `~jai`, or `~jai + ~work` for several accounts shown as one. */
+export function handleOf(model: Pick<GitHubModel, 'login' | 'accounts'>): string {
+  const logins = model.accounts && model.accounts.length > 1 ? model.accounts : [model.login];
+  return logins.map((login) => `~${login.toLowerCase()}`).join(' + ');
 }
 
 /** Local calendar date as YYYY-MM-DD, matching GitHub's day strings. */

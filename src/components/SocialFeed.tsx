@@ -252,7 +252,7 @@ function markOf(event: SocialEvent): Mark {
   }
 }
 
-function FeedRow({
+export function FeedRow({
   event,
   onOpen,
 }: {

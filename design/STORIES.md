@@ -50,7 +50,8 @@ one keeps those endings inside.
 4. **I want to know when I actually work**, because I suspect it is later than
    I say it is. → `hours`, the only screen built on real commit timestamps.
 5. **I want my own name and my own year on the front page**, not a feed of
-   other people's repositories. → `you`.
+   other people's repositories. → `you`. And to post it without cropping a
+   screenshot: `share`, top right on any chart, makes it a 4:3 image.
 
 ### inbox — *what wants me*
 
@@ -65,7 +66,7 @@ one keeps those endings inside.
 8a. **I want to put a row away and have it come back if it matters.** Swipe
    left for `done`, right for `snooze` until nine; a new comment on the
    thread brings it back. → `inbox`.
-8b. **I want to be told, even with the app shut.** → notifications on `you`.
+8b. **I want to be told, even with the app shut.** → notifications, on the account page (the avatar, top right).
 9. **I want to know the difference between "nobody said anything" and "GitHub
    would not tell us".** Two different facts, two different lines.
    → `inbox` empty and error states.
@@ -127,13 +128,15 @@ one keeps those endings inside.
 
 22. **I want to paste a token once and never see a login again.** Stored in the
     keystore, restored on launch, never sent anywhere but GitHub. And a
-    second one beside it, for the work account. → `you` → accounts.
+    second one beside it, for the work account — and both **added up**, because
+    neither profile alone is what I did. → the avatar, top right → accounts,
+    `together`.
 23. **I want to be told when my token is the reason the numbers are wrong.** A
     PAT without `repo` returns a smaller, valid, wrong year and GitHub reports
     no error; the strip under the masthead names it and links to a token that
     has the scope.
 24. **I want to try it before I hand it a token.** → `try the demo`.
-25. **I want one button that erases it.** → `disconnect`, on `you`, which also
+25. **I want one button that erases it.** → `disconnect`, on the account page, which also
     clears the widget and the message pool.
 
 ---
@@ -230,7 +233,7 @@ is mostly *yes*, because this list is the brief the app was built to.
 | 9 | my own contribution history, properly | the profile graph is the thing people screenshot, and mobile shows the least of it | **yes** — most of the app |
 | 10 | a widget that works on my phone | glanceable counts without unlocking anything | **yes** |
 | 11 | releases, discussions, issue forms, security alerts in-app | feature parity with the site | **yes** — the repository screen; issue *forms* render as fields |
-| 12 | multiple accounts and org switching | work and personal on one phone | **yes** — accounts on `you`; orgs come with whichever account can see them |
+| 12 | multiple accounts and org switching | work and personal on one phone | **yes** — accounts behind the avatar, top right, and ticked ones added up on every chart; orgs come with whichever account can see them |
 | 13 | fast cold start, no repeated sign-in | a tool you open twenty times a day | **yes** — a warm launch draws the saved year before any request lands |
 | 14 | honest numbers | a number that quietly omits private work is worse than no number | **yes** |
 | 15 | organise the inbox — swipe actions, folders | people ask for Spark-style swipes and custom notification folders by name | **yes** — swipe left `done`, right `snooze`; `snoozed` and `done` folders; anything written on again comes back |

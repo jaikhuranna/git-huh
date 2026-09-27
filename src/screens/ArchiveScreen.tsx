@@ -1,8 +1,9 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Line, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { Serif } from '../components/Type';
 import type { GitHubModel, YearSummary } from '../lib/contributions';
+import { howLongMonths, quietRuns, wavePath } from '../lib/quiet';
 import { colors, fonts, themed } from '../theme';
 import { fmt, Page, ScreenHead } from './shared';
 
@@ -11,7 +12,9 @@ const ROW_HEIGHT = 44;
 /**
  * pin10 — the Valentine's Day rainfall chart. One row per year, circles
  * sized by monthly volume, a single vertical line carrying today's date back
- * through every year, and paired before/after bars down the right.
+ * through every year, and paired before/after bars down the right. Three
+ * months or more without a circle is bridged with the app's wave, so a quiet
+ * season reads as one stretch rather than as circles that failed to draw.
  */
 export function ArchiveScreen({ model }: { model: GitHubModel }) {
   const { width } = useWindowDimensions();
@@ -47,7 +50,9 @@ export function ArchiveScreen({ model }: { model: GitHubModel }) {
       <View style={styles.heads}>
         <Serif style={styles.headYear}>Contribution Year</Serif>
         <Serif style={styles.headToday}>Today</Serif>
-        <Serif style={styles.headSplit}>before · after</Serif>
+        <Serif numberOfLines={1} style={styles.headSplit}>
+          before · after
+        </Serif>
       </View>
 
       <Svg height={chartHeight} width={chartWidth}>
@@ -102,6 +107,10 @@ function Row({
   const median = [...year.months].sort((a, b) => a - b)[6] ?? 0;
   const step = (monthsWidth - 34) / 12;
 
+  const now = new Date();
+  const until = year.year === now.getFullYear() ? now.getMonth() + 1 : 12;
+  const silences = year.year > now.getFullYear() ? [] : quietRuns(year.months, 3, until);
+
   const beforeW = (year.beforeToday / peakSplit) * (barsWidth * 0.46);
   const afterW = (year.afterToday / peakSplit) * (barsWidth * 0.46);
 
@@ -143,6 +152,37 @@ function Row({
           />
         );
       })}
+
+      {silences.map((run) => {
+        const x1 = 28 + run.start * step + step * 0.3;
+        const x2 = 28 + (run.end + 1) * step - step * 0.3;
+        return (
+          <Path
+            d={wavePath(x1, x2, mid, 2, 9)}
+            fill="none"
+            key={`w${run.start}`}
+            opacity={0.45}
+            stroke={colors.ink}
+            strokeLinecap="round"
+            strokeWidth={1.1}
+          />
+        );
+      })}
+      {silences.map((run) =>
+        (run.end - run.start + 1) * step >= 34 ? (
+          <SvgText
+            fill={colors.ink70}
+            fontFamily={fonts.mono}
+            fontSize={7}
+            key={`t${run.start}`}
+            textAnchor="middle"
+            x={28 + ((run.start + run.end + 1) / 2) * step}
+            y={mid - 7}
+          >
+            {howLongMonths(run.end - run.start + 1)}
+          </SvgText>
+        ) : null,
+      )}
 
       <Rect
         fill={highlighted ? colors.rain : colors.steel}
@@ -198,6 +238,8 @@ const styles = themed(() =>
       fontSize: 12,
     },
     headSplit: {
+      flexShrink: 0,
+      paddingRight: 2,
       color: colors.ink70,
       fontFamily: fonts.serifItalic,
       fontSize: 12,

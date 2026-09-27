@@ -9,12 +9,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '../components/Avatar';
 import { TOKEN_SETTINGS_URL } from '../components/PatForm';
 import { Segments } from '../components/Segments';
 import { Label } from '../components/Type';
 import { Wordmark } from '../components/Wordmark';
+import { shareKindOf } from '../lib/shareData';
 import { savedAge } from '../lib/store';
-import { DEMO_TOKEN } from '../lib/token';
 import { ArchiveScreen as ArchiveView } from '../screens/ArchiveScreen';
 import { BriefScreen as BriefView } from '../screens/BriefScreen';
 import { CardsScreen as CardsView } from '../screens/CardsScreen';
@@ -29,7 +30,7 @@ import { OrbitScreen as OrbitView } from '../screens/OrbitScreen';
 import { PosterScreen as PosterView } from '../screens/PosterScreen';
 import { ReviewScreen as ReviewView } from '../screens/ReviewScreen';
 import { WeatherScreen as WeatherView } from '../screens/WeatherScreen';
-import { colors, space, themed } from '../theme';
+import { colors, radii, space, themed } from '../theme';
 import { SECTIONS, type ScreenName, type SectionView } from './sections';
 import { useSession } from './session';
 
@@ -161,23 +162,24 @@ export function SectionScreen({ index }: { index: number }) {
     social,
     stack,
     tab,
-    token,
     triage,
   } = session;
   const section = SECTIONS[index];
   const loadingActivity = activityState.status === 'loading';
 
-  const { switchTo, goToPage } = session;
+  const { goToPage, goToTab } = session;
   const openPull = useCallback(
     (pr: { repo: string; number: number }) =>
       nav.open({ kind: 'pull', repo: pr.repo, number: pr.number }),
     [nav],
   );
-  const addAccount = useCallback(() => nav.open({ kind: 'add-account' }), [nav]);
-  const switchAccount = useCallback(
-    (account: { token: string }) => switchTo(account.token),
-    [switchTo],
+  const openAccount = useCallback(() => nav.open({ kind: 'account' }), [nav]);
+  const openInbox = useCallback(
+    () => goToTab(SECTIONS.findIndex((candidate) => candidate.key === 'inbox')),
+    [goToTab],
   );
+  const view = section.views[pages[index]]?.name ?? section.views[0].name;
+  const shareable = shareKindOf(view) != null;
   const onPage = useCallback((page: number) => goToPage(index, page), [goToPage, index]);
 
   const render = (name: ScreenName, live: boolean) => {
@@ -186,12 +188,12 @@ export function SectionScreen({ index }: { index: number }) {
       case 'hey':
         return (
           <HeyScreen
-            accounts={session.accounts}
-            demo={token === DEMO_TOKEN}
+            home={session.home}
             model={model}
-            onAdd={addAccount}
-            onDisconnect={session.disconnect}
-            onSwitch={switchAccount}
+            onInbox={openInbox}
+            onOpen={session.openEvent}
+            onSettings={openAccount}
+            social={social}
           />
         );
       case 'now':
@@ -231,13 +233,44 @@ export function SectionScreen({ index }: { index: number }) {
     <SafeAreaView edges={['top']} style={styles.screen}>
       <View style={styles.chrome}>
         <Wordmark size={20} />
-        <Label style={styles.handle}>
-          {contributions.status === 'ready' && contributions.offline && contributions.savedAt != null
-            ? `offline · saved ${savedAge(contributions.savedAt)}`
-            : model
-              ? `~${model.login.toLowerCase()}`
-              : ''}
-        </Label>
+        <View style={styles.corner}>
+          {contributions.status === 'ready' &&
+            contributions.offline &&
+            contributions.savedAt != null && (
+              <Label numberOfLines={1} style={styles.handle}>
+                offline · {savedAge(contributions.savedAt)}
+              </Label>
+            )}
+          {shareable && model && (
+            <Pressable
+              accessibilityLabel="share this view as an image"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => nav.open({ kind: 'share', view })}
+              style={styles.share}
+            >
+              <Label style={styles.shareLabel}>share</Label>
+            </Pressable>
+          )}
+          {model && (
+            <Pressable
+              accessibilityLabel="account, notifications and settings"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={openAccount}
+              style={styles.avatars}
+            >
+              {(model.accounts ?? [model.login]).slice(0, 3).map((login, position) => (
+                <Avatar
+                  key={login}
+                  login={login}
+                  size={28}
+                  style={position > 0 ? styles.stacked : undefined}
+                />
+              ))}
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {session.scopes === 'limited' && <ScopeNotice />}
@@ -263,15 +296,38 @@ const styles = themed(() =>
       flex: 1,
     },
     chrome: {
-      alignItems: 'baseline',
+      alignItems: 'center',
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingBottom: 10,
+      paddingBottom: 8,
       paddingHorizontal: space.gutter,
-      paddingTop: 14,
+      paddingTop: 10,
+    },
+    corner: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      flexShrink: 1,
+      gap: 10,
     },
     handle: {
       color: colors.ink40,
+      flexShrink: 1,
+    },
+    share: {
+      borderColor: colors.hair,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 11,
+      paddingVertical: 5,
+    },
+    shareLabel: {
+      color: colors.ink,
+    },
+    avatars: {
+      flexDirection: 'row',
+    },
+    stacked: {
+      marginLeft: -9,
     },
     notice: {
       alignItems: 'center',

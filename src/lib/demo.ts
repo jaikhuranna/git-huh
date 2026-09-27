@@ -307,12 +307,32 @@ function sumDays(weeks: ContributionWeek[]): number {
   return weeks.flatMap((week) => week.contributionDays).reduce((sum, day) => sum + day.contributionCount, 0);
 }
 
-/** Deterministic fake profile that exercises every screen — no empty arrays, no zeros. */
+/**
+ * Two honest silences, so the demo shows the wave every chart draws over a
+ * long stretch of nothing (`lib/quiet.ts`): six weeks off this spring, and a
+ * summer away three years ago.
+ */
+function injectQuiet(map: Map<string, number>, now: Date, startYear: number): void {
+  const clear = (from: Date, days: number) => {
+    const day = new Date(from);
+    for (let i = 0; i < days; i++) {
+      map.set(toISODate(day), 0);
+      day.setDate(day.getDate() + 1);
+    }
+  };
+  const spring = new Date(now);
+  spring.setDate(spring.getDate() - 190);
+  clear(spring, 44);
+  clear(new Date(startYear + 2, 5, 1), 122);
+}
+
+/** Deterministic fake profile that exercises every screen — no empty arrays, and two long silences for the wave. */
 export function demoGitHubModel(now: Date = new Date()): GitHubModel {
   const random = rng(20260917);
 
   const { map, startYear } = buildDailyMap(now, random);
   injectStreaks(map, now, random);
+  injectQuiet(map, now, startYear);
 
   const repos = demoRepos(now, random);
   const weeks = rollingWeeks(map, now);

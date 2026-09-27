@@ -1,8 +1,11 @@
 import { createContext, useContext } from 'react';
 
+import type { ScreenName } from '../shell/sections';
+
 /**
  * Everything that opens *over* the sections: a pull request, an issue or a
- * discussion, a repository, a file, the new-issue form, a second account.
+ * discussion, a repository, a file, the new-issue form, a second account,
+ * the account page, and a view made into an image to share.
  *
  * These are a stack, the way detail views are on every phone: each one
  * pushes over the last and `back` pops it, so a pull request opened from a
@@ -24,7 +27,11 @@ export type Route =
       find?: string;
     }
   | { kind: 'new-issue'; repo: string }
-  | { kind: 'add-account' };
+  | { kind: 'add-account' }
+  /** Accounts, which of them are added together, notifications, the home feed. */
+  | { kind: 'account' }
+  /** A view as a 4:3 image, to post somewhere. */
+  | { kind: 'share'; view: ScreenName };
 
 export interface Nav {
   open: (route: Route) => void;

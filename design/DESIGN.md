@@ -87,16 +87,21 @@ anywhere else. You work most on {weekday yellow}s, and your longest run was {str
 days in a row. You have {prs red} pull requests still open.`
 Vanity figures (stars, followers) stay out of it; they make it read like a template.
 Then italic serif `since {year} · {activeDays} active days · {n} day streak`.
-Then the accounts on this phone (the one in use filled black, `+ add`), the notifications
-switch with a mono line saying what it is doing (`off · the inbox only updates while the app
-is open`), and two pills: filled black `open github →`, outlined `disconnect` (`exit demo`
-on the demo).
+The cross grid follows the widget's rules (`lib/quiet.ts`): the newest cross is the
+bottom-right one, and a long silence folds into the wave with its length over it
+(`6 wk`). Its crosses are two days each, so the wave here is two columns wide and keeps
+no column of empties either side — at the widget's edges a six-week break never folded.
 
-The activity feed is not here but in its own section (`inbox`, screen 14): a feed
-under a greeting is a feed nobody scrolls to twice, and triage is the first thing
-anyone opens a GitHub app for. This screen is the person — the greeting, the year,
-the sentence, the accounts, notifications, the link out and `disconnect`, which is the only
-destructive action in the app and the reason this screen is not behind anything.
+Then **a short feed**: a mono head naming what it lists (`pr comments` by default) with
+`change` on the right, and the newest eight rows of the inbox's own feed filtered to
+those kinds, in the inbox's row style, then `n more in the inbox →`. Nothing is fetched
+for it. Which kinds it lists is a setting on the account page (`lib/home.ts` is the
+menu: `pr comments · reviews · review requests · mentions`), so adding a kind is a line
+there rather than a new screen. It is here because the page used to end in a stretch of
+empty paper with two buttons at the bottom of it.
+
+The account itself — switching, adding, adding up, notifications, `disconnect` — is not
+on this page any more but behind the avatar in the top-right corner (below).
 
 ### 2. `now` — pin02 (Ai OS)
 `canvasCool` background, dotted 4px grid behind the hero.
@@ -478,12 +483,30 @@ answer stays on screen with its age: `offline · saved 3h ago` in the chrome
 for the year, and at the top of any pushed screen. A revoked token still
 fails loudly, saved answer or not.
 
-### Accounts and notifications — on `today · you`
+### The account page — the avatar, top right
 
-Under the sentence, two blocks. **accounts**: the one in use filled black,
-the others as chips that switch the whole app, and a dashed `+ add account`
-that pushes the token form with a `cancel`. `disconnect` forgets the current
-account and moves to the next one if the phone holds another.
+Every section's chrome is the wordmark on the left and, on the right, `share` (on a
+view that is a chart) and the account's picture in a circle — several overlapping when
+accounts are added together. Settings open from the corner on every phone; the avatar
+pushes **`account`** (`AccountScreen`) onto the stack.
+
+**accounts**: one row each, picture, `~login` and a mono line. The one in use carries a
+black `in use`; the others switch the whole app when tapped, and carry a `together`
+toggle. **Ticked accounts are added into the one in use** (`lib/merge.ts`,
+`useTogether`): the calendar is summed day by day and its levels worked out again over
+the sum, every total and breakdown bucket is summed, repositories and languages are
+merged, and `~you + ~work` becomes the handle on every chart and card. The inbox, the
+pull requests and every write stay with the account in use — its token is the one that
+can act — and an account that cannot be read drops out of the sum with `could not be
+read · left out of the charts` rather than taking the charts down. People with a work
+account asked for this: neither profile alone is what they did. Then a dashed
+`+ add account` (the token form, with `cancel`) and `forget ~login` for the others.
+
+**on the you page**: the kinds the `you` feed lists, as chips.
+
+At the foot, filled black `open github →` and outlined `disconnect ~login` (`exit
+demo`). `disconnect` forgets the current account and moves to the next one if the phone
+holds another.
 
 **notifications**: `turn on`, then one chip per kind (`review requests ·
 mentions · changes requested · approvals · comments`), and a line that says
@@ -529,12 +552,46 @@ to. `STORIES.md` is why the grouping is this grouping.
   and mounts the first time it is opened rather than on launch, so nothing
   is built before it is looked at. A mounted screen is memoised and redraws
   only when its own data changes.
-- **Detail is a stack.** `pull`, `thread`, `repo`, `file`, `new issue` and
-  `add account` push over the sections and over each other, each with `←
+- **Detail is a stack.** `pull`, `thread`, `repo`, `file`, `new issue`,
+  `account`, `share` and `add account` push over the sections and over each other, each with `←
   back` and the system back button wired to pop the top. Lower pages stay
   mounted, hidden, so back returns to them as they were. A github.com link
   anywhere in rendered Markdown opens the matching page on the stack instead
   of the browser. (`lib/nav.tsx`.)
+
+### Share — a view as a 4:3 image
+
+`share` in the chrome, on any view that is a chart, pushes a preview of that view
+recomposed as a **4:3 card** (`ShareCard`, 640 × 480 points, captured at 1600 × 1200
+PNG with react-native-view-shot and handed to the system share sheet with
+expo-sharing). A card is not a screenshot: a phone screen is portrait and scrolls, a
+timeline image is landscape and does neither. Every card is the same frame — wordmark
+and handle across the top, a serif title and one thin figure, the chart, and a line of
+fact with the month along the foot — so a run of them reads as a series.
+
+| views | card | chart |
+|---|---|---|
+| `you` `now` `weather` `join the dots` | a year on github | four figures and the cross field, eleven rows deep so a whole year fits |
+| `weeks` | {year}, week by week | the poster for one year (chips on the share page pick it) |
+| `split` | where the year went | one ruled bar and a legend with counts and shares |
+| `languages` | what I write in | six bars and an `other` |
+| `years` | every year on github | a column per year, the last twelve |
+| `hours` | when I commit | 24 bars from the sampled commits |
+
+Lists (`inbox`, `pulls`, `brief`, `cycle`, `repos`) have no card. Every list on a card is
+capped in `lib/shareData.ts` and big figures are shortened (`12.3k`), so no account can
+push anything off the frame; a card with nothing to draw says so in the chart's place.
+The card follows the phone's light or dark.
+
+### Silences — the wave, in every chart
+
+The widget draws three weeks or more of nothing as the app's wave with its length on it
+(`The dot field`, below). The app's charts do the same, from `lib/quiet.ts`: bars and
+rows keep their axis and the wave **bridges the empty stretch in place** — a month of
+empty weeks on the poster, three empty months on a repository card or an archive row,
+a week of empty days on `now`'s ruler, three weeks across whole columns of `join the
+dots`, an empty run of hours or years on a share card — and the cross field folds it the
+way the widget does. The part of a year that has not happened yet is never a silence.
 
 *(Superseded: a single horizontal pager of thirteen pages under a
 horizontally scrolling name rail. Everything was one swipe from its

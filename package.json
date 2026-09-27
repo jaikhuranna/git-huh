@@ -1,6 +1,6 @@
 {
   "name": "git-huh",
-  "version": "0.0.1-alpha",
+  "version": "0.0.2-alpha",
   "description": "Your GitHub history as a set of printed artefacts, an inbox you can clear from your phone, and a home-screen widget.",
   "license": "GPL-3.0-or-later",
   "author": "Jai Khurana (https://github.com/jaikhuranna)",
@@ -33,6 +33,7 @@
     "expo-notifications": "~57.0.20",
     "expo-router": "~57.0.21",
     "expo-secure-store": "~57.0.4",
+    "expo-sharing": "~57.0.22",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "expo-task-manager": "~57.0.0",
@@ -42,6 +43,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.13.0",
+    "react-native-view-shot": "5.1.0",
     "react-native-web": "^0.21.2",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"

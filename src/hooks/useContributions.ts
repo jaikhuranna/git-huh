@@ -44,7 +44,7 @@ const EMPTY_STATS: ContributionStats = {
   years: [],
 };
 
-async function loadModel(token: string, signal: AbortSignal): Promise<GitHubModel> {
+export async function loadModel(token: string, signal: AbortSignal): Promise<GitHubModel> {
   const contributions = await fetchContributions(token, signal);
   let stats: ContributionStats;
   try {

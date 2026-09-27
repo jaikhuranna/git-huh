@@ -16,6 +16,7 @@ import type { GitHubModel, RepoSummary } from '../lib/contributions';
 import { useRemote } from '../hooks/useRemote';
 import { demoSearch } from '../lib/demo';
 import { useNav } from '../lib/nav';
+import { howLongMonths, quietRuns, wavePath } from '../lib/quiet';
 import { searchCode } from '../lib/repo';
 import { colors, fonts, radii, themed } from '../theme';
 import { SearchField, SearchResults } from './RepoScreen';
@@ -209,7 +210,8 @@ function RepoCard({
  * The repository's commit history, one bar per month, oldest on the left.
  * The busiest month is drawn solid and carries its count; the rest step down
  * in opacity. A month with no commits still gets a baseline tick, so a gap in
- * the work reads as a gap rather than as missing data.
+ * the work reads as a gap rather than as missing data — and three months or
+ * more of nothing is bridged with the app's wave instead, its length over it.
  */
 function MonthChart({
   months,
@@ -228,8 +230,18 @@ function MonthChart({
   // Leaves room above the tallest bar for its count.
   const tallest = CHART_HEIGHT - 12;
 
+  const silences = sampled
+    ? quietRuns(
+        months.map((month) => month.count),
+        3,
+      )
+    : [];
+  const silent = (index: number) =>
+    silences.some((run) => index >= run.start && index <= run.end);
+
   const bars: ReactElement[] = [];
   months.forEach((month, index) => {
+    if (silent(index)) return;
     const x = index * pitch + (pitch - barWidth) / 2;
     const height =
       month.count === 0 ? 2 : Math.max(3, (month.count / peak) * tallest);
@@ -250,6 +262,37 @@ function MonthChart({
   return (
     <>
       {bars}
+      {silences.map((run) => {
+        const x1 = run.start * pitch + pitch * 0.25;
+        const x2 = (run.end + 1) * pitch - pitch * 0.25;
+        return (
+          <Path
+            d={wavePath(x1, x2, base - 4, 2.2, 10)}
+            fill="none"
+            key={`w${run.start}`}
+            opacity={0.45}
+            stroke={colors.onBlack}
+            strokeLinecap="round"
+            strokeWidth={1.25}
+          />
+        );
+      })}
+      {silences.map((run) =>
+        (run.end - run.start + 1) * pitch >= 40 ? (
+          <SvgText
+            fill={colors.onBlack}
+            fontFamily={fonts.mono}
+            fontSize={8}
+            key={`t${run.start}`}
+            opacity={0.5}
+            textAnchor="middle"
+            x={((run.start + run.end + 1) / 2) * pitch}
+            y={base - 12}
+          >
+            {howLongMonths(run.end - run.start + 1)}
+          </SvgText>
+        ) : null,
+      )}
       {!sampled && (
         <SvgText
           fill={colors.onBlack}

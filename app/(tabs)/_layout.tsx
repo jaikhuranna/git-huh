@@ -7,11 +7,13 @@ import { PatForm } from '../../src/components/PatForm';
 import { Body, Label } from '../../src/components/Type';
 import { NavContext, type Route } from '../../src/lib/nav';
 import { tokenStore } from '../../src/lib/token';
+import { AccountScreen } from '../../src/screens/AccountScreen';
 import { FileScreen } from '../../src/screens/FileScreen';
 import { LoadingScreen } from '../../src/screens/LoadingScreen';
 import { NewIssueScreen } from '../../src/screens/NewIssueScreen';
 import { PullScreen } from '../../src/screens/PullScreen';
 import { RepoScreen } from '../../src/screens/RepoScreen';
+import { ShareScreen } from '../../src/screens/ShareScreen';
 import { ThreadScreen } from '../../src/screens/ThreadScreen';
 import { SECTIONS } from '../../src/shell/sections';
 import { useSession } from '../../src/shell/session';
@@ -33,6 +35,10 @@ const RouteView = memo(function RouteView({ route }: { route: Route }) {
       return <FileScreen find={route.find} path={route.path} refName={route.ref} repo={route.repo} />;
     case 'new-issue':
       return <NewIssueScreen repo={route.repo} />;
+    case 'account':
+      return <AccountScreen />;
+    case 'share':
+      return <ShareScreen view={route.view} />;
     case 'add-account':
       return null;
   }
@@ -49,7 +55,10 @@ function routeKey(route: Route): string {
     case 'new-issue':
       return `${route.kind}:${route.repo}`;
     case 'add-account':
-      return 'add-account';
+    case 'account':
+      return route.kind;
+    case 'share':
+      return `share:${route.view}`;
   }
 }
 

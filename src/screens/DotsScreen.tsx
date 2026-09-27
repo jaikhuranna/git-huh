@@ -1,9 +1,10 @@
 import { Fragment } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Polyline, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Path, Polyline, Text as SvgText } from 'react-native-svg';
 
 import { Label } from '../components/Type';
 import { insights, type GitHubModel } from '../lib/contributions';
+import { howLong, quietRuns, wavePath } from '../lib/quiet';
 import { colors, fonts, themed } from '../theme';
 import { fmt, hash, Page, ScreenHead } from './shared';
 
@@ -40,6 +41,24 @@ export function DotsScreen({ model }: { model: GitHubModel }) {
     };
   };
 
+  // Three weeks or more of nothing, across at least four whole columns, is one
+  // wave through the middle of the field rather than a patch of ghost dots.
+  const silences = quietRuns(
+    days.map((day) => day.count),
+    21,
+    Math.max(0, days.findIndex((day) => day.isToday)) || days.length,
+  )
+    .map((run) => ({
+      days: run.end - run.start + 1,
+      from: Math.ceil(run.start / 7),
+      to: Math.floor((run.end + 1) / 7),
+    }))
+    .filter((run) => run.to - run.from >= 4);
+  const hushed = (index: number) => {
+    const col = Math.floor(index / 7);
+    return silences.some((run) => col >= run.from && col < run.to);
+  };
+
   const streak: string[] = [];
   for (let i = startIndex; i <= endIndex; i++) {
     const { x, y } = point(i);
@@ -64,7 +83,33 @@ export function DotsScreen({ model }: { model: GitHubModel }) {
           />
         )}
 
+        {silences.map((run) => (
+          <Path
+            d={wavePath(run.from * stepX + stepX * 0.3, run.to * stepX - stepX * 0.3, chartHeight / 2, 2.6, 12)}
+            fill="none"
+            key={`w${run.from}`}
+            opacity={0.5}
+            stroke={colors.ink}
+            strokeLinecap="round"
+            strokeWidth={1.25}
+          />
+        ))}
+        {silences.map((run) => (
+          <SvgText
+            fill={colors.ink70}
+            fontFamily={fonts.mono}
+            fontSize={8}
+            key={`t${run.from}`}
+            textAnchor="middle"
+            x={((run.from + run.to) / 2) * stepX}
+            y={chartHeight / 2 - 9}
+          >
+            {howLong(run.days)}
+          </SvgText>
+        ))}
+
         {days.map((day, index) => {
+          if (day.level === 0 && hushed(index)) return null;
           const { x, y } = point(index);
           const inStreak = index >= startIndex && index <= endIndex;
 
