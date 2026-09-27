@@ -143,8 +143,9 @@ from a GitHub app and dislike about GitHub's own).
 
 ## Licence
 
-[PolyForm Noncommercial 1.0.0](LICENSE.md). You can use, change and share
-git-huh for any noncommercial purpose. For anything else, ask.
+[GNU GPL v3.0 or later](LICENSE). You can use, change, share and even sell
+git-huh, as long as anything you ship from it is GPL too, with its source.
+Issues and pull requests are welcome.
 Third-party fonts and icons are listed in
 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 

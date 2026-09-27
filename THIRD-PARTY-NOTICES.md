@@ -1,7 +1,7 @@
 # Third-party notices
 
-git-huh's own code is under the PolyForm Noncommercial License 1.0.0
-(`LICENSE.md`). The parts below are other people's work, included under their
+git-huh's own code is under the GNU General Public License v3.0 or later
+(`LICENSE`). The parts below are other people's work, included under their
 own licences, which are reproduced here as they require.
 
 Dependencies installed through npm (React Native, Expo and the rest in

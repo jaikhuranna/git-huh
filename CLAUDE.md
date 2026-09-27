@@ -22,8 +22,8 @@ alerts, several accounts, and everything readable offline.
 It is personal: you paste a token (or several), and nothing leaves the
 device except requests to GitHub.
 
-The repository is public, under the PolyForm Noncommercial licence
-(`LICENSE`; third-party parts in `THIRD-PARTY-NOTICES.md`). The pins
+The repository is public, under the GPL v3.0 or later (`LICENSE`;
+third-party parts in `THIRD-PARTY-NOTICES.md`). The pins
 themselves are other people's images and are **not** in the repository —
 they live beside it, in the workspace's `board/` — so never commit them,
 screenshots with real account data, or anything else that is not ours to
