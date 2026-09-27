@@ -216,7 +216,12 @@ compiled on a Mac.
   by Glance. See the widget trap below before touching it. The widget draws
   whatever the *last app that ran* wrote, so after an update it paints the old
   payload with the new renderer until the app is opened once. The card's
-  surface is `WidgetSurface.kt` (the Material You neutral, read natively).
+  surface is `WidgetSurface.kt` (the Material You neutral, read natively),
+  and the ink is **never** chosen in Kotlin: every bitmap is painted white
+  with its weight in the alpha and tinted by a day/night `ColorProvider`
+  (`TINT`, and `setImageTintList` on the strip), because the launcher
+  re-resolves the surface on a scheme change without asking the app, and a
+  baked-in ink is left behind on the wrong background.
 - `targets/widget/` — the **iOS widget** (WidgetKit + SwiftUI): `Payload.swift`
   reads the same JSON the Android widget does out of the App Group
   `group.app.githuh`, and `DotField.swift` is a rule-for-rule port of
@@ -226,6 +231,9 @@ compiled on a Mac.
   so the strip is today's line, still. **Change the field on one platform,
   change it on the other.**
 - `design/DESIGN.md` — the spec every screen is derived from.
+- `docs/screenshots/` — the README's images. **Always taken in the demo**
+  (`octocat`), from a release build on the emulator, never from a real
+  account: a screen of real data carries private repository names.
 
 **`android/` is committed on purpose.** It holds hand-written native code, so
 it is not a disposable prebuild artifact — never re-add it to `.gitignore`,

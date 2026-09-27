@@ -1,0 +1,7 @@
+<resources>
+  <!-- The night canvas (src/theme/palette.ts), so a launch in dark mode does
+       not flash paper before the first frame. -->
+  <color name="splashscreen_background">#141312</color>
+  <color name="splashscreen_logo">#F2F0EB</color>
+  <color name="activityBackground">#141312</color>
+</resources>

@@ -7,6 +7,7 @@
     <item name="android:windowBackground">@color/activityBackground</item>
   </style>
   <style name="Theme.App.SplashScreen" parent="AppTheme">
-    <item name="android:windowBackground">@drawable/splashscreen_logo</item>
+    <item name="android:windowBackground">@drawable/splashscreen</item>
+    <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/splashscreen_background</item>
   </style>
 </resources>

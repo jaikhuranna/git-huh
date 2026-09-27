@@ -465,12 +465,12 @@ export function demoSocial(): SocialEvent[] {
       kind: 'review',
       actor: 'marcusleroy',
       state: 'CHANGES_REQUESTED',
-      title: 'refactor: split the sankey layout pass',
+      title: 'fix(widget): today cell timezone drift',
       repo: `${DEMO_LOGIN}/git-huh`,
       number: 139,
       url: `https://github.com/${DEMO_LOGIN}/git-huh/pull/139`,
       at: hours(7),
-      excerpt: 'Two passes over the same array — can this fold into one?',
+      excerpt: 'The widget and the grid each work out the date — can they share one helper?',
     },
     {
       id: 'd3',
@@ -550,7 +550,7 @@ export function demoPullDetail(repo: string, number: number): PullDetailFull {
     number,
     title: listed?.title ?? 'feat: adaptive icon monochrome layer',
     url: listed?.htmlUrl ?? `https://github.com/${repo}/pull/${number}`,
-    body: DEMO_PULL_BODY,
+    body: DEMO_PULL_BODIES[number] ?? DEMO_PULL_BODY,
     repo,
     author: DEMO_LOGIN,
     state: 'OPEN',
@@ -558,7 +558,7 @@ export function demoPullDetail(repo: string, number: number): PullDetailFull {
     createdAt: opened,
     mergedAt: null,
     baseRefName: 'main',
-    headRefName: 'monochrome-layer',
+    headRefName: DEMO_BRANCHES[number] ?? 'monochrome-layer',
     additions: 54,
     deletions: 13,
     changedFiles: 2,
@@ -661,6 +661,34 @@ const layers = ["foreground", "monochrome"] as const;
 
 > Checked against Pixel Launcher and Nothing Launcher on a tinted wallpaper.
 `;
+
+/**
+ * The other listed pull requests say what they are about too; the
+ * conversation and the diff are the one above's, which a demo can live with.
+ */
+const DEMO_PULL_BODIES: Record<number, string> = {
+  139: `## Problem
+
+The widget read the day boundary in UTC while the grid read it locally, so
+for a few hours around midnight today's plus sat on yesterday's square.
+
+## Fix
+
+- one \`toISODate\` for both, in local time
+- the line of the day turns over at local midnight as well`,
+  41: `A checklist for cutting a release by hand: bump both version numbers, build
+one ABI, attach the APK, and write notes a person would read.`,
+  128: `Each column of the dot matrix is its own memoised component, so a new day
+redraws one column instead of fifty-three.`,
+  33: 'Glance 1.1.1 fixes the widget losing its corner radius on some launchers.',
+};
+
+const DEMO_BRANCHES: Record<number, string> = {
+  139: 'widget-local-day',
+  41: 'release-checklist',
+  128: 'memo-columns',
+  33: 'bump-glance',
+};
 
 // ---------------------------------------------------------------------------
 // The rest of the world, for the demo account: a repository to walk around

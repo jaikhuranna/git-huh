@@ -1,7 +1,7 @@
 package app.githuh.widget
 
 import android.content.Context
-import android.content.res.Configuration
+import android.content.res.ColorStateList
 import android.os.Build
 import android.util.TypedValue
 import android.widget.RemoteViews
@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -67,9 +68,18 @@ private val STRIP_GAP = 8.dp
 private fun Dp.toPx(context: Context): Int =
     (value * context.resources.displayMetrics.density).toInt()
 
-private fun isNight(context: Context): Boolean =
-    (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-        Configuration.UI_MODE_NIGHT_YES
+/**
+ * Every mark is painted in one ink, white, with its weight in the alpha, and
+ * the launcher tints it: black by day, white at night. The surface is a
+ * day/night colour as well, so when the phone changes scheme the launcher
+ * re-resolves both on the spot. Ink decided here instead would stay behind
+ * until the next redraw — white type on a card that had just turned pale.
+ */
+private val INK = Color(0xFFFFFFFF)
+private val FAINT = Color(0x8CFFFFFF)
+private val DAY_INK = Color(0xFF000000)
+private val NIGHT_INK = Color(0xFFFFFFFF)
+private val TINT = ColorFilter.tint(ColorProvider(day = DAY_INK, night = NIGHT_INK))
 
 class GitHuhWidget : GlanceAppWidget() {
 
@@ -86,16 +96,8 @@ class GitHuhWidget : GlanceAppWidget() {
 @androidx.compose.runtime.Composable
 private fun Content(state: WidgetState?) {
     val context = LocalContext.current
-    val dark = isNight(context)
-
     val day = Color(WidgetSurface.color(context, night = false))
     val night = Color(WidgetSurface.color(context, night = true))
-
-    // Bitmap text cannot be recoloured by a ColorProvider, so the ink is
-    // decided while composing; the surface still gets a day/night provider,
-    // so it flips with the system even before the next redraw.
-    val ink = if (dark) Color(0xFFFFFFFF) else Color(0xFF000000)
-    val faint = if (dark) Color(0x8CFFFFFF) else Color(0x8C000000)
 
     // Not Scaffold: it pads the sides and the ends by different amounts. One
     // padding on all four sides, and the background drawn here rather than
@@ -111,27 +113,24 @@ private fun Content(state: WidgetState?) {
         verticalAlignment = Alignment.Top,
     ) {
         if (state == null) {
-            EmptyContent(context, ink, faint)
+            EmptyContent(context)
         } else {
-            FilledContent(context, state, LocalSize.current, ink, faint)
+            FilledContent(context, state, LocalSize.current)
         }
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun androidx.glance.layout.ColumnScope.EmptyContent(
-    context: Context,
-    ink: Color,
-    faint: Color,
-) {
+private fun androidx.glance.layout.ColumnScope.EmptyContent(context: Context) {
     Column(
         modifier = GlanceModifier.fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Image(
-            provider = GlyphRenderer.render(context, 16f, ink.toArgb()),
+            provider = GlyphRenderer.render(context, 16f, INK.toArgb()),
             contentDescription = null,
+            colorFilter = TINT,
         )
         Spacer(GlanceModifier.height(8.dp))
         Image(
@@ -139,9 +138,10 @@ private fun androidx.glance.layout.ColumnScope.EmptyContent(
                 context,
                 "open the app to connect",
                 9f,
-                faint.toArgb(),
+                FAINT.toArgb(),
             ),
             contentDescription = null,
+            colorFilter = TINT,
         )
     }
 }
@@ -151,8 +151,6 @@ private fun androidx.glance.layout.ColumnScope.FilledContent(
     context: Context,
     state: WidgetState,
     size: DpSize,
-    ink: Color,
-    faint: Color,
 ) {
     // The card's own padding is already taken off by the Column above; these
     // are the box the content actually has, and the field is whatever the
@@ -163,7 +161,7 @@ private fun androidx.glance.layout.ColumnScope.FilledContent(
     val fieldHeight = (size.height - (WIDGET_PADDING * 2) - chrome).coerceAtLeast(28.dp)
 
     if (lines.isNotEmpty()) {
-        Strip(context, lines, innerWidth, ink, faint)
+        Strip(context, lines, innerWidth)
         Spacer(GlanceModifier.height(STRIP_GAP))
     }
 
@@ -174,11 +172,12 @@ private fun androidx.glance.layout.ColumnScope.FilledContent(
             widthPx = innerWidth.toPx(context),
             heightPx = fieldHeight.toPx(context),
             rows = ROWS,
-            ink = ink.toArgb(),
+            ink = INK.toArgb(),
             emptyAlpha = 0.07f,
         ),
         contentDescription = "${state.todayCount} contributions today",
         contentScale = ContentScale.Fit,
+        colorFilter = TINT,
         modifier = GlanceModifier.fillMaxWidth().height(fieldHeight),
     )
 }
@@ -208,8 +207,6 @@ private fun Strip(
     context: Context,
     lines: List<WidgetState.Line>,
     innerWidth: Dp,
-    ink: Color,
-    faint: Color,
 ) {
     val first = lines.firstOrNull() ?: return
 
@@ -219,10 +216,11 @@ private fun Strip(
                 context,
                 if (first.repo.isBlank()) first.message else "${first.message}   ${first.repo}",
                 STRIP_SP,
-                ink.toArgb(),
+                INK.toArgb(),
                 maxWidthDp = innerWidth.value,
             ),
             contentDescription = first.message,
+            colorFilter = TINT,
         )
         return
     }
@@ -231,8 +229,8 @@ private fun Strip(
         context = context,
         lines = lines,
         unitPx = innerWidth.toPx(context),
-        ink = ink.toArgb(),
-        faint = faint.toArgb(),
+        ink = INK.toArgb(),
+        faint = FAINT.toArgb(),
         sizeSp = STRIP_SP,
     )
 
@@ -242,6 +240,14 @@ private fun Strip(
             val frame = frames[index % frames.size]
             setImageViewBitmap(id, frame)
             setViewLayoutWidth(id, frame.width.toFloat(), TypedValue.COMPLEX_UNIT_PX)
+            // The same day/night tint as the Glance images, for the one view
+            // Glance does not draw.
+            setColorStateList(
+                id,
+                "setImageTintList",
+                ColorStateList.valueOf(DAY_INK.toArgb()),
+                ColorStateList.valueOf(NIGHT_INK.toArgb()),
+            )
         }
     }
 

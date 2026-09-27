@@ -87,13 +87,15 @@ anywhere else. You work most on {weekday yellow}s, and your longest run was {str
 days in a row. You have {prs red} pull requests still open.`
 Vanity figures (stars, followers) stay out of it; they make it read like a template.
 Then italic serif `since {year} · {activeDays} active days · {n} day streak`.
-Then the accounts on this phone (the one in use filled black, `+ add`), and two pills:
-filled black `open github →`, outlined `disconnect` (`exit demo` on the demo).
+Then the accounts on this phone (the one in use filled black, `+ add`), the notifications
+switch with a mono line saying what it is doing (`off · the inbox only updates while the app
+is open`), and two pills: filled black `open github →`, outlined `disconnect` (`exit demo`
+on the demo).
 
 The activity feed is not here but in its own section (`inbox`, screen 14): a feed
 under a greeting is a feed nobody scrolls to twice, and triage is the first thing
 anyone opens a GitHub app for. This screen is the person — the greeting, the year,
-the sentence, the accounts, the link out and `disconnect`, which is the only
+the sentence, the accounts, notifications, the link out and `disconnect`, which is the only
 destructive action in the app and the reason this screen is not behind anything.
 
 ### 2. `now` — pin02 (Ai OS)
@@ -554,7 +556,11 @@ neutral that Nothing's own widgets use — `system_neutral1_50` by day and
 `system_neutral1_900` at night — read natively while the card is composed
 (`WidgetSurface.kt`), so it follows the wallpaper without the app having to run. Android
 11 and older have no dynamic palette and get fixed tones (`#E5E5E5` / `#1B1B1B`), which
-are also what the iOS widget uses. Ink is `#000` by day and `#fff` at night.
+are also what the iOS widget uses. Ink is `#000` by day and `#fff` at night — painted
+white, with each mark's weight in its alpha, and tinted by the launcher with a day/night
+colour, so the ink and the surface flip together the moment the phone changes scheme.
+Ink chosen while composing would stay behind until the next redraw: white type on a card
+that had just turned pale.
 **There is no accent**, and no Nothing red: today is a plus, and the field reads
 through shape, which is what the rest of the app does.
 
