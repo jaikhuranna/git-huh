@@ -62,8 +62,12 @@ gh release create v<version> /tmp/git-huh-<version>-arm64.apk \
   --title "git-huh <version>" --prerelease --notes "..."
 ```
 
-Versions are `3.3.0-alpha.1` and so on while the app is in alpha; tags are
-`v<version>`. The older `dev-*` releases predate the public repository.
+Public versions started over at `0.0.1-alpha` (tag `v0.0.1-alpha`, release
+title `alpha v0.0.1`); tags are `v<version>`. The older `dev-*` releases
+(2.x–3.2) predate the public repository. **`versionCode` never goes back
+down** — it carries on from the dev builds (29 for `0.0.1-alpha`), because
+Android refuses to install a lower code over a higher one, whatever the
+version name says.
 
 **Release signing** reads `GITHUH_UPLOAD_*` from `~/.gradle/gradle.properties`
 (the keystore is `android/app/githuh-dev.keystore`, gitignored). Neither the
