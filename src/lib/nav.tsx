@@ -50,24 +50,73 @@ export function useNav(): Nav {
 }
 
 /**
+ * First path segments on github.com that are GitHub's own pages rather than
+ * an owner — `github.com/settings/tokens` is not a repository called
+ * `settings/tokens`.
+ */
+const RESERVED = new Set([
+  'about',
+  'apps',
+  'codespaces',
+  'collections',
+  'enterprise',
+  'events',
+  'explore',
+  'features',
+  'issues',
+  'login',
+  'marketplace',
+  'new',
+  'notifications',
+  'orgs',
+  'organizations',
+  'pricing',
+  'pulls',
+  'search',
+  'settings',
+  'sponsors',
+  'topics',
+  'trending',
+]);
+
+const GITHUB_PATH = /^https?:\/\/(?:www\.)?github\.com\/([^/?#]+)\/([^/?#]+)(\/[^?#]*)?/;
+
+/**
  * A github.com link, read as somewhere inside the app. Anything this cannot
  * place stays a link and leaves for the browser, once, on purpose.
  */
 export function routeForUrl(url: string): Route | null {
-  const match = /^https:\/\/github\.com\/([^/]+)\/([^/#?]+)(?:\/(pull|issues|discussions)\/(\d+))?/.exec(
-    url,
-  );
-  if (!match) return null;
-  const repo = `${match[1]}/${match[2]}`;
-  const number = Number(match[4]);
-  switch (match[3]) {
+  const match = GITHUB_PATH.exec(url);
+  if (!match || RESERVED.has(match[1].toLowerCase())) return null;
+  const repo = `${match[1]}/${match[2].replace(/\.git$/, '')}`;
+  const [, section, ...rest] = (match[3] ?? '').split('/');
+
+  if (!section) return { kind: 'repo', repo };
+  const number = Number(rest[0]);
+  switch (section) {
     case 'pull':
-      return { kind: 'pull', repo, number };
+      return Number.isInteger(number) && number > 0 ? { kind: 'pull', repo, number } : null;
     case 'issues':
-      return { kind: 'thread', repo, number, type: 'issue' };
+      return Number.isInteger(number) && number > 0
+        ? { kind: 'thread', repo, number, type: 'issue' }
+        : null;
     case 'discussions':
-      return { kind: 'thread', repo, number, type: 'discussion' };
+      return Number.isInteger(number) && number > 0
+        ? { kind: 'thread', repo, number, type: 'discussion' }
+        : null;
+    case 'blob': {
+      // `blob/<ref>/<path>`. A ref with a slash in it is ambiguous in the URL
+      // itself; the first segment is by far the common case.
+      const [ref, ...path] = rest;
+      if (!ref || path.length === 0) return null;
+      try {
+        return { kind: 'file', repo, ref, path: decodeURIComponent(path.join('/')) };
+      } catch {
+        return null;
+      }
+    }
     default:
-      return { kind: 'repo', repo };
+      // Actions, releases, wikis and the rest have no page here.
+      return null;
   }
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { executeQuery } from './github';
+import { rest } from './rest';
 
 /**
  * One pull request, opened.
@@ -284,21 +285,11 @@ async function fetchFiles(
   number: number,
   signal?: AbortSignal,
 ): Promise<DiffFile[]> {
-  const response = await fetch(
-    `https://api.github.com/repos/${repo}/pulls/${number}/files?per_page=${FILE_LIMIT}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-      },
-      signal,
-    },
-  );
-  if (!response.ok) return [];
-  const parsed = filesSchema.safeParse(await response.json());
-  if (!parsed.success) return [];
-
-  return parsed.data.map((file) => {
+  const files = await rest(token, `/repos/${repo}/pulls/${number}/files?per_page=${FILE_LIMIT}`, {
+    schema: filesSchema,
+    signal,
+  });
+  return files.map((file) => {
     const { lines, truncated } = file.patch
       ? parsePatch(file.patch)
       : { lines: [], truncated: false };
@@ -314,7 +305,10 @@ async function fetchFiles(
   });
 }
 
-/** Everything one pull request has to say. Throws only on the GraphQL half. */
+/**
+ * Everything one pull request has to say. Only the GraphQL half can fail it:
+ * the file patches are optional.
+ */
 export async function fetchPullDetail(
   token: string,
   repo: string,

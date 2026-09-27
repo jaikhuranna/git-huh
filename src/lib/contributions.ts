@@ -1,4 +1,4 @@
-import { brightCycle } from '../theme';
+import { brightCycle } from '../theme/palette';
 import type {
   Contributions,
   ContributionStats,
@@ -342,9 +342,14 @@ const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
 /** Streaks, peaks and rhythms derived from the visible window. */
 export function insights(model: GitHubModel): Insights {
   const days = model.columns.flat();
+  const todayIndex = days.findIndex((day) => day.isToday);
+  const last = todayIndex >= 0 ? todayIndex : days.length - 1;
 
+  // A streak is alive until a whole day passes without work. Today is not
+  // over, so an empty today does not break it: the count starts at yesterday.
   let currentStreak = 0;
-  for (let i = days.length - 1; i >= 0 && days[i].count > 0; i--) {
+  const from = days[last]?.count > 0 ? last : last - 1;
+  for (let i = from; i >= 0 && days[i].count > 0; i--) {
     currentStreak += 1;
   }
 
@@ -395,7 +400,6 @@ export function insights(model: GitHubModel): Insights {
   const velocity =
     lastWeek > 0 ? ((thisWeek - lastWeek) / lastWeek) * 100 : thisWeek > 0 ? 100 : 0;
 
-  const todayIndex = days.findIndex((day) => day.isToday);
   const yesterdayCount = todayIndex > 0 ? days[todayIndex - 1].count : 0;
 
   return {

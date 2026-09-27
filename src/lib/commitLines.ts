@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { CommitLine } from './messageCache';
+import { rest } from './rest';
 
 /**
  * Words for the loading screen, pulled from the whole of your history rather
@@ -17,8 +18,6 @@ import type { CommitLine } from './messageCache';
  * whole thing is best-effort: every failure resolves to an empty list and the
  * caller falls back to the sampled history it already has.
  */
-
-const SEARCH = 'https://api.github.com/search/commits';
 
 /** Skewed hard towards the old end — that is the point of the screen. */
 const OLDEST = 30;
@@ -55,22 +54,15 @@ async function page(
   signal?: AbortSignal,
 ): Promise<CommitLine[]> {
   const query = encodeURIComponent(`author:${login}`);
-  const response = await fetch(
-    `${SEARCH}?q=${query}&sort=author-date&order=${order}&per_page=${perPage}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-      },
-      signal,
-    },
+  // A 422 (an unindexed account), a 403 (the search rate limit) and every
+  // other failure mean the same thing here: no words this time. The caller
+  // turns them into an empty page.
+  const data = await rest(
+    token,
+    `/search/commits?q=${query}&sort=author-date&order=${order}&per_page=${perPage}`,
+    { schema: searchSchema, signal },
   );
-  // 422 (unindexed account), 403 (search rate limit) and friends all mean the
-  // same thing here: no words this time.
-  if (!response.ok) return [];
-  const parsed = searchSchema.safeParse(await response.json());
-  if (!parsed.success) return [];
-  return parsed.data.items
+  return data.items
     .map((item) => ({
       message: subject(item.commit.message),
       repo: item.repository?.name ?? '',
@@ -79,8 +71,8 @@ async function page(
 }
 
 /**
- * A pool of commit subjects, oldest-heavy. Never throws; an abort is the one
- * thing it re-raises, so a screen teardown does not write a stale cache.
+ * A pool of commit subjects, oldest-heavy. Never throws, except to re-raise
+ * an abort, so a screen teardown does not write a stale cache.
  */
 export async function fetchCommitLines(
   token: string,

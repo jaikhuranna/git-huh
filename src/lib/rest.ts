@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import { GitHubError } from './github';
+import { GitHubError, parseAs } from './github';
 
 const API = 'https://api.github.com';
 
@@ -15,6 +15,7 @@ const API = 'https://api.github.com';
  */
 export async function rest<T = unknown>(
   token: string,
+  /** Relative to the API root, so the token is only ever sent to GitHub. */
   path: string,
   {
     method = 'GET',
@@ -32,7 +33,7 @@ export async function rest<T = unknown>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path.startsWith('http') ? path : `${API}${path}`, {
+    response = await fetch(`${API}${path}`, {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
@@ -54,8 +55,13 @@ export async function rest<T = unknown>(
   const type = response.headers.get('content-type') ?? '';
   if (!type.includes('json')) return (await response.text()) as T;
 
-  const data: unknown = await response.json();
-  return schema ? schema.parse(data) : (data as T);
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new GitHubError('api', 'GitHub sent back something this app does not understand.');
+  }
+  return schema ? parseAs(schema, data) : (data as T);
 }
 
 /** Plain text from an endpoint that answers with a redirect to a file. */

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { rest } from './rest';
+
 export interface PullRequest {
   number: number;
   title: string;
@@ -8,8 +10,6 @@ export interface PullRequest {
   draft: boolean;
   htmlUrl: string;
 }
-
-const REST_ENDPOINT = 'https://api.github.com/search/issues';
 
 const searchSchema = z.object({
   total_count: z.number().int().nonnegative(),
@@ -35,20 +35,10 @@ export async function fetchOpenPrs(
   signal?: AbortSignal,
 ): Promise<PullRequest[]> {
   const query = encodeURIComponent(`is:pr is:open author:${login}`);
-  const response = await fetch(
-    `${REST_ENDPOINT}?q=${query}&sort=created&order=desc&per_page=20`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-      },
-      signal,
-    },
-  );
-  if (!response.ok) {
-    throw new Error(`GitHub responded with ${response.status}.`);
-  }
-  const data = searchSchema.parse(await response.json());
+  const data = await rest(token, `/search/issues?q=${query}&sort=created&order=desc&per_page=20`, {
+    schema: searchSchema,
+    signal,
+  });
   return data.items.map((item) => ({
     number: item.number,
     title: item.title,

@@ -75,7 +75,12 @@ export function kindOf(event: SocialEvent): NotifyKind | null {
   }
 }
 
-const stamp = (event: SocialEvent) => `${event.id}@${event.at}`;
+/**
+ * What makes an event the same event next time. The id alone: a review
+ * request's timestamp is its pull request's `updatedAt`, which moves with
+ * every push, and one request must not notify once per commit.
+ */
+const stamp = (event: SocialEvent) => event.id;
 const seenKey = (login: string) => `${login.toLowerCase()}-notified`;
 
 export async function readSettings(): Promise<NotifySettings> {
@@ -107,6 +112,9 @@ function phrase(event: SocialEvent): string {
       return `${event.actor} commented`;
   }
 }
+
+/** Deliver immediately, on the app's own channel rather than Android's fallback one. */
+const NOW: Notifications.ChannelAwareTriggerInput = { channelId: CHANNEL };
 
 /** One pass: read the feed, post what is new, remember it. Returns how many were posted. */
 async function checkInbox(): Promise<number> {
@@ -142,11 +150,14 @@ async function checkInbox(): Promise<number> {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: phrase(event),
-        body: event.excerpt && kindOf(event) !== 'review-request' ? `${event.title} — “${event.excerpt}”` : event.title,
+        body:
+          event.excerpt && kindOf(event) !== 'review-request'
+            ? `${event.title} — “${event.excerpt}”`
+            : event.title,
         subtitle: `${event.repo} #${event.number}`,
         data: { url: event.url, repo: event.repo, number: event.number },
       },
-      trigger: null,
+      trigger: NOW,
     });
   }
   if (fresh.length > MAX_EACH) {
@@ -156,7 +167,7 @@ async function checkInbox(): Promise<number> {
         body: 'open git-huh to read them',
         data: { inbox: true },
       },
-      trigger: null,
+      trigger: NOW,
     });
   }
 

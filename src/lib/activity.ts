@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { toISODate } from './contributions';
 import { executeQuery } from './github';
 import type { CommitLine } from './messageCache';
 
@@ -185,7 +186,10 @@ function query(login: string): string {
   `;
 }
 
-/** Fetch commit timestamps and pull request detail. Never throws. */
+/**
+ * Fetch commit timestamps and pull request detail. The caller treats a
+ * failure as an empty sample; nothing else depends on it.
+ */
 export async function fetchActivity(
   token: string,
   login: string,
@@ -210,7 +214,7 @@ export async function fetchActivity(
       commits.push({
         hour: when.getHours(),
         weekday: when.getDay(),
-        date: `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}`,
+        date: toISODate(when),
         repo: repo.nameWithOwner,
         additions: node.additions,
         deletions: node.deletions,
@@ -258,6 +262,13 @@ export function hourHistogram(commits: CommitSample[]): number[] {
   return hours;
 }
 
+/** The middle value — an upper median for an even count — or 0 for none. */
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
 export interface Ledger {
   additions: number;
   deletions: number;
@@ -270,14 +281,11 @@ export interface Ledger {
 export function ledger(commits: CommitSample[]): Ledger {
   const additions = commits.reduce((sum, c) => sum + c.additions, 0);
   const deletions = commits.reduce((sum, c) => sum + c.deletions, 0);
-  const sizes = commits
-    .map((c) => c.additions + c.deletions)
-    .sort((a, b) => a - b);
   return {
     additions,
     deletions,
     net: additions - deletions,
-    medianDiff: sizes.length ? sizes[Math.floor(sizes.length / 2)] : 0,
+    medianDiff: median(commits.map((c) => c.additions + c.deletions)),
   };
 }
 
@@ -294,12 +302,6 @@ export interface CycleStats {
 }
 
 const HOUR = 3_600_000;
-
-function median(values: number[]): number {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
-}
 
 export function cycleStats(pulls: PullDetail[]): CycleStats {
   const cycleHours: number[] = [];
@@ -349,11 +351,10 @@ const INITIALS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 /**
  * The last `maxMonths` calendar months ending with this one, all at zero.
  *
- * Every repository card is drawn against this same window. The cards used to
- * size their axis to whatever range that repo's own commits happened to
- * cover, which meant one card showed a single bar labelled `s` and the card
- * under it showed twelve — two charts that look comparable and are not. A
- * shared axis costs some empty bars and buys a deck you can read down.
+ * Every repository card is drawn against this same window. An axis sized to
+ * each repo's own commits would give one card a single bar and the card under
+ * it twelve — two charts that look comparable and are not. A shared axis
+ * costs some empty bars and buys a deck you can read down.
  */
 export function monthWindow(maxMonths = 12, now: Date = new Date()): MonthBar[] {
   const last = now.getFullYear() * 12 + now.getMonth();

@@ -282,7 +282,12 @@ export async function executeQuery<T>(
     throw new GitHubError('api', `GitHub responded with ${response.status}.`);
   }
 
-  const body = (await response.json()) as GraphQLResponse;
+  let body: GraphQLResponse;
+  try {
+    body = (await response.json()) as GraphQLResponse;
+  } catch {
+    throw unexpected();
+  }
   if (body.errors?.length) {
     const first = body.errors[0];
     const message = first?.message ?? 'Unknown GraphQL error.';
@@ -296,7 +301,22 @@ export async function executeQuery<T>(
     throw new GitHubError(kind, message);
   }
 
-  return schema.parse(body.data);
+  return parseAs(schema, body.data);
+}
+
+function unexpected(): GitHubError {
+  return new GitHubError('api', 'GitHub sent back something this app does not understand.');
+}
+
+/**
+ * Validate a response against its schema. A shape GitHub has changed is an
+ * API failure like any other — screens handle `GitHubError`, never a raw
+ * ZodError.
+ */
+export function parseAs<T>(schema: z.ZodType<T>, data: unknown): T {
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) throw unexpected();
+  return parsed.data;
 }
 
 /**
