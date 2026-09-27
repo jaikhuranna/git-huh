@@ -45,9 +45,9 @@ deliberately does **not** use the Nothing design language.
   Everywhere else the texture is that pin's own device — crosses, ribbons,
   stacked squares, arcs, filing rules.
 
-Nothing survives in exactly one place: **widget A's background**, resolved
-from `nothing-mtui`'s `widgetBg` against the device's live Material You
-palette. Nothing red may appear inside widget A and nowhere else.
+Nothing survives in exactly one place: **the widget's background**, the
+Material You neutral Nothing's own widgets sit on, read natively from the
+device's live palette (`WidgetSurface.kt`). Nothing red appears nowhere.
 
 ## 3. Colour
 

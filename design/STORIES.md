@@ -31,9 +31,9 @@ is at a desk — anyone at a desk has the web.
 ## 2. The stories
 
 Each story names the section it lives in, what it needs from GitHub, and
-where it stops. **Where a story stops matters.** Until 3.1 this app only
-read, and every story that ended in "and then I approve it" ended outside
-the app; 3.1 moved those endings inside.
+where it stops. **Where a story stops matters.** An app that only reads
+ends every story that goes "and then I approve it" outside the app; this
+one keeps those endings inside.
 
 ### today — *how am I doing*
 
@@ -110,7 +110,7 @@ the app; 3.1 moved those endings inside.
     leaves `lab` by earning a place in one of the four sections above.
     → `join the dots` today.
 
-### writing back (3.1)
+### writing back
 
 26. **I want to answer from where I read it** — reply, approve, request
     changes. → `pull` → `talk`.
@@ -214,9 +214,8 @@ from silence.
 ## 4. What people want from a GitHub app
 
 Ranked by how often it is asked for, not by how easy it is. The last column
-is honest about this app: **yes**, **partly**, or **no** — and as of 3.1 the
-column is mostly *yes*, because 3.1 was the release that took this list as
-its brief.
+is honest about this app: **yes**, **partly**, or **no** — and the column
+is mostly *yes*, because this list is the brief the app was built to.
 
 | # | want | why it is wanted | git-huh |
 |---|---|---|---|

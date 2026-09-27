@@ -167,35 +167,31 @@ function SwipeRow({
   // is read while rendering the transform.
   const [x] = useState(() => new Animated.Value(0));
 
-  const leave = (direction: 1 | -1, then: () => void) =>
-    Animated.timing(x, {
-      duration: 160,
-      toValue: direction * width,
-      useNativeDriver: false,
-    }).start(() => {
-      then();
-      x.setValue(0);
-    });
+  const responder = useMemo(() => {
+    const leave = (direction: 1 | -1, then: () => void) =>
+      Animated.timing(x, {
+        duration: 160,
+        toValue: direction * width,
+        useNativeDriver: false,
+      }).start(() => {
+        then();
+        x.setValue(0);
+      });
 
-  const responder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.6,
-        onPanResponderMove: (_, gesture) => x.setValue(gesture.dx),
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderRelease: (_, gesture) => {
-          if (gesture.dx <= -COMMIT_AT) leave(-1, folder ? onReopen : onDone);
-          else if (gesture.dx >= COMMIT_AT) leave(1, folder ? onReopen : onSnooze);
-          else Animated.spring(x, { toValue: 0, useNativeDriver: false }).start();
-        },
-        onPanResponderTerminate: () =>
-          Animated.spring(x, { toValue: 0, useNativeDriver: false }).start(),
-      }),
-    // `leave` closes over the handlers, which change with the row's folder.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [folder, onDone, onReopen, onSnooze, width],
-  );
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.6,
+      onPanResponderMove: (_, gesture) => x.setValue(gesture.dx),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx <= -COMMIT_AT) leave(-1, folder ? onReopen : onDone);
+        else if (gesture.dx >= COMMIT_AT) leave(1, folder ? onReopen : onSnooze);
+        else Animated.spring(x, { toValue: 0, useNativeDriver: false }).start();
+      },
+      onPanResponderTerminate: () =>
+        Animated.spring(x, { toValue: 0, useNativeDriver: false }).start(),
+    });
+  }, [folder, onDone, onReopen, onSnooze, width, x]);
 
   return (
     <View

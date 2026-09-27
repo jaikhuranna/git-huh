@@ -1,7 +1,9 @@
-# git-huh 2.0 — design spec
+# git-huh — design spec
 
-Source of truth: the Pinterest board **"nothing github"** (10 pins), saved at `design/board/pin01..pin10`.
-Every app screen is one pin, rendered with real GitHub data.
+Source of truth: the Pinterest board **"nothing github"** (eleven pins, `pin01`–`pin11`).
+Every app screen is one pin, rendered with real GitHub data. The pins are other people's
+work and are not redistributed in this repository; each is described where its screen
+is specified, which is all the spec relies on.
 
 This file is the **per-screen spec**. The rules that hold across every screen —
 colour, type, space, motion, patterns, the prohibitions — live in
@@ -12,8 +14,9 @@ colour, type, space, motion, patterns, the prohibitions — live in
 1. **No Nothing design language in the app.** No DotGothic16 anywhere in `src/` or `app/`.
    No `#D71921` / `#E8442E` "brand red". No paper-grey + dot-matrix combination.
    The `?` in the wordmark is ink, not red.
-2. **Nothing lives only in Widget A's background**, resolved through the `nothing-mtui` token
-   mapping. Nothing red (`widgetFood` `#d71921`) may appear *only* inside Widget A.
+2. **Nothing lives only in the widget's background**: the Material You neutral that
+   Nothing's own widgets sit on (`WidgetSurface.kt`). Nothing red appears nowhere, the
+   widget included.
 3. Dots-as-texture are allowed **only** where a pin itself uses them: pin02's LED numerals,
    pin08's halftone card, pin10's circle rows. Everywhere else the texture is crosses (pin04),
    bars (pin09), ribbons (pin05), arcs (pin06) or rules (pin03).
@@ -72,22 +75,26 @@ the app — the sections and their order are under "Navigation" below, and
 screen: `today · you`.
 
 ### 1. `hey` — pin04 (Pantom)
-Warm canvas. Top-left `git-huh?` in Instrument Serif + mono `2.0`; top-right pill `disconnect`.
-Instrument Serif 44 `Hey,` then `~{login}` on the next line.
-Below: **cross grid** — 53×7 contribution year drawn as `+` glyphs, weight and opacity stepping
-with level (0 → ink at 8%, 4 → ink at 100% bold). This replaces the dot matrix entirely.
-Below: the colored sentence, Inter 400 17/26, each stat inline-colored:
-`You shipped {commits blue} commits in {repos green} repos. {prs red} pull requests are open,
-{stars yellow} stars landed, {followers purple} people follow along.`
-Then italic serif subtitle `since {year} · {activeDays} active days`.
-Two pills: filled black `open github →`, outlined `refresh`.
+Warm canvas. Instrument Serif 44 `Hey,` then `~{login}` on the next line.
+Below: **cross grid** — the contribution year drawn as `+` glyphs, two days to a column,
+weight and opacity stepping with level (0 → ink at 8%, 4 → ink at 100% bold). There is
+no dot matrix.
+Below: the coloured sentence, Inter 400 17/26, every figure about the same year the
+crosses draw, each inline-coloured, and any figure with nothing in it dropped rather
+than printed as a zero:
+`You made {total blue} contributions in the last year, more of them to {repo green} than
+anywhere else. You work most on {weekday yellow}s, and your longest run was {streak purple}
+days in a row. You have {prs red} pull requests still open.`
+Vanity figures (stars, followers) stay out of it; they make it read like a template.
+Then italic serif `since {year} · {activeDays} active days · {n} day streak`.
+Then the accounts on this phone (the one in use filled black, `+ add`), and two pills:
+filled black `open github →`, outlined `disconnect` (`exit demo` on the demo).
 
-The activity feed used to sit below the fold here. It is now its own section
-(`inbox`, screen 14): a feed under a greeting is a feed nobody scrolls to
-twice, and triage is the first thing anyone opens a GitHub app for. What is
-left on this screen is the person — the greeting, the year, the sentence, the
-link out and `disconnect`, which is the only destructive action in the app and
-the reason this screen is not behind anything.
+The activity feed is not here but in its own section (`inbox`, screen 14): a feed
+under a greeting is a feed nobody scrolls to twice, and triage is the first thing
+anyone opens a GitHub app for. This screen is the person — the greeting, the year,
+the sentence, the accounts, the link out and `disconnect`, which is the only
+destructive action in the app and the reason this screen is not behind anything.
 
 ### 2. `now` — pin02 (Ai OS)
 `canvasCool` background, dotted 4px grid behind the hero.
@@ -134,9 +141,8 @@ black dominant (~60%). A month rule runs under the baseline, one tick per month.
 Below: mono caption `{total} contributions · busiest week {n}, in {month}`.
 
 Every year is drawn from **its own calendar** (`YearSummary.weeks`), so 2019 gets the same
-fifty-two columns as this year. Older years used to fall back to twelve monthly bars, which
-made them look like a different chart, and the latest year used the trailing-365-day window
-under a calendar-year label — which was not that year.
+fifty-two columns as this year rather than twelve monthly bars that read as a different
+chart, and this year's label sits over this calendar year, not the trailing 365 days.
 
 Year chips are a **wrapped row, never a horizontal scroller**: nested inside the pager, a
 horizontal scroller loses every drag to the page swipe and the chips past the right edge
@@ -195,8 +201,8 @@ on repos nobody has touched in months. The sampled history answers it to the
 hour wherever it reaches; `pushedAt` is the fallback below the sample, and the
 age printed on the card is the same value the deck sorted by.
 
-*(Superseded: the body used to be a halftone field keyed off `hash(repo, col, row)` — a texture
-that looked like data and encoded none. Every mark on the card is now a real month.)*
+Every mark on the card is a real month. A halftone keyed off `hash(repo, col, row)` would
+look like data and encode none.
 
 ### 8. `index` — pin03 (correspondence storage)
 
@@ -216,8 +222,7 @@ behind it. So this screen **files by repository**:
   with a black number tab down its left edge, the title (2 lines max) and a
   mono `ink40` age on the right;
 - folders step right by `min(rank,4) × 8px`, cards by a further 12px;
-- the repo name appears **once, on the tab** — not repeated down every row,
-  which is what the flat list used to do.
+- the repo name appears **once, on the tab** — not repeated down every row.
 
 Under the last folder, the rest of the drawer is drawn as the **top edges of
 empty cards**: one hairline per edge at a 15px pitch, stepping right and
@@ -303,15 +308,15 @@ pin03's filing card with the lid off: the masthead, one pull request's cover (nu
 chip, diff rule, counts, labels) and then its description.
 
 The description is **rendered, not printed** (`components/Markdown`). GitHub hands back raw
-Markdown and this screen used to put it on the page verbatim, so a heading arrived as a literal
-`## Problem` and a list as a column of hyphens. The renderer is deliberately partial — headings,
+Markdown, and verbatim a heading arrives as a literal `## Problem` and a list as a column of
+hyphens. The renderer is deliberately partial — headings,
 lists, task lists, quotes, fenced code, rules, and inline code / bold / italic / links — and
 anything it does not recognise falls through as text, which is the correct failure for prose.
 Headings are underlined with a wave; so is `The description`.
 
 Paging lives in a **bar pinned to the bottom** (`← prev · n of N · next →`), so `next` is in the
-same place on every pull request. It used to sit under the description, which put it below the
-fold on a long body and halfway up the screen on a one-liner.
+same place on every pull request. Under the description it would sit below the fold on a long
+body and halfway up the screen on a one-liner.
 
 ### 13. `pull` — a pull request, opened
 
@@ -509,18 +514,19 @@ to. `STORIES.md` is why the grouping is this grouping.
   on iOS 26, with SF Symbols and the system's own type, minimising as you
   scroll down. On Android it is Material 3's navigation bar on canvas, mono
   labels, Material Symbols, and the selected indicator filled black — which is
-  what filled black means everywhere else. It used to be drawn in JavaScript
-  (`TabBar`), which could never look like either system. `inbox` carries a count of the events addressed to you (review
+  what filled black means everywhere else. A bar drawn in JavaScript could
+  never look like either system's. `inbox` carries a count of the events addressed to you (review
   requests, mentions, changes requested), which is the honest version of a
   badge: it is computed from the rows that are actually there.
 - **Segments** (`Segments`): mono labels with a 2px ink rule under the
   selected one — pin03's tab, kept from the old rail. Hidden when a section
   has one view. The row **wraps, it never scrolls**.
-- **Swiping** moves between views *within* a section and stops at its edges.
-  A drag can no longer carry you three destinations away.
+- **Swiping** moves between views *within* a section and stops at its edges,
+  so a drag never carries you three destinations away.
 - **Sections keep their place.** Each remembers which view you left it on,
-  and mounts the first time it is opened rather than on launch — the old
-  pager built all thirteen screens before the first one was looked at.
+  and mounts the first time it is opened rather than on launch, so nothing
+  is built before it is looked at. A mounted screen is memoised and redraws
+  only when its own data changes.
 - **Detail is a stack.** `pull`, `thread`, `repo`, `file`, `new issue` and
   `add account` push over the sections and over each other, each with `←
   back` and the system back button wired to pop the top. Lower pages stay
@@ -541,44 +547,40 @@ hairline underline, filled black pill `connect`, ghost pill `try the demo`. Erro
 
 ## The widget
 
-### Widget A — `GitHuhWidget` (nothing-mtui background)
-Background **must** come from the `nothing-mtui` token mapping:
-`widgetBg` = `neutral1/50` in light, `neutral1/900` in dark.
-Resolution order:
- 1. Android 12+ → resolve the live Material You palette natively:
-    `android.R.color.system_neutral1_50` / `system_neutral1_900`. This is what Nothing OS does.
- 2. Otherwise → the static fallback the package ships, passed in the sync payload from JS
-    (`nothingWidgetColors(null, mode)`), so JS stays the owner of the package.
-Elements use `widgetElements` (`#000` light / `#fff` dark). **There is no accent.**
-`widgetFood` (`#d71921`) used to mark today and was the only Nothing red in the project;
-it is gone, and today is a plus instead — the field reads through shape, which is what
-the rest of the app does.
+### The widget — `GitHuhWidget`
+
+**The surface is the one place Nothing survives.** The card sits on the Material You
+neutral that Nothing's own widgets use — `system_neutral1_50` by day and
+`system_neutral1_900` at night — read natively while the card is composed
+(`WidgetSurface.kt`), so it follows the wallpaper without the app having to run. Android
+11 and older have no dynamic palette and get fixed tones (`#E5E5E5` / `#1B1B1B`), which
+are also what the iOS widget uses. Ink is `#000` by day and `#fff` at night.
+**There is no accent**, and no Nothing red: today is a plus, and the field reads
+through shape, which is what the rest of the app does.
 
 **One padding, every side.** Glance's `Scaffold` pads the sides and the top and bottom by
-different amounts, so the card's border was never the same width twice; the card draws
-its own background, its own corner radius and a single `padding(14.dp)` instead.
+different amounts, so the card draws its own background, its own corner radius and a
+single `padding(14.dp)` instead.
 
 Layout, top to bottom — **two elements, and nothing else**:
  1. **A commit message of your own, travelling.** Mono 11, right to left, with the
-    repository it was written in at the end of the line in the faint ink. It replaced
-    the sigil + `~handle` lockup: a home-screen card has four lines to spend and one of
-    them was telling its owner their own name. **The handle is not a fallback for it** —
-    a card with no pool yet runs no strip. Two things keep the line from being either
-    absent or a different one every hour: a sync that carries no pool keeps the stored
-    one rather than erasing it, and the pick hashes the day against each message instead
-    of indexing a list the app reshuffles on every launch.
+    repository it was written in at the end of the line in the faint ink. A home-screen
+    card has four lines to spend, and none of them goes on telling its owner their own
+    name. **The handle is not a fallback for it** — a card with no line to run runs
+    none, and a card that has never been synced shows the sigil (`GlyphRenderer`) and
+    `open the app to connect`. Two things keep the line from being
+    either absent or a different one every hour: a sync that carries no pool keeps the
+    stored one rather than erasing it, and the pick hashes the local day against each
+    message instead of indexing a list the app reshuffles on every launch.
  2. **The dot field** (below), which has the rest of the card. Today is a **plus**;
     a peak day is a rounded square; everything else is a dot sized by level.
 
-The counts that used to sit between them — `N today` at 22sp, and the footer
-`{calendar total} this year · {openPrs} prs` — are **gone**. They are on every screen
-in the app, and a home screen is not where they were wanted. `widgetFood` survives as
-today's mark in the field, which is still the only Nothing red in the project.
+No counts. They are on every screen in the app, and a home screen is not where they
+are wanted.
 
-**The strip is a loop, and it starts on the card.** It used to enter from beyond the
-right edge (`fromXDelta="100%p"`), which meant five seconds of empty card at the top of
-every pass — you sat waiting for a message to arrive. It now starts where it rests, at
-the card's left edge, and travels left.
+**The strip is a loop, and it starts on the card** — at the card's left edge, where it
+rests, travelling left. Entering from beyond the right edge (`fromXDelta="100%p"`) would
+mean five seconds of empty card at the top of every pass.
 
 The loop is painted as one frame per card width — `CYCLE_UNITS` (3) of them, each two
 widths long and starting one width further along than the last — and the flipper shows
@@ -623,7 +625,7 @@ the left-hand edge. That call is API 31; below it the strip is printed still.
 
 ### The dot field — one bitmap, painted at the shape of its box
 
-Both widgets paint the field with `DotFieldRenderer` and hand it to Glance as a single
+The widget paints the field with `DotFieldRenderer` and hand it to Glance as a single
 `Image` with `ContentScale.Fit`. **Do not go back to a Column of weighted Rows.** That
 layout cannot make a square grid: the columns split the reported width while the rows
 were pinned to a capped dp height, so the horizontal pitch ran about 2.5× the vertical
@@ -643,16 +645,14 @@ Three rules, and all three exist because breaking one was visible on a real phon
    under-reports just gets a smaller bitmap scaled back up.
 3. **The newest day is the bottom-right mark.** The field is a run of days, not
    GitHub's weekday calendar: days go down each column and on to the next, oldest
-   top-left, so the last mark on the card is today — the same corner every day. It
-   used to keep weekday rows, which put today halfway up the last column with the
-   rest of the week drawn as days that had not happened yet. The payload is therefore
+   top-left, so the last mark on the card is today — the same corner every day, and
+   never a column of days that have not happened yet. The payload is therefore
    the year as it happened, ending on today, with no padding in it.
 4. **Three weeks or more of nothing is a wave.** A quiet stretch that long is drawn
    as the app's hand-drawn rule across the middle of the field, three columns wide,
    with its length over it in mono — `5 wk`, `4 mo`, `1 yr` — and the columns it would
    have filled go to days that had something in them. A year with one busy spring
-   used to be a card of ghost dots with the spring pushed off the left edge; now the
-   spring is on the card and the silence is one line that says how long it was.
+   shows the spring, and the silence after it is one line that says how long it was.
 5. **A silence starts and ends as empty days.** Each side of a wave keeps one whole
    column of the stretch's own empty days, and the newer side finishes the column its
    marks stopped in first, so the wave sits between two columns of nothing and never
@@ -661,17 +661,13 @@ Three rules, and all three exist because breaking one was visible on a real phon
    kept theirs, so a wave never costs the card room — under five weeks or so of
    nothing stays as dots. The oldest silence runs out to the card's left
    edge — quiet since before anything the card can show. Only a payload shorter
-   than the card leaves ghost dots on the left: an account younger than the card,
-   or a widget still holding what a pre-3.1 app sent (32 weeks), until the app is
-   next opened.
+   than the card leaves ghost dots on the left: an account younger than the card.
 
-### There is no widget B
+### One widget
 
-`GitHuhBoardWidget` — the pin08 urbit card, sigil + `~handle` + halftone field — has
-been **deleted**. Two widgets of the same data, differing mostly in their surface, was
-one more than the home screen wanted, and the board card was the one still printing the
-handle back at its owner. The provider, its receiver, its `xml` and its string are gone;
-`GlyphRenderer` stays, because widget A's empty state is drawn with it.
+Two widgets of the same data, differing mostly in their surface, is one more than the
+home screen wants. The pin08 card (sigil + `~handle` + halftone field) is not built;
+its sigil survives as the widget's empty state (`GlyphRenderer`).
 
 
 ## Data coverage

@@ -7,7 +7,7 @@ you without reaching for a laptop.** The numbers GitHub already has about
 you — a year of contributions, the languages, the repos, the pull requests
 and the arguments in them — rendered as a set of printed artefacts rather
 than as a dashboard: fourteen screens, each one a pin from the "nothing
-github" Pinterest board (`design/board/`), grouped into five sections, plus
+github" Pinterest board, grouped into five sections, plus
 one home-screen widget — a Glance widget on Android and a WidgetKit one on
 iOS, drawing the same card from the same payload. It follows the system into
 dark mode.
@@ -21,6 +21,13 @@ alerts, several accounts, and everything readable offline.
 
 It is personal: you paste a token (or several), and nothing leaves the
 device except requests to GitHub.
+
+The repository is public, under the PolyForm Noncommercial licence
+(`LICENSE`; third-party parts in `THIRD-PARTY-NOTICES.md`). The pins
+themselves are other people's images and are **not** in the repository —
+they live beside it, in the workspace's `board/` — so never commit them,
+screenshots with real account data, or anything else that is not ours to
+publish.
 
 Three documents govern the work and all three are part of it:
 
@@ -45,14 +52,24 @@ task, not something to ask about first.
 hand from this machine:
 
 ```bash
-# bump versionName / versionCode in android/app/build.gradle and app.json first
+# bump versionName / versionCode in android/app/build.gradle, app.json and
+# package.json first
 cd android
 ANDROID_HOME=/home/jaikhurana/Android ./gradlew assembleRelease --no-daemon \
   -PreactNativeArchitectures=arm64-v8a
-gh release create dev-<version> \
-  app/build/outputs/apk/release/app-arm64-v8a-release.apk \
-  --title "dev-<version>" --prerelease --notes "..."
+cp app/build/outputs/apk/release/app-arm64-v8a-release.apk /tmp/git-huh-<version>-arm64.apk
+gh release create v<version> /tmp/git-huh-<version>-arm64.apk \
+  --title "git-huh <version>" --prerelease --notes "..."
 ```
+
+Versions are `3.3.0-alpha.1` and so on while the app is in alpha; tags are
+`v<version>`. The older `dev-*` releases predate the public repository.
+
+**Release signing** reads `GITHUH_UPLOAD_*` from `~/.gradle/gradle.properties`
+(the keystore is `android/app/githuh-dev.keystore`, gitignored). Neither the
+keystore nor its passwords ever go in the repository. Without them a release
+build falls back to the debug key, which installs fine but cannot update a
+build signed with the real one.
 
 **Build one architecture at a time on this machine.** `gradle.properties`
 lists four ABIs, and a four-ABI build of the native modules (reanimated,
@@ -98,9 +115,6 @@ compiled on a Mac.
   it rather than trying to work around the bundler.
 - **`android/local.properties`** must point at the SDK (`sdk.dir=`). It is
   gitignored, so it needs recreating on a fresh clone.
-- **`nothing-mtui` is a private repo.** `npm install` therefore needs an
-  account with access to it. This is also why CI cannot work without extra
-  credential setup.
 
 ## Layout
 
@@ -165,7 +179,7 @@ compiled on a Mac.
   read:discussion, write:discussion, security_events`. Every screen works on
   less and says what the missing scope costs.
 - `src/lib/messageCache.ts` — the pool of commit messages the loading screen
-  and widget A's strip are made of. It has to be on screen before the request
+  and the widget's strip are made of. It has to be on screen before the request
   that would fetch them, hence the cache; it is refetched only when more than
   a week old and otherwise just reshuffled. **It carries a `VERSION`: bump it
   in the same change as any new limit or field, or the change never reaches a
@@ -179,9 +193,13 @@ compiled on a Mac.
 - `src/lib/pullDetail.ts` — one pull request in full: GraphQL for the object,
   its comments and its review threads, REST for the file patches (GraphQL's
   `files` connection carries no patch text), plus the unified-diff parser.
-- `src/lib/` — GitHub GraphQL, the `GitHubModel` view model, seeded demo data.
+- `src/lib/` — GitHub GraphQL and REST (`github.ts`, `rest.ts`: every
+  failure is a `GitHubError` with a `kind`, never a raw fetch or Zod error),
+  the `GitHubModel` view model, seeded demo data. The pure modules have unit
+  tests beside them (`*.test.ts`).
 - `src/theme/index.ts` — every colour, font and radius, in a day and a night
-  palette. Use these tokens; do not invent values in screens. **Colours are
+  palette (the raw palettes are `src/theme/palette.ts`, free of React Native
+  so the data layer can use them). Use these tokens; do not invent values in screens. **Colours are
   read at render**: `colors.x` is a getter on the palette in force, so a
   module-level `StyleSheet.create` must be wrapped as `themed(() =>
   StyleSheet.create({...}))`, and so must any module-level table of colours —
@@ -197,8 +215,8 @@ compiled on a Mac.
   `res/layout/widget_strip.xml` and is the one view here that is not painted
   by Glance. See the widget trap below before touching it. The widget draws
   whatever the *last app that ran* wrote, so after an update it paints the old
-  payload with the new renderer until the app is opened once — a 3.0 payload
-  held 32 weeks, and on a 3.1 card that looked like history cut off.
+  payload with the new renderer until the app is opened once. The card's
+  surface is `WidgetSurface.kt` (the Material You neutral, read natively).
 - `targets/widget/` — the **iOS widget** (WidgetKit + SwiftUI): `Payload.swift`
   reads the same JSON the Android widget does out of the App Group
   `group.app.githuh`, and `DotField.swift` is a rule-for-rule port of
@@ -207,8 +225,6 @@ compiled on a Mac.
   `ExtensionStorage` (`src/lib/widgetBridge.ts`). WidgetKit cannot animate,
   so the strip is today's line, still. **Change the field on one platform,
   change it on the other.**
-- `preview/` — ten of the screens as HTML at 393×852, used to iterate on
-  layout in a browser and to build `review.html`. It lags the app.
 - `design/DESIGN.md` — the spec every screen is derived from.
 
 **`android/` is committed on purpose.** It holds hand-written native code, so
@@ -223,12 +239,11 @@ grey-paper-plus-dot-grid combination. Type is Instrument Serif (display) + Inter
 Mono (labels and data). Colour is six categorical brights used to distinguish
 categories, never a single brand accent.
 
-Nothing survives in exactly one place: **the widget's background**, which
-resolves `nothing-mtui`'s `widgetBg` token against the device's live Material
-You palette. That palette is read natively from
-`android.R.color.system_neutral1_*` and handed to JS over the widget bridge —
-calling `nothingWidgetColors(null, …)` returns the package's static fallback
-and silently stops tracking the wallpaper.
+Nothing survives in exactly one place: **the widget's background**, the
+Material You neutral Nothing's own widgets sit on
+(`android.R.color.system_neutral1_50` / `_900`). It is read natively in
+`WidgetSurface.kt` each time the card is composed — never carried in the
+sync payload, which would keep the old colour after the wallpaper changed.
 
 Dots as texture are allowed only where the source pin is built from them:
 `now` (LED numerals), `dots` (the puzzle), `archive` (circle rows). Everywhere else use that pin's own device — crosses, ribbons,
@@ -236,8 +251,8 @@ stacked squares, arcs, filing rules.
 
 ## Running against Metro (emulator QA)
 
-The HTML previews size off a fixed 393 px box and have missed real layout bugs;
-the emulator is the loop that catches them. Two gotchas on this machine:
+The emulator is the loop that catches layout bugs. Two gotchas on this
+machine:
 
 - **Port 8081 is taken by another service**, so start Metro elsewhere and map
   it: `npx expo start --port 8082` then
@@ -277,8 +292,9 @@ Two separate things follow from it and both are load-bearing:
   add up to `contributionCalendar.totalContributions` — the difference is work
   in repositories the profile does not expose. It has to be queried and carried
   as its own bucket, or every "where it went" figure understates the year.
-- **The widgets must read the calendar, not the commit buckets.** `todayCount`
-  and `total` include private work; `todayCommits` and `totalCommits` do not.
+- **The widget must read the calendar, not the commit buckets.** `todayCount`
+  (the only count in its payload) includes private work; `todayCommits` does
+  not.
 
 `useTokenScopes` only reports `limited` when it is certain: classic PATs send
 `x-oauth-scopes`, fine-grained ones send nothing, and there is nothing to infer
@@ -306,11 +322,12 @@ survive either; a layout inflated into the launcher's process ignores
 
 What works is `ViewFlipper` with `android:autoStart="true"`: it starts itself on
 attach, animates from this package's `res/anim`, and stops when the screen goes
-off. Widget A's strip is two `ImageView` children holding the same painted line,
-flipped at exactly the length of one pass. The children are images rather than text
-because of the font, and their width is set with `setViewLayoutWidth` (API 31) so
-that `toXDelta="-100%"` means the width of *the message* rather than the width of
-the card — without it the line can never leave the screen.
+off. The widget's strip is a flipper of `ImageView` frames, each two card widths of
+the painted loop, each slid exactly one width per turn so the hand-over lands on
+identical pixels (`design/DESIGN.md` has the whole mechanism). The children are images
+rather than text because of the font, and their width is set with
+`setViewLayoutWidth` (API 31) so that a percentage delta means the width of *the
+frame* rather than the width of the card.
 
 ### A background colour that changes loses its corner radius
 
@@ -351,13 +368,24 @@ response*, which is the entire point of that screen. Measure with
 
 ## Checks
 
-There are no tests. Before shipping, run `npx tsc --noEmit` (it should be
-clean) and `npx eslint app src` (four warnings, all pre-existing — `NowScreen`
-imports an unused `G`, `IndexScreen` has an exhaustive-deps note, and
-`Wordmark` imports `react-native` twice). **Zero errors; do not add more
-warnings.** Note that
+Before shipping, all three must be clean:
+
+```bash
+npm run typecheck   # the app, then the tests (tsconfig.test.json)
+npm run lint        # zero errors and zero warnings — keep it that way
+npm test            # unit tests on Node's built-in runner, no extra deps
+```
+
+Tests live beside the module they test (`src/lib/nav.test.ts`) and may only
+import modules that do not load React Native or an Expo native module —
+`tsconfig.test.json` compiles them to `.test-build/` as CommonJS and Node runs
+them. Keep pure logic in modules like that so it can be tested; a screen is
+checked on the emulator instead.
+
 eslint here errors on `setState` called synchronously in an effect body, so a
 hook that resets state on a prop change has to derive it during render instead
-— `useContributions` and `useTokenScopes` both stamp their result with the
-token that produced it for exactly this reason. The `preview/*.html` sheet is a browser sandbox and has drifted
-behind the app; trust the emulator over it.
+— `useRemote` and `useTokenScopes` both stamp their result with the key that
+produced it for exactly this reason. Hooks that feed the session return one
+object per distinct answer (`useMemo`), because the screens are memoised
+against them; a hook that returns a fresh object every render redraws every
+mounted screen.

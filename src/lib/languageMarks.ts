@@ -1,10 +1,10 @@
 /**
- * Language marks, from devicon (MIT). Each entry is the icon's viewBox and its
- * subpaths joined into one `d` — they are drawn as a single tinted silhouette
+ * Language marks, from devicon (https://github.com/devicons/devicon, MIT —
+ * see THIRD-PARTY-NOTICES.md). Each entry is the icon's viewBox and its
+ * subpaths joined into one `d`: they are drawn as a single tinted silhouette
  * rather than in brand colour, because they sit on a chip already filled with
- * GitHub's colour for that language.
- *
- * Generated; see scripts/fetch_lang_icons.py.
+ * GitHub's colour for that language. To add one, take the language's `plain`
+ * SVG from devicon and join its paths the same way.
  */
 export interface LanguageMark {
   viewBox: string;

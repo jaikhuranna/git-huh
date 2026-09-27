@@ -160,7 +160,7 @@ function Fill({
           <Field
             answer={field.type === 'markdown' ? undefined : answers[field.id]}
             field={field}
-            key={index}
+            key={field.type === 'markdown' ? `text-${index}` : field.id}
             onChange={(value) => field.type !== 'markdown' && set(field.id, value)}
             width={width - space.gutter * 2}
           />
