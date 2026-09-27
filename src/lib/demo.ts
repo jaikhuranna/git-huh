@@ -36,9 +36,13 @@ function rng(seed: number): () => number {
   };
 }
 
-const DEMO_LOGIN = 'jaikhuranna';
-const DEMO_NAME = 'Jai Khurana';
-const DEMO_BIO = 'Building small, honest software. Currently: git-huh.';
+/**
+ * GitHub's own placeholder account, so nobody reads the demo's invented year
+ * as a real person's. Every figure below is generated.
+ */
+const DEMO_LOGIN = 'octocat';
+const DEMO_NAME = 'The Octocat';
+const DEMO_BIO = 'A demo account. Every number here is made up.';
 const DEMO_AVATAR = 'https://avatars.githubusercontent.com/u/0?v=4';
 const DEMO_CREATED_AT = '2016-03-12T00:00:00Z';
 const YEAR_COUNT = 6;
@@ -47,40 +51,40 @@ export const demoPullRequests: PullRequest[] = [
   {
     number: 142,
     title: 'feat: adaptive icon monochrome layer',
-    repo: 'jaikhuranna/git-huh',
-    htmlUrl: 'https://github.com/jaikhuranna/git-huh/pull/142',
+    repo: `${DEMO_LOGIN}/git-huh`,
+    htmlUrl: `https://github.com/${DEMO_LOGIN}/git-huh/pull/142`,
     createdAt: '2026-09-16T10:24:00Z',
     draft: false,
   },
   {
     number: 139,
     title: 'fix(widget): today cell timezone drift',
-    repo: 'jaikhuranna/git-huh',
-    htmlUrl: 'https://github.com/jaikhuranna/git-huh/pull/139',
+    repo: `${DEMO_LOGIN}/git-huh`,
+    htmlUrl: `https://github.com/${DEMO_LOGIN}/git-huh/pull/139`,
     createdAt: '2026-09-14T18:03:00Z',
     draft: false,
   },
   {
     number: 41,
     title: 'docs: release ritual checklist',
-    repo: 'jaikhuranna/paper-tokens',
-    htmlUrl: 'https://github.com/jaikhuranna/paper-tokens/pull/41',
+    repo: `${DEMO_LOGIN}/paper-tokens`,
+    htmlUrl: `https://github.com/${DEMO_LOGIN}/paper-tokens/pull/41`,
     createdAt: '2026-09-11T09:41:00Z',
     draft: false,
   },
   {
     number: 128,
     title: 'perf: memoize dot matrix columns',
-    repo: 'jaikhuranna/git-huh',
-    htmlUrl: 'https://github.com/jaikhuranna/git-huh/pull/128',
+    repo: `${DEMO_LOGIN}/git-huh`,
+    htmlUrl: `https://github.com/${DEMO_LOGIN}/git-huh/pull/128`,
     createdAt: '2026-09-08T21:12:00Z',
     draft: true,
   },
   {
     number: 33,
     title: 'chore: bump glance to 1.1.1',
-    repo: 'jaikhuranna/dot-tiles',
-    htmlUrl: 'https://github.com/jaikhuranna/dot-tiles/pull/33',
+    repo: `${DEMO_LOGIN}/dot-tiles`,
+    htmlUrl: `https://github.com/${DEMO_LOGIN}/dot-tiles/pull/33`,
     createdAt: '2026-08-30T14:55:00Z',
     draft: false,
   },
@@ -376,7 +380,7 @@ export function demoActivity(): Activity {
       hour: ((hour % 24) + 24) % 24,
       weekday: when.getDay(),
       date: `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}`,
-      repo: `jaikhuranna/${DEMO_REPOS[Math.floor(random() * DEMO_REPOS.length)]}`,
+      repo: `${DEMO_LOGIN}/${DEMO_REPOS[Math.floor(random() * DEMO_REPOS.length)]}`,
       additions: Math.round(size * (0.45 + random() * 0.5)),
       deletions: Math.round(size * (0.1 + random() * 0.45)),
       message: DEMO_MESSAGES[Math.floor(random() * DEMO_MESSAGES.length)],
@@ -450,9 +454,9 @@ export function demoSocial(): SocialEvent[] {
       kind: 'comment',
       actor: 'annapetrova',
       title: 'feat: adaptive icon monochrome layer',
-      repo: 'jaikhuranna/git-huh',
+      repo: `${DEMO_LOGIN}/git-huh`,
       number: 142,
-      url: 'https://github.com/jaikhuranna/git-huh/pull/142',
+      url: `https://github.com/${DEMO_LOGIN}/git-huh/pull/142`,
       at: hours(2),
       excerpt: 'The monochrome layer looks right on my Pixel, but the padding is off by a hair at 48dp.',
     },
@@ -462,9 +466,9 @@ export function demoSocial(): SocialEvent[] {
       actor: 'marcusleroy',
       state: 'CHANGES_REQUESTED',
       title: 'refactor: split the sankey layout pass',
-      repo: 'jaikhuranna/git-huh',
+      repo: `${DEMO_LOGIN}/git-huh`,
       number: 139,
-      url: 'https://github.com/jaikhuranna/git-huh/pull/139',
+      url: `https://github.com/${DEMO_LOGIN}/git-huh/pull/139`,
       at: hours(7),
       excerpt: 'Two passes over the same array — can this fold into one?',
     },
@@ -496,9 +500,9 @@ export function demoSocial(): SocialEvent[] {
       actor: 'annapetrova',
       state: 'APPROVED',
       title: 'perf: memoize dot matrix columns',
-      repo: 'jaikhuranna/dot-tiles',
+      repo: `${DEMO_LOGIN}/dot-tiles`,
       number: 57,
-      url: 'https://github.com/jaikhuranna/dot-tiles/pull/57',
+      url: `https://github.com/${DEMO_LOGIN}/dot-tiles/pull/57`,
       at: hours(26),
       excerpt: 'Nice — 40% fewer re-renders on my trace.',
     },
@@ -767,7 +771,7 @@ export function demoThread(repo: string, number: number, type: 'issue' | 'discus
     url: `https://github.com/${repo}/${discussion ? 'discussions' : 'issues'}/${number}`,
     body: discussion
       ? 'Material You gives us both. The wallpaper is prettier, the theme is what people *chose*. Which one wins when they disagree?'
-      : 'After switching from light to dark the widget keeps the old background until the next sync.\n\n**Steps**\n\n1. Place the widget\n2. Switch the system theme\n3. Wait\n\n@jaikhuranna any idea whether the palette is read once?',
+      : 'After switching from light to dark the widget keeps the old background until the next sync.\n\n**Steps**\n\n1. Place the widget\n2. Switch the system theme\n3. Wait\n\n@octocat any idea whether the palette is read once?',
     state: discussion ? 'OPEN' : 'OPEN',
     author: 'devonwrites',
     createdAt: ago(52),
