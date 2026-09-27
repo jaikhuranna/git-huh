@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { GitHubError } from '../lib/github';
 import { readSaved, writeSaved } from '../lib/store';
@@ -107,6 +107,31 @@ export function useRemote<T>(
 
   const reload = useCallback(() => setNonce((value) => value + 1), []);
 
+  // One object per distinct answer, so a screen memoised on it redraws when
+  // the answer changes rather than whenever its parent does.
+  return useMemo(
+    () => derive({ key, nonce, demo, cached, fresh, failed, reload }),
+    [cached, demo, failed, fresh, key, nonce, reload],
+  );
+}
+
+function derive<T>({
+  key,
+  nonce,
+  demo,
+  cached,
+  fresh,
+  failed,
+  reload,
+}: {
+  key: string | null;
+  nonce: number;
+  demo: T | undefined;
+  cached: Round<T> | null;
+  fresh: Round<T> | null;
+  failed: Failure | null;
+  reload: () => void;
+}): Remote<T> & { reload: () => void } {
   if (key == null) return { status: 'idle', reload };
   if (demo !== undefined) {
     return {

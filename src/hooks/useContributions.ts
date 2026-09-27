@@ -84,27 +84,29 @@ export function useContributions(
     },
   );
 
-  switch (remote.status) {
-    case 'idle':
-      return { status: 'idle', reload: remote.reload };
-    case 'loading':
-      return { status: 'loading', reload: remote.reload };
-    case 'ready':
-      return {
-        status: 'ready',
-        model: remote.data,
-        savedAt: remote.savedAt,
-        offline: remote.offline,
-        reload: remote.reload,
-      };
-    case 'error':
-      return {
-        status: 'error',
-        error:
-          remote.error instanceof GitHubError
-            ? remote.error
-            : new GitHubError('api', 'Something unexpected happened.'),
-        reload: remote.reload,
-      };
-  }
+  return useMemo((): ContributionsState & { reload: () => void } => {
+    switch (remote.status) {
+      case 'idle':
+        return { status: 'idle', reload: remote.reload };
+      case 'loading':
+        return { status: 'loading', reload: remote.reload };
+      case 'ready':
+        return {
+          status: 'ready',
+          model: remote.data,
+          savedAt: remote.savedAt,
+          offline: remote.offline,
+          reload: remote.reload,
+        };
+      case 'error':
+        return {
+          status: 'error',
+          error:
+            remote.error instanceof GitHubError
+              ? remote.error
+              : new GitHubError('api', 'Something unexpected happened.'),
+          reload: remote.reload,
+        };
+    }
+  }, [remote]);
 }

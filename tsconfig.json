@@ -2,5 +2,12 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "android",
+    "ios",
+    ".test-build",
+    "**/*.test.ts"
+  ]
 }

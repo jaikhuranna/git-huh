@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import {
   Linking,
   Pressable,
@@ -15,23 +15,43 @@ import { Label } from '../components/Type';
 import { Wordmark } from '../components/Wordmark';
 import { savedAge } from '../lib/store';
 import { DEMO_TOKEN } from '../lib/token';
-import { ArchiveScreen } from '../screens/ArchiveScreen';
-import { BriefScreen } from '../screens/BriefScreen';
-import { CardsScreen } from '../screens/CardsScreen';
-import { ClockScreen } from '../screens/ClockScreen';
-import { DotsScreen } from '../screens/DotsScreen';
-import { FlowScreen } from '../screens/FlowScreen';
-import { HeyScreen } from '../screens/HeyScreen';
-import { InboxScreen } from '../screens/InboxScreen';
-import { IndexScreen } from '../screens/IndexScreen';
-import { NowScreen } from '../screens/NowScreen';
-import { OrbitScreen } from '../screens/OrbitScreen';
-import { PosterScreen } from '../screens/PosterScreen';
-import { ReviewScreen } from '../screens/ReviewScreen';
-import { WeatherScreen } from '../screens/WeatherScreen';
+import { ArchiveScreen as ArchiveView } from '../screens/ArchiveScreen';
+import { BriefScreen as BriefView } from '../screens/BriefScreen';
+import { CardsScreen as CardsView } from '../screens/CardsScreen';
+import { ClockScreen as ClockView } from '../screens/ClockScreen';
+import { DotsScreen as DotsView } from '../screens/DotsScreen';
+import { FlowScreen as FlowView } from '../screens/FlowScreen';
+import { HeyScreen as HeyView } from '../screens/HeyScreen';
+import { InboxScreen as InboxView } from '../screens/InboxScreen';
+import { IndexScreen as IndexView } from '../screens/IndexScreen';
+import { NowScreen as NowView } from '../screens/NowScreen';
+import { OrbitScreen as OrbitView } from '../screens/OrbitScreen';
+import { PosterScreen as PosterView } from '../screens/PosterScreen';
+import { ReviewScreen as ReviewView } from '../screens/ReviewScreen';
+import { WeatherScreen as WeatherView } from '../screens/WeatherScreen';
 import { colors, space, themed } from '../theme';
 import { SECTIONS, type ScreenName, type SectionView } from './sections';
 import { useSession } from './session';
+
+/**
+ * Every section stays mounted once opened, and the session changes often — the
+ * inbox refreshes, a page is pushed over everything. Memoised, a screen redraws
+ * when its own data does, not whenever any of the fourteen's does.
+ */
+const ArchiveScreen = memo(ArchiveView);
+const BriefScreen = memo(BriefView);
+const CardsScreen = memo(CardsView);
+const ClockScreen = memo(ClockView);
+const DotsScreen = memo(DotsView);
+const FlowScreen = memo(FlowView);
+const HeyScreen = memo(HeyView);
+const InboxScreen = memo(InboxView);
+const IndexScreen = memo(IndexView);
+const NowScreen = memo(NowView);
+const OrbitScreen = memo(OrbitView);
+const PosterScreen = memo(PosterView);
+const ReviewScreen = memo(ReviewView);
+const WeatherScreen = memo(WeatherView);
 
 /**
  * The one thing the app cannot fix for you.
@@ -147,6 +167,19 @@ export function SectionScreen({ index }: { index: number }) {
   const section = SECTIONS[index];
   const loadingActivity = activityState.status === 'loading';
 
+  const { switchTo, goToPage } = session;
+  const openPull = useCallback(
+    (pr: { repo: string; number: number }) =>
+      nav.open({ kind: 'pull', repo: pr.repo, number: pr.number }),
+    [nav],
+  );
+  const addAccount = useCallback(() => nav.open({ kind: 'add-account' }), [nav]);
+  const switchAccount = useCallback(
+    (account: { token: string }) => switchTo(account.token),
+    [switchTo],
+  );
+  const onPage = useCallback((page: number) => goToPage(index, page), [goToPage, index]);
+
   const render = (name: ScreenName, live: boolean) => {
     if (!model) return null;
     switch (name) {
@@ -156,9 +189,9 @@ export function SectionScreen({ index }: { index: number }) {
             accounts={session.accounts}
             demo={token === DEMO_TOKEN}
             model={model}
-            onAdd={() => nav.open({ kind: 'add-account' })}
+            onAdd={addAccount}
             onDisconnect={session.disconnect}
-            onSwitch={(account) => session.switchTo(account.token)}
+            onSwitch={switchAccount}
           />
         );
       case 'now':
@@ -171,18 +204,11 @@ export function SectionScreen({ index }: { index: number }) {
         return <InboxScreen onOpen={session.openEvent} state={social} triage={triage} />;
       case 'index':
         return (
-          <IndexScreen
-            onOpen={(pr) => nav.open({ kind: 'pull', repo: pr.repo, number: pr.number })}
-            state={prs}
-          />
+          <IndexScreen onOpen={openPull} state={prs} />
         );
       case 'brief':
         return (
-          <BriefScreen
-            activity={activity}
-            loading={loadingActivity}
-            onOpen={(pr) => nav.open({ kind: 'pull', repo: pr.repo, number: pr.number })}
-          />
+          <BriefScreen activity={activity} loading={loadingActivity} onOpen={openPull} />
         );
       case 'review':
         return <ReviewScreen activity={activity} loading={loadingActivity} />;
@@ -219,7 +245,7 @@ export function SectionScreen({ index }: { index: number }) {
       <View style={styles.body}>
         <SectionPager
           active={index === tab && stack.length === 0}
-          onPage={(page) => session.goToPage(index, page)}
+          onPage={onPage}
           page={pages[index]}
           render={render}
           views={section.views}

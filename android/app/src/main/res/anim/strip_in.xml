@@ -8,9 +8,9 @@
   further along the loop, so when it is shown at rest the pixels do not change:
   no seam, and no gap.
 
-  It used to start at `100%p`, beyond the right edge of the card, which meant
-  five seconds of empty card at the top of every pass before the first letter
-  arrived. Do not put it back.
+  Do not start it at `100%p`, beyond the right edge of the card: that is five
+  seconds of empty card at the top of every pass before the first letter
+  arrives.
 
   `fillAfter` is deliberately absent. A turn that is interrupted — and the one
   started at bind time, before the view is attached, often is — would otherwise

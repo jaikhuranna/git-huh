@@ -48,10 +48,9 @@ const SECURITY_TOKEN_URL =
 /**
  * A repository, from the inside.
  *
- * The repo cards used to be the end of the line — tap one and you were in a
- * browser. This is the other side of the card: the files, a search through
- * the code, the releases, the open issues, the discussions and the security
- * alerts, each of them a named gap in GitHub's own phone app.
+ * The other side of a repo card: the files, a search through the code, the
+ * releases, the open issues, the discussions and the security alerts, each
+ * of them a named gap in GitHub's own phone app.
  */
 export function RepoScreen({ repo }: { repo: string }) {
   const nav = useNav();

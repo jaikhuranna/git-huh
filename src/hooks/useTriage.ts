@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { SocialEvent } from '../lib/social';
 import { loadMarks, nextMorning, saveMarks, type Marks } from '../lib/triage';
+
+const NO_MARKS: Marks = {};
 
 interface Loaded {
   login: string;
@@ -30,7 +32,7 @@ export function useTriage(login: string | null): Triage {
     };
   }, [login]);
 
-  const marks = loaded && loaded.login === login ? loaded.marks : {};
+  const marks = loaded && loaded.login === login ? loaded.marks : NO_MARKS;
 
   const update = useCallback(
     (change: (current: Marks) => Marks) => {
@@ -45,20 +47,23 @@ export function useTriage(login: string | null): Triage {
     [login],
   );
 
-  return {
-    marks,
-    done: (event) =>
-      update((current) => ({ ...current, [event.id]: { at: event.at, done: true } })),
-    snooze: (event) =>
-      update((current) => ({
-        ...current,
-        [event.id]: { at: event.at, snoozeUntil: nextMorning() },
-      })),
-    reopen: (event) =>
-      update((current) => {
-        const next = { ...current };
-        delete next[event.id];
-        return next;
-      }),
-  };
+  return useMemo(
+    () => ({
+      marks,
+      done: (event: SocialEvent) =>
+        update((current) => ({ ...current, [event.id]: { at: event.at, done: true } })),
+      snooze: (event: SocialEvent) =>
+        update((current) => ({
+          ...current,
+          [event.id]: { at: event.at, snoozeUntil: nextMorning() },
+        })),
+      reopen: (event: SocialEvent) =>
+        update((current) => {
+          const next = { ...current };
+          delete next[event.id];
+          return next;
+        }),
+    }),
+    [marks, update],
+  );
 }

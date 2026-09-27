@@ -101,7 +101,7 @@ function Spiral({
   const cx = size / 2;
   const cy = size / 2;
   // The outer end has to clear the largest chip, or the top language is
-  // sliced off by the edge of the canvas — which is what used to happen.
+  // sliced off by the edge of the canvas.
   const outer = size / 2 - 20;
   const inner = size * 0.1;
 

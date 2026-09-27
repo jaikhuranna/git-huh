@@ -7,9 +7,9 @@ import { rest } from './rest';
 /**
  * Everything the app can change on GitHub, in one place.
  *
- * git-huh read and never wrote, which made triage end in "open the laptop"
- * — the most common reason people give for the phone app being half a tool.
- * These are the writes that finish a triage: reply, review, comment on a
+ * An app that only reads makes triage end in "open the laptop" — the most
+ * common reason people give for a phone app being half a tool. These are
+ * the writes that finish a triage: reply, review, comment on a
  * line, open an issue, close one, and make the small change yourself. Each
  * one is a single request the person has pressed a named button for; none
  * of them happen in the background.
@@ -197,12 +197,18 @@ export async function commitDirect(token: string, proposal: Proposal): Promise<P
  * collaborator: fork, branch, commit, and a pull request back upstream.
  */
 export async function proposeChange(token: string, proposal: Proposal): Promise<ProposalResult> {
-  const branch = await freshBranchName(token, proposal);
+  // The commit the file was read at. Resolved once, upstream: a fork may be
+  // behind, or lack the branch entirely, and forks share their parent's
+  // objects, so the new branch can start from this commit either way.
+  const base = await rest(token, `/repos/${proposal.repo}/git/ref/heads/${encodePath(proposal.base)}`, {
+    schema: refSchema,
+  });
 
   let headRepo = proposal.repo;
   let headOwner: string | null = null;
+  let branch: string;
   try {
-    await createBranch(token, proposal.repo, proposal.base, branch);
+    branch = await branchAt(token, headRepo, proposal.login, base.object.sha);
   } catch (error) {
     if (!(error instanceof GitHubError) || (error.kind !== 'forbidden' && error.kind !== 'missing')) {
       throw error;
@@ -210,43 +216,42 @@ export async function proposeChange(token: string, proposal: Proposal): Promise<
     const fork = await forkOf(token, proposal.repo);
     headRepo = fork.full_name;
     headOwner = fork.owner.login;
-    await createBranch(token, headRepo, proposal.base, branch);
+    branch = await branchAt(token, headRepo, proposal.login, base.object.sha);
   }
 
   await putFile(token, headRepo, proposal, branch);
 
+  const [title, ...description] = proposal.message.split('\n');
   const pull = await rest(token, `/repos/${proposal.repo}/pulls`, {
     method: 'POST',
     body: {
-      title: proposal.message.split('\n')[0],
+      title,
       head: headOwner ? `${headOwner}:${branch}` : branch,
       base: proposal.base,
-      body: proposal.message.includes('\n')
-        ? proposal.message.split('\n').slice(1).join('\n').trim()
-        : '',
+      body: description.join('\n').trim(),
     },
     schema: pullMade,
   });
   return { kind: 'pull', repo: proposal.repo, number: pull.number };
 }
 
-async function createBranch(token: string, repo: string, from: string, branch: string) {
-  const base = await rest(token, `/repos/${repo}/git/ref/heads/${encodePath(from)}`, {
-    schema: refSchema,
-  });
+/** A new branch in `repo` pointing at `sha`, named the way the website names it. */
+async function branchAt(token: string, repo: string, login: string, sha: string): Promise<string> {
+  const branch = await freshBranchName(token, repo, login);
   await rest(token, `/repos/${repo}/git/refs`, {
     method: 'POST',
-    body: { ref: `refs/heads/${branch}`, sha: base.object.sha },
+    body: { ref: `refs/heads/${branch}`, sha },
   });
+  return branch;
 }
 
 /** `login-patch-1`, the website's own naming, bumped until it is free. */
-async function freshBranchName(token: string, proposal: Proposal): Promise<string> {
-  const stem = `${proposal.login.toLowerCase()}-patch`;
+async function freshBranchName(token: string, repo: string, login: string): Promise<string> {
+  const stem = `${login.toLowerCase()}-patch`;
   for (let n = 1; n <= 30; n++) {
     const name = `${stem}-${n}`;
     try {
-      await rest(token, `/repos/${proposal.repo}/git/ref/heads/${name}`);
+      await rest(token, `/repos/${repo}/git/ref/heads/${name}`);
     } catch (error) {
       if (error instanceof GitHubError && error.kind === 'missing') return name;
       throw error;

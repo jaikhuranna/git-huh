@@ -278,8 +278,8 @@ export function toGitHubModel(
   }
 
   // GitHub's calendar day boundaries can drift one day off the local clock;
-  // if no cell matched, mark the most recent past day as "today" so the
-  // accent dot always renders.
+  // if no cell matched, mark the most recent past day as "today" so today
+  // always has a cell.
   if (!allDays.some((day) => day.isToday)) {
     const lastPast = allDays.findLast((day) => day.date <= today);
     if (lastPast) lastPast.isToday = true;
@@ -339,8 +339,20 @@ export interface Insights {
 
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
+/** Four screens read the same model's insights; each model is read once. */
+const insightsOf = new WeakMap<GitHubModel, Insights>();
+
 /** Streaks, peaks and rhythms derived from the visible window. */
 export function insights(model: GitHubModel): Insights {
+  let found = insightsOf.get(model);
+  if (!found) {
+    found = computeInsights(model);
+    insightsOf.set(model, found);
+  }
+  return found;
+}
+
+function computeInsights(model: GitHubModel): Insights {
   const days = model.columns.flat();
   const todayIndex = days.findIndex((day) => day.isToday);
   const last = todayIndex >= 0 ? todayIndex : days.length - 1;
@@ -364,7 +376,7 @@ export function insights(model: GitHubModel): Insights {
 
   days.forEach((day, index) => {
     if (day.count > 0) {
-      run = run === 0 ? 1 : run + 1;
+      run += 1;
       if (run === 1) runStart = index;
       if (run > longestStreak) {
         longestStreak = run;

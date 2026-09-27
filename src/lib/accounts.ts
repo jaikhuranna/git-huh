@@ -6,12 +6,11 @@ import { keyOf, removeSaved, removeSavedPrefix } from './store';
 /**
  * Every account this phone has been given a token for.
  *
- * The app used to hold exactly one token, which is right for a personal app
- * and wrong for anyone with a work account and a personal one — the second
- * most common reason people give for wanting more from a GitHub app. The
- * current token still lives where it always has (`tokenStore`); this is the
- * list you can switch between, kept in the keystore beside it because it is
- * made of tokens too.
+ * One token is right for a personal app and wrong for anyone with a work
+ * account and a personal one — the second most common reason people give for
+ * wanting more from a GitHub app. The current token lives in `tokenStore`;
+ * this is the list you can switch between, kept in the keystore beside it
+ * because it is made of tokens too.
  *
  * Two accounts are the same account when their logins match; adding a login
  * that is already here replaces its token rather than listing it twice.

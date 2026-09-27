@@ -39,10 +39,9 @@ interface Series {
  * chips walk back through every year the account has been active.
  *
  * Every year is drawn from its *own* calendar, so 2019 gets the same
- * fifty-two columns as this year. The screen used to fall back to twelve
- * monthly bars for anything but the latest year, which made older years look
- * like a different chart — and drew the trailing-365-day window under this
- * year's label, which was not that year at all.
+ * fifty-two columns as this year rather than twelve monthly bars that read
+ * as a different chart — and this year's label sits over this calendar year,
+ * not over the trailing 365 days.
  */
 export function PosterScreen({ model }: { model: GitHubModel }) {
   const [year, setYear] = useState<number | null>(null);

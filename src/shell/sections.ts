@@ -37,9 +37,9 @@ export interface Section {
 /**
  * Five sections, and every screen belongs to exactly one.
  *
- * The app used to be thirteen equal pages behind a scrolling rail, which
- * meant the answer to "where is the thing I want" was "swipe until it turns
- * up". These are the four questions the screens actually answer — what today
+ * Thirteen equal pages behind a scrolling rail make the answer to "where is
+ * the thing I want" "swipe until it turns up". These are the four questions
+ * the screens actually answer — what today
  * looks like, what wants me, what I am shipping, what the year was — plus
  * `lab`, which is where an artefact lives until it has earned a place in one
  * of the other four.

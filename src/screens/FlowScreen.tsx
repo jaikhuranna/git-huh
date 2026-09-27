@@ -126,9 +126,9 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
 
   /**
    * The second stage belongs to the commits band alone: `topRepos` is built
-   * from commit contributions, so hanging every repository off the whole
-   * trunk — as this used to — drew a diagram in which the repos absorbed
-   * pull requests and reviews they never saw. They are sized against the
+   * from commit contributions, and hanging every repository off the whole
+   * trunk would draw repos absorbing pull requests and reviews they never
+   * saw. They are sized against the
    * commits band, which means a year that was mostly private shows a thin
    * fan. That is the shape of the year, and the legend carries the numbers.
    */

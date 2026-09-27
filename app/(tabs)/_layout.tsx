@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useEffect } from 'react';
+import { memo, useEffect } from 'react';
 import { BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { PatForm } from '../../src/components/PatForm';
@@ -17,8 +17,11 @@ import { SECTIONS } from '../../src/shell/sections';
 import { useSession } from '../../src/shell/session';
 import { colors, fonts, space, themed } from '../../src/theme';
 
-/** One thing pushed over the sections. */
-function RouteView({ route }: { route: Route }) {
+/**
+ * One thing pushed over the sections. Memoised: a page lower in the stack
+ * should not redraw because another was pushed on top of it.
+ */
+const RouteView = memo(function RouteView({ route }: { route: Route }) {
   switch (route.kind) {
     case 'pull':
       return <PullScreen number={route.number} repo={route.repo} />;
@@ -33,7 +36,7 @@ function RouteView({ route }: { route: Route }) {
     case 'add-account':
       return null;
   }
-}
+});
 
 function routeKey(route: Route): string {
   switch (route.kind) {
@@ -65,8 +68,8 @@ function AddAccount({ onCancel, onVerified }: { onCancel: () => void; onVerified
 /**
  * The five sections on the platform's own tab bar: `UITabBarController` on
  * iOS, which is Liquid Glass on iOS 26, and Material 3's navigation bar on
- * Android. The bar used to be drawn in JavaScript, which could never look like
- * either system's and was the one part of the app that felt like a web page.
+ * Android. A bar drawn in JavaScript can never look like either system's,
+ * and would be the one part of the app that felt like a web page.
  *
  * Nothing is here until there is a year to show: the loading wave, the token
  * form and the error all take the whole screen, with no bar under them.

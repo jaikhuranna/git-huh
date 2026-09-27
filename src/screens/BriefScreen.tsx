@@ -18,14 +18,13 @@ import { ago, fmt } from './shared';
  * pin03's filing card, opened up. The `index` screen lists pull requests;
  * this one actually reads one — the description, the diff, the review state.
  *
- * The description is rendered rather than printed. GitHub hands back raw
- * Markdown, and this screen used to put it on the page verbatim: a heading
- * arrived as a literal `## Problem` and a list as a column of hyphens.
+ * The description is rendered rather than printed: GitHub hands back raw
+ * Markdown, and verbatim a heading arrives as a literal `## Problem` and a
+ * list as a column of hyphens.
  *
  * Paging lives in a bar pinned to the bottom, so `next` is in the same place
- * on every pull request. It used to sit under the description, which meant
- * its position depended on how much the author had written — a long body put
- * it below the fold and a one-liner put it halfway up the screen.
+ * on every pull request. Under the description, its position would depend on
+ * how much the author had written.
  */
 export function BriefScreen({
   activity,

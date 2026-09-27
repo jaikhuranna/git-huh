@@ -427,6 +427,11 @@ export function lastCommitAt(
   return latest;
 }
 
+/** Merge commits are GitHub's words, not yours: no screen prints them. */
+export function isMergeSubject(message: string): boolean {
+  return /^merge (branch|pull request|remote|commit)/i.test(message);
+}
+
 /**
  * `count` messages spread evenly across the whole history rather than taken
  * off the top, so the loading screen shows work from all over time instead of
@@ -442,7 +447,7 @@ export function spreadMessages(
   for (const commit of commits) {
     const clean = commit.message.trim();
     if (clean.length === 0) continue;
-    if (/^merge (branch|pull request|remote)/i.test(clean)) continue;
+    if (isMergeSubject(clean)) continue;
     const key = clean.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

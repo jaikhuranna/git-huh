@@ -34,14 +34,16 @@ export function useOpenPrs(
     },
   );
 
-  if (remote.status === 'ready') {
-    return {
-      status: 'ready',
-      prs: remote.data,
-      savedAt: remote.savedAt,
-      offline: remote.offline,
-    };
-  }
-  if (remote.status === 'error') return { status: 'error' };
-  return { status: remote.status };
+  return useMemo(() => {
+    if (remote.status === 'ready') {
+      return {
+        status: 'ready',
+        prs: remote.data,
+        savedAt: remote.savedAt,
+        offline: remote.offline,
+      };
+    }
+    if (remote.status === 'error') return { status: 'error' };
+    return { status: remote.status };
+  }, [remote]);
 }

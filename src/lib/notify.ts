@@ -83,6 +83,12 @@ export function kindOf(event: SocialEvent): NotifyKind | null {
 const stamp = (event: SocialEvent) => event.id;
 const seenKey = (login: string) => `${login.toLowerCase()}-notified`;
 
+/** The seen-set, read back. Entries once carried `@updatedAt`; drop it. */
+async function readSeen(login: string): Promise<string[]> {
+  const saved = (await readSaved<string[]>(seenKey(login)))?.value ?? [];
+  return saved.map((entry) => entry.split('@')[0]);
+}
+
 export async function readSettings(): Promise<NotifySettings> {
   return (await readSaved<NotifySettings>(SETTINGS_KEY))?.value ?? DEFAULT_SETTINGS;
 }
@@ -93,7 +99,7 @@ export async function writeSettings(settings: NotifySettings): Promise<void> {
 
 /** What the phone already knows about — so the background check stays quiet about it. */
 export async function markSeen(login: string, events: SocialEvent[]): Promise<void> {
-  const seen = (await readSaved<string[]>(seenKey(login)))?.value ?? [];
+  const seen = await readSeen(login);
   const next = [...new Set([...events.map(stamp), ...seen])].slice(0, KEEP_SEEN);
   await writeSaved(seenKey(login), next);
 }
@@ -129,12 +135,12 @@ async function checkInbox(): Promise<number> {
   const [events, marks, seenSaved] = await Promise.all([
     fetchSocial(token, login),
     loadMarks(login),
-    readSaved<string[]>(seenKey(login)),
+    readSeen(login),
   ]);
   // The inbox opens on what this pass read, rather than on an older answer.
   await writeSaved(`${login.toLowerCase()}-social`, events);
 
-  const seen = new Set(seenSaved?.value ?? []);
+  const seen = new Set(seenSaved);
   const fresh = events.filter((event) => {
     const kind = kindOf(event);
     return (

@@ -1,7 +1,23 @@
 {
   "name": "git-huh",
   "version": "3.2.0",
+  "description": "Your GitHub history as a set of printed artefacts, an inbox you can clear from your phone, and a home-screen widget.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "author": "Jai Khurana (https://github.com/jaikhuranna)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jaikhuranna/git-huh.git"
+  },
+  "private": true,
   "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "lint": "expo lint",
+    "test": "tsc -p tsconfig.test.json && cd .test-build && node --test"
+  },
   "dependencies": {
     "@bacons/apple-targets": "^5.0.0",
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
@@ -31,17 +47,10 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/node": "^22.20.3",
     "@types/react": "~19.2.2",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3"
-  },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
-  },
-  "private": true
+  }
 }

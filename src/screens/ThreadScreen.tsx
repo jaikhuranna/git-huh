@@ -19,7 +19,6 @@ import { ago } from './shared';
 /**
  * An issue or a discussion, opened — and answered — without leaving.
  *
- * It used to be the one kind of inbox row that still left for the browser.
  * The shape is the pull request's `talk` tab without the diff: the opening
  * post, the replies on wavy spines, and a box at the bottom. An issue can be
  * closed from here as well, since closing is what most triage of an issue

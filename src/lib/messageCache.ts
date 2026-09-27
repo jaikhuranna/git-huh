@@ -16,13 +16,12 @@ import { Platform } from 'react-native';
 
 const KEY = 'commit_lines';
 /**
- * Bumped whenever the shape or the limits of a stored line change, because a
- * pool already on the device is otherwise kept for a week and the change does
- * not reach the screen. 2.7 shipped a longer subject and a repository beside
- * it, and every phone carried on printing 34-character lines with nothing
- * after them: the cap is applied when a line is *written*, not when it is
- * read. A pool from an older version reads back with no timestamp, so it is
- * shown once and replaced on the same launch.
+ * Bump whenever the shape or the limits of a stored line change. A pool on
+ * the device is kept for a week, and the cap is applied when a line is
+ * *written*, not when it is read — so without a bump a new limit or field
+ * reaches no phone that already has a pool. A pool from another version
+ * reads back with no timestamp, so it is shown once and replaced on the same
+ * launch.
  */
 const VERSION = 2;
 const MAX_LINES = 40;
@@ -111,9 +110,9 @@ export async function readCachedLines(): Promise<CachedLines> {
 }
 
 /**
- * One stored entry, whichever shape it was written in. Caches written before
- * 2.7 hold bare strings and have no repository to give, so they read back
- * with an empty one and the widget simply prints nothing after the message.
+ * One stored entry, whichever shape it was written in. The oldest shape is a
+ * bare string with no repository to give, so it reads back with an empty one
+ * and the widget prints nothing after the message.
  */
 function toLine(entry: unknown): CommitLine | null {
   if (typeof entry === 'string') return { message: entry, repo: '' };

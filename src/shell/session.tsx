@@ -44,6 +44,8 @@ export type TokenState = string | null | undefined;
 /** Lines kept for the loading screen — it draws about 26 at a time. */
 const POOL_SIZE = 40;
 
+const INBOX = SECTIONS.findIndex((section) => section.key === 'inbox');
+
 export interface Session {
   token: TokenState;
   setToken: (token: string | null) => void;
@@ -213,7 +215,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (route) {
         setStack((current) => [...current, route]);
       } else if (data?.inbox) {
-        goToTab(1);
+        goToTab(INBOX);
       }
       Notifications.clearLastNotificationResponseAsync().catch(() => {});
     };
@@ -368,30 +370,58 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setTokenState(null);
   }, [accounts, login, resetSession, switchTo, token]);
 
-  const value: Session = {
-    token,
-    setToken,
-    contributions,
-    model,
-    scopes,
-    prs,
-    social,
-    triage,
-    activityState,
-    activity,
-    accounts,
-    said,
-    tab,
-    goToTab,
-    pages,
-    goToPage,
-    stack,
-    nav,
-    openEvent,
-    switchTo,
-    disconnect,
-    wanting: wantsYou(social, triage.marks),
-  };
+  const wanting = useMemo(() => wantsYou(social, triage.marks), [social, triage.marks]);
+
+  const value = useMemo<Session>(
+    () => ({
+      token,
+      setToken,
+      contributions,
+      model,
+      scopes,
+      prs,
+      social,
+      triage,
+      activityState,
+      activity,
+      accounts,
+      said,
+      tab,
+      goToTab,
+      pages,
+      goToPage,
+      stack,
+      nav,
+      openEvent,
+      switchTo,
+      disconnect,
+      wanting,
+    }),
+    [
+      accounts,
+      activity,
+      activityState,
+      contributions,
+      disconnect,
+      goToPage,
+      goToTab,
+      model,
+      nav,
+      openEvent,
+      pages,
+      prs,
+      said,
+      scopes,
+      setToken,
+      social,
+      stack,
+      switchTo,
+      tab,
+      token,
+      triage,
+      wanting,
+    ],
+  );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

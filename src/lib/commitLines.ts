@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { isMergeSubject } from './activity';
 import type { CommitLine } from './messageCache';
 import { rest } from './rest';
 
@@ -40,10 +41,8 @@ function subject(message: string): string {
   return message.split('\n')[0]?.trim() ?? '';
 }
 
-/** Merge commits are GitHub's words, not yours. */
 function authored(line: CommitLine): boolean {
-  if (line.message.length < 3) return false;
-  return !/^merge (branch|pull request|remote|commit)/i.test(line.message);
+  return line.message.length >= 3 && !isMergeSubject(line.message);
 }
 
 async function page(

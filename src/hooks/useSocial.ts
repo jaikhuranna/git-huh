@@ -35,15 +35,17 @@ export function useSocial(
     },
   );
 
-  if (remote.status === 'ready') {
-    return {
-      status: 'ready',
-      events: remote.data,
-      savedAt: remote.savedAt,
-      offline: remote.offline,
-      reload: remote.reload,
-    };
-  }
-  if (remote.status === 'error') return { status: 'error', reload: remote.reload };
-  return { status: remote.status, reload: remote.reload };
+  return useMemo(() => {
+    if (remote.status === 'ready') {
+      return {
+        status: 'ready',
+        events: remote.data,
+        savedAt: remote.savedAt,
+        offline: remote.offline,
+        reload: remote.reload,
+      };
+    }
+    if (remote.status === 'error') return { status: 'error', reload: remote.reload };
+    return { status: remote.status, reload: remote.reload };
+  }, [remote]);
 }

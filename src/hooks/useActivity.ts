@@ -35,7 +35,9 @@ export function useActivity(
     },
   );
 
-  if (remote.status === 'ready') return { status: 'ready', activity: remote.data };
-  if (remote.status === 'error') return { status: 'ready', activity: EMPTY_ACTIVITY };
-  return { status: remote.status };
+  return useMemo(() => {
+    if (remote.status === 'ready') return { status: 'ready', activity: remote.data };
+    if (remote.status === 'error') return { status: 'ready', activity: EMPTY_ACTIVITY };
+    return { status: remote.status };
+  }, [remote]);
 }

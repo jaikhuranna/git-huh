@@ -36,6 +36,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# compiled unit tests (npm test)
+/.test-build
+
 # generated native folders. `android/` is NOT ignored: this project has
 # hand-written native code (the Glance widget), which `expo prebuild` would
 # regenerate away, so the Android project is committed.

@@ -25,10 +25,9 @@ import { fmt, Page } from './shared';
  * year's figures in five colours.
  *
  * This is also where the account lives: the handle, the link out, and the
- * one destructive action in the app. The activity feed used to sit under all
- * of it and is now the `inbox` section — a feed below the fold of a greeting
- * is a feed nobody reads twice, and the account is not something to hide
- * behind a menu either.
+ * one destructive action in the app. The account is not something to hide
+ * behind a menu. The activity feed is its own section (`inbox`), because a
+ * feed below the fold of a greeting is a feed nobody reads twice.
  */
 export function HeyScreen({
   model,
@@ -109,11 +108,10 @@ export function HeyScreen({
 
 /**
  * pin04's one sentence, five figures in five colours — all of them about the
- * same year the crosses above it draw. It used to set this year's commits
- * against every repository the account had ever owned, and to report stars
- * "landed" and followers "following along"; it read like a template filled
- * in. Now it says what you did, where, how steadily, when, and what is still
- * open, and a figure with nothing in it drops out rather than printing a zero.
+ * same year the crosses above it draw. It says what you did, where, how
+ * steadily, when, and what is still open, and a figure with nothing in it
+ * drops out rather than printing a zero. Vanity figures (stars, followers)
+ * stay out of it: they make it read like a template filled in.
  */
 function Sentence({
   model,
