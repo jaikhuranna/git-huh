@@ -2,7 +2,7 @@
   "expo": {
     "name": "git-huh?",
     "slug": "git-huh",
-    "version": "0.0.2-alpha",
+    "version": "0.0.3-alpha",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "githuh",

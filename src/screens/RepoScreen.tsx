@@ -105,7 +105,7 @@ export function RepoScreen({ repo }: { repo: string }) {
             <Data style={styles.stat}>⑂ {fmt(repoInfo.forks)}</Data>
             {repoInfo.language && (
               <View style={styles.lang}>
-                <View style={[styles.swatch, { backgroundColor: repoInfo.language.color }]} />
+                <View style={styles.swatch} />
                 <Data style={styles.stat}>{repoInfo.language.name}</Data>
               </View>
             )}
@@ -504,9 +504,9 @@ function Discussions({ repo, info }: { repo: string; info: RepoInfo | null }) {
 // --- security ----------------------------------------------------------------
 
 const SEVERITY = themed<Record<string, string>>(() => ({
-  critical: colors.red,
-  high: colors.red,
-  medium: colors.yellow,
+  critical: colors.no,
+  high: colors.no,
+  medium: colors.ink70,
   low: colors.ink40,
 }));
 
@@ -601,6 +601,7 @@ const styles = themed(() =>
       gap: 5,
     },
     swatch: {
+      backgroundColor: colors.ink,
       borderRadius: 4,
       height: 8,
       width: 8,
@@ -792,7 +793,7 @@ const styles = themed(() =>
       marginTop: 16,
     },
     error: {
-      color: colors.red,
+      color: colors.no,
       lineHeight: 16,
       marginTop: 14,
     },

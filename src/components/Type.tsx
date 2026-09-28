@@ -3,9 +3,10 @@ import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from
 import { colors, fonts, themed, type } from '../theme';
 
 /**
- * The three voices of the board: a display serif (pin04's "Hey,"), a
- * grotesque (pin02's headings and pin07's thin numerals) and a typewriter
- * mono (pin03's index, pin08's ~names, pin09's caption).
+ * One face, the widget's: IBM Plex Mono at every size. The primitives are
+ * roles — a light display line, a medium title, a regular body, a thin
+ * numeral, a small label — so a screen says what a line is for and the face
+ * follows.
  *
  * A face that failed to load falls back to the platform's own, so a failed
  * download degrades to readable type rather than a blank screen.
@@ -24,15 +25,15 @@ function make(voice: keyof typeof voices) {
   };
 }
 
-/** pin04 — greetings, hero words, pin10's year labels. */
+/** Greetings and hero words — light and large. */
 export const Display = make('display');
 export const Serif = make('serif');
 export const Title = make('title');
 export const Heading = make('heading');
 export const Body = make('body');
-/** pin07's 54°F lockup — Inter ExtraLight at poster scale. */
+/** One figure at poster scale, in the thin cut. */
 export const Numeral = make('numeral');
-/** Small mono caps-ish label — the app's connective tissue. */
+/** The small grey label — the app's connective tissue. */
 export const Label = make('label');
 export const Data = make('data');
 export const Micro = make('micro');
@@ -40,7 +41,7 @@ export const Micro = make('micro');
 const voices = themed(() =>
   StyleSheet.create({
     display: { ...type.display, color: colors.ink },
-    serif: { fontFamily: fonts.serif, fontSize: 15, lineHeight: 20, color: colors.ink },
+    serif: { fontFamily: fonts.italic, fontSize: 12, lineHeight: 18, color: colors.ink70 },
     title: { ...type.title, color: colors.ink },
     heading: { ...type.heading, color: colors.ink },
     body: { ...type.body, color: colors.ink },

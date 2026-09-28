@@ -21,10 +21,10 @@ import { colors, fonts, radii, themed } from '../theme';
 import { Data, Label, Micro } from './Type';
 
 const TONE = themed<Record<CheckTone, string>>(() => ({
-  fail: colors.red,
-  waiting: colors.yellow,
-  running: colors.blue,
-  pass: colors.green,
+  fail: colors.no,
+  waiting: colors.ink70,
+  running: colors.ink,
+  pass: colors.yes,
   neutral: colors.ink40,
 }));
 
@@ -363,7 +363,7 @@ const styles = themed(() =>
       padding: 10,
     },
     errorLine: {
-      color: colors.red,
+      color: colors.no,
       fontSize: 10,
       lineHeight: 14,
     },
@@ -401,18 +401,18 @@ const styles = themed(() =>
       color: colors.ink,
     },
     sent: {
-      color: colors.green,
+      color: colors.yes,
       marginBottom: 10,
     },
     failed: {
-      color: colors.red,
+      color: colors.no,
       marginBottom: 10,
     },
     note: {
       marginTop: 16,
     },
     error: {
-      color: colors.red,
+      color: colors.no,
       marginTop: 16,
     },
   }),

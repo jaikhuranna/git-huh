@@ -321,7 +321,7 @@ const styles = themed(() =>
       lineHeight: 13,
     },
     kind: {
-      color: colors.purple,
+      color: colors.ink70,
     },
     fieldLabel: {
       color: colors.ink,
@@ -334,7 +334,7 @@ const styles = themed(() =>
       borderRadius: radii.tile,
       borderWidth: 1,
       color: colors.ink,
-      fontFamily: fonts.sans,
+      fontFamily: fonts.mono,
       fontSize: 14,
       marginTop: 4,
       paddingHorizontal: 12,
@@ -416,11 +416,11 @@ const styles = themed(() =>
       marginTop: 10,
     },
     failed: {
-      color: colors.red,
+      color: colors.no,
       marginTop: 10,
     },
     sent: {
-      color: colors.green,
+      color: colors.yes,
       marginTop: 10,
     },
     note: {

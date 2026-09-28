@@ -181,20 +181,17 @@ function excerpt(body: string): string | undefined {
   return line.length > 120 ? `${line.slice(0, 119)}…` : line;
 }
 
-export async function fetchSocial(
-  token: string,
-  login: string,
-  signal?: AbortSignal,
-): Promise<SocialEvent[]> {
-  const data = await executeQuery(token, query(login), socialSchema, signal);
+/**
+ * The events on a page of your own pull requests: who commented, who
+ * reviewed, and what they wrote inline. `withOpen` adds the pull request
+ * itself as a row, which the inbox wants and the history does not.
+ */
+function eventsFromPrs(nodes: readonly unknown[], login: string, withOpen: boolean): SocialEvent[] {
   const me = login.toLowerCase();
-  const events = new Map<string, SocialEvent>();
+  const out: SocialEvent[] = [];
+  const add = (event: SocialEvent) => out.push(event);
 
-  const add = (event: SocialEvent) => {
-    if (!events.has(event.id)) events.set(event.id, event);
-  };
-
-  for (const raw of data.mine.nodes) {
+  for (const raw of nodes) {
     const parsed = minePrSchema.safeParse(raw);
     // The search union returns issues too, and an empty `{}` for anything the
     // token cannot see; either way there is nothing to draw.
@@ -202,23 +199,25 @@ export async function fetchSocial(
     const pr = parsed.data;
     const repo = pr.repository.nameWithOwner;
 
-    add({
-      id: pr.id,
-      kind: 'open',
-      actor: login,
-      title: pr.title,
-      repo,
-      number: pr.number,
-      url: pr.url,
-      at: pr.updatedAt,
-      excerpt: pr.isDraft
-        ? 'draft'
-        : pr.reviewDecision === 'APPROVED'
-          ? 'approved · ready to merge'
-          : pr.reviewDecision === 'CHANGES_REQUESTED'
-            ? 'changes requested'
-            : 'waiting on review',
-    });
+    if (withOpen) {
+      add({
+        id: pr.id,
+        kind: 'open',
+        actor: login,
+        title: pr.title,
+        repo,
+        number: pr.number,
+        url: pr.url,
+        at: pr.updatedAt,
+        excerpt: pr.isDraft
+          ? 'draft'
+          : pr.reviewDecision === 'APPROVED'
+            ? 'approved · ready to merge'
+            : pr.reviewDecision === 'CHANGES_REQUESTED'
+              ? 'changes requested'
+              : 'waiting on review',
+      });
+    }
 
     for (const comment of pr.comments?.nodes ?? []) {
       // Your own replies are not news.
@@ -270,6 +269,24 @@ export async function fetchSocial(
     }
   }
 
+  return out;
+}
+
+export async function fetchSocial(
+  token: string,
+  login: string,
+  signal?: AbortSignal,
+): Promise<SocialEvent[]> {
+  const data = await executeQuery(token, query(login), socialSchema, signal);
+  const me = login.toLowerCase();
+  const events = new Map<string, SocialEvent>();
+
+  const add = (event: SocialEvent) => {
+    if (!events.has(event.id)) events.set(event.id, event);
+  };
+
+  for (const event of eventsFromPrs(data.mine.nodes, login, true)) add(event);
+
   for (const raw of data.requested.nodes) {
     const parsed = threadSchema.safeParse(raw);
     if (!parsed.success) continue;
@@ -307,6 +324,86 @@ export async function fetchSocial(
   }
 
   return [...events.values()].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+}
+
+/** Pull requests per page of history, and how much of each one is read. */
+const HISTORY_PAGE = 10;
+
+const historySchema = z.object({
+  search: z.object({
+    pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
+    nodes: z.array(z.unknown()),
+  }),
+});
+
+const HISTORY_QUERY = /* GraphQL */ `
+  query History($q: String!, $after: String) {
+    search(type: ISSUE, query: $q, first: ${HISTORY_PAGE}, after: $after) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        ... on PullRequest {
+          id
+          number
+          title
+          url
+          updatedAt
+          isDraft
+          reviewDecision
+          repository { nameWithOwner }
+          author { login }
+          comments(last: 20) {
+            nodes { id author { login } bodyText createdAt url }
+          }
+          reviews(last: 10) {
+            nodes {
+              id
+              author { login }
+              state
+              bodyText
+              submittedAt
+              url
+              comments(first: 6) {
+                nodes { id author { login } bodyText createdAt url }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export interface SocialPage {
+  events: SocialEvent[];
+  /** Where the next page starts; null when there is nothing older. */
+  cursor: string | null;
+}
+
+/**
+ * Older conversation on your pull requests, a page at a time.
+ *
+ * The inbox's feed is deliberately short — your *open* pull requests and the
+ * last few words on each — because it is also the background check. Under
+ * the greeting that made the page stop after a screenful. This walks back
+ * through every pull request you have written, open or not, newest activity
+ * first, and reads far more of each one; the `you` page asks for the next
+ * page as it is scrolled.
+ */
+export async function fetchSocialPage(
+  token: string,
+  login: string,
+  after: string | null,
+  signal?: AbortSignal,
+): Promise<SocialPage> {
+  const data = await executeQuery(token, HISTORY_QUERY, historySchema, signal, {
+    q: `is:pr author:${login} sort:updated-desc`,
+    after,
+  });
+  const { pageInfo, nodes } = data.search;
+  return {
+    events: eventsFromPrs(nodes, login, false),
+    cursor: pageInfo.hasNextPage ? pageInfo.endCursor : null,
+  };
 }
 
 export const SOCIAL_FILTERS = [

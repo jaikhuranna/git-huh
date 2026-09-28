@@ -7,11 +7,13 @@ import {
   View,
 } from 'react-native';
 
+import { DiffDots } from '../components/DiffDots';
 import { Markdown } from '../components/Markdown';
+import { StateChip } from '../components/StateChip';
 import { Squiggle } from '../components/Squiggle';
-import { Data, Heading, Label, Serif } from '../components/Type';
+import { Data, Heading, Label } from '../components/Type';
 import type { Activity, PullDetail } from '../lib/activity';
-import { colors, fonts, radii, space, themed } from '../theme';
+import { colors, radii, space, themed } from '../theme';
 import { ago, fmt } from './shared';
 
 /**
@@ -45,11 +47,8 @@ export function BriefScreen({
   return (
     <View style={styles.screen}>
       <View style={styles.masthead}>
-        <Data style={styles.chapter}>Ch. 4 /</Data>
-        <Data style={styles.title}>THE BRIEF</Data>
-        <Data style={styles.chapter}>
-          {pulls.length ? `${at + 1} / ${pulls.length}` : '—'}
-        </Data>
+        <Label style={styles.title}>the brief</Label>
+        <Label>{pulls.length ? `${at + 1} / ${pulls.length}` : '—'}</Label>
       </View>
 
       {loading && <Label style={styles.note}>opening the file…</Label>}
@@ -66,16 +65,16 @@ export function BriefScreen({
           >
             <View style={styles.card}>
               <View style={styles.tabRow}>
-                <View style={styles.tab}>
-                  <Data style={styles.tabText}>#{pr.number}</Data>
-                </View>
-                <StateChip pr={pr} />
+                <Data style={styles.tabText}>#{pr.number}</Data>
+                <PullState pr={pr} />
               </View>
 
               <Data style={styles.repo}>{pr.repo}</Data>
               <Heading style={styles.prTitle}>{pr.title}</Heading>
 
-              <DiffBar pr={pr} />
+              <View style={styles.diff}>
+                <DiffDots additions={pr.additions} deletions={pr.deletions} />
+              </View>
 
               <View style={styles.statRow}>
                 <Data style={styles.stat}>{fmt(pr.changedFiles)} files</Data>
@@ -87,10 +86,7 @@ export function BriefScreen({
               {pr.labels.length > 0 && (
                 <View style={styles.labels}>
                   {pr.labels.map((label) => (
-                    <View
-                      key={label.name}
-                      style={[styles.label, { borderColor: `#${label.color}` }]}
-                    >
+                    <View key={label.name} style={styles.label}>
                       <Data style={styles.labelText}>{label.name}</Data>
                     </View>
                   ))}
@@ -98,7 +94,7 @@ export function BriefScreen({
               )}
             </View>
 
-            <Serif style={styles.bodyHead}>The description</Serif>
+            <Label style={styles.bodyHead}>the description</Label>
             <Squiggle
               amplitude={2.4}
               length={body * 0.45}
@@ -160,41 +156,17 @@ export function BriefScreen({
   );
 }
 
-function StateChip({ pr }: { pr: PullDetail }) {
+function PullState({ pr }: { pr: PullDetail }) {
   const [text, tone] = pr.isDraft
     ? ['draft', colors.ink40]
     : pr.state === 'MERGED'
-      ? ['merged', colors.purple]
+      ? ['merged', colors.ink]
       : pr.state === 'CLOSED'
-        ? ['closed', colors.red]
+        ? ['closed', colors.no]
         : pr.reviewDecision === 'APPROVED'
-          ? ['approved', colors.green]
-          : ['open', colors.blue];
-
-  return (
-    <View style={[styles.stateChip, { backgroundColor: tone }]}>
-      <Data style={styles.stateText}>{text}</Data>
-    </View>
-  );
-}
-
-/** Additions against deletions, as one proportional rule. */
-function DiffBar({ pr }: { pr: PullDetail }) {
-  const total = Math.max(1, pr.additions + pr.deletions);
-  const addShare = pr.additions / total;
-
-  return (
-    <View style={styles.diff}>
-      <View style={styles.diffTrack}>
-        <View style={[styles.diffAdd, { flex: Math.max(addShare, 0.02) }]} />
-        <View style={[styles.diffDel, { flex: Math.max(1 - addShare, 0.02) }]} />
-      </View>
-      <View style={styles.diffLabels}>
-        <Data style={styles.add}>+{fmt(pr.additions)}</Data>
-        <Data style={styles.del}>−{fmt(pr.deletions)}</Data>
-      </View>
-    </View>
-  );
+          ? ['approved', colors.yes]
+          : ['open', colors.ink];
+  return <StateChip text={text} tone={tone} />;
 }
 
 const styles = themed(() =>
@@ -205,12 +177,11 @@ const styles = themed(() =>
     },
     masthead: {
       alignItems: 'baseline',
-      borderBottomColor: colors.ink,
-      borderBottomWidth: 1,
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginHorizontal: space.gutter,
-      paddingBottom: 8,
+      paddingBottom: 4,
+      paddingHorizontal: 4,
     },
     scroll: {
       flex: 1,
@@ -220,79 +191,34 @@ const styles = themed(() =>
       paddingHorizontal: space.gutter,
       paddingTop: 16,
     },
-    chapter: {
-      color: colors.ink70,
-      fontSize: 11,
-    },
     title: {
-      fontSize: 12,
-      letterSpacing: 1.6,
+      color: colors.ink,
     },
     card: {
       backgroundColor: colors.card,
-      borderColor: colors.hairStrong,
-      borderWidth: 1,
-      padding: 16,
+      borderRadius: radii.card,
+      padding: 18,
     },
     tabRow: {
       alignItems: 'center',
       flexDirection: 'row',
       justifyContent: 'space-between',
     },
-    tab: {
-      backgroundColor: colors.black,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-    },
     tabText: {
-      color: colors.onBlack,
-      fontSize: 12,
-    },
-    stateChip: {
-      borderRadius: radii.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-    },
-    stateText: {
-      color: colors.onBlack,
-      fontSize: 10,
+      color: colors.ink40,
     },
     repo: {
-      color: colors.ink70,
-      fontSize: 10,
+      color: colors.ink40,
+      fontSize: 11,
       marginTop: 14,
     },
     prTitle: {
-      fontSize: 17,
+      fontSize: 16,
       lineHeight: 23,
       marginTop: 4,
     },
     diff: {
       marginTop: 16,
-    },
-    diffTrack: {
-      borderRadius: 2,
-      flexDirection: 'row',
-      gap: 2,
-      height: 6,
-      overflow: 'hidden',
-    },
-    diffAdd: {
-      backgroundColor: colors.green,
-    },
-    diffDel: {
-      backgroundColor: colors.red,
-    },
-    diffLabels: {
-      flexDirection: 'row',
-      gap: 14,
-      marginTop: 7,
-    },
-    add: {
-      color: colors.green,
-    },
-    del: {
-      color: colors.red,
     },
     statRow: {
       flexDirection: 'row',
@@ -311,6 +237,7 @@ const styles = themed(() =>
       marginTop: 12,
     },
     label: {
+      borderColor: colors.hairStrong,
       borderRadius: radii.pill,
       borderWidth: 1,
       paddingHorizontal: 10,
@@ -320,8 +247,7 @@ const styles = themed(() =>
       fontSize: 10,
     },
     bodyHead: {
-      fontFamily: fonts.serifItalic,
-      fontSize: 15,
+      color: colors.ink,
       marginTop: 22,
     },
     headRule: {

@@ -11,61 +11,73 @@ colour, type, space, motion, patterns, the prohibitions — live in
 
 ## Hard rules
 
-1. **No Nothing design language in the app.** No DotGothic16 anywhere in `src/` or `app/`.
-   No `#D71921` / `#E8442E` "brand red". No paper-grey + dot-matrix combination.
-   The `?` in the wordmark is ink, not red.
-2. **Nothing lives only in the widget's background**: the Material You neutral that
-   Nothing's own widgets sit on (`WidgetSurface.kt`). Nothing red appears nowhere, the
-   widget included.
-3. Dots-as-texture are allowed **only** where a pin itself uses them: pin02's LED numerals,
-   pin08's halftone card, pin10's circle rows. Everywhere else the texture is crosses (pin04),
-   bars (pin09), ribbons (pin05), arcs (pin06) or rules (pin03).
+1. **The app is the widget, zoomed out.** The home-screen card — a warm near-black
+   surface, one mono face, your commit messages travelling across the top and the days
+   as dots under them, a plus for today, a wave for a silence — is the source of every
+   screen. Each screen keeps the layout its pin gave it; the marks are the widget's.
+2. **Still not the Nothing design language.** No DotGothic16, no dot-matrix *typeface*,
+   no `#D71921`. The dots are data (a day, a week, a month, an hour), never a texture
+   laid under something else.
+3. **One ink.** Colour appears only as the machine's `yes` and `no` (added / removed,
+   passed / failed, approved / changes requested), muted, and always beside a word or a
+   sign that says the same thing.
 
 ## Palette
 
 ```
-canvas      #F2F0EB   warm paper            (pin04, pin07)
-canvasCool  #E4E3DE   Ai OS grey            (pin02 only)
-card        #FBFAF7   raised surface
-recess      #E9E7E1   inset / track
-hair        rgba(17,16,16,0.12)
-ink         #111110
-ink70       #5B5A55
-ink40       #93918B
-ink20       #C6C4BE
-black       #0B0B0A   urbit card, filing tabs, pills
-onBlack     #F4F2ED
-onBlack55   rgba(244,242,237,0.55)
+                day        night
+canvas          #ECE8E4    #141110   the page the cards sit on
+card            #F8F5F2    #221C1A   the widget's card — every raised surface
+recess          #E0DBD6    #2D2624   inset: a track, a code block, a swiped row
+ink             #211C1A    #ECE5E0   statement
+ink70           #615854    #ADA49E   support
+ink40           #978D88    #7A716C   annotation
+ink20           #CBC3BE    #463E3B   structure
+black / onBlack  the solid surface (a selected chip, the one button that is the point)
+yes             #56794F    #93AD8A   sage
+no              #A8553F    #D08A74   clay
 ```
 
-Categorical brights — used for *categories*, never as a single brand accent:
-
-```
-blue   #2F7FE0    red    #E8412B    green  #1F9A53
-yellow #F5B426    purple #6B4FBB    pink   #F2A0C4
-```
-
-Pastels (pin02 dock only): `#F2A65A #B9A7E6 #9BC995 #F2A0C4`
-Weather gradient (pin07): cold `#7FA8C9 → #2C4F78`, warm `#F5B426 → #D23A0E`
+Intensity is never hue: it is a dot's size and weight, on the widget's own ramps
+(`levels.scale` / `levels.alpha` = `DotFieldRenderer.SCALES` / `ALPHAS`).
 
 ## Type
 
-| role | family | spec |
-|---|---|---|
-| display | Instrument Serif 400 | 44/46, 30/34 — greetings, hero words, year labels (italic) |
-| title | Inter 700 | 24/28 |
-| heading | Inter 600 | 15/20 |
-| body | Inter 400 | 14/20 |
-| thin numeral | Inter 200 | 86/86 — pin07 hero only |
-| label | IBM Plex Mono 500 | 11/14, letterSpacing 0.8, lowercase |
-| data | IBM Plex Mono 400 | 12/16, tabular |
+One family, IBM Plex Mono, in every role (`@expo-google-fonts/ibm-plex-mono`):
 
-Fonts ship via `@expo-google-fonts/{inter,instrument-serif,ibm-plex-mono}`.
-Every family has a system fallback so a font-load failure still renders.
+| role | cut | spec |
+|---|---|---|
+| display | 300 Light | 34/40, −0.8 tracking — greetings, a handle |
+| title | 500 Medium | 19/25 |
+| heading | 500 Medium | 14/20 |
+| body | 400 Regular | 13/20 — prose, titles, comments |
+| numeral | 200 ExtraLight | 86/92 — `weather`'s one figure |
+| label | 400 Regular | 11/15, lowercase |
+| data | 400 Regular | 12/16 |
+| aside | 400 Italic | 12/18, `ink70` — `since 2021 · …` |
+
+Every primitive has a system fallback so a font-load failure still renders.
 
 ## Geometry
 
-radius: card 20, tile 14, pill 999, sheet 28. grid gutter 20. card padding 18.
+radius: card 24, sheet 28 (the widget's corner), tile 14, pill 999. gutter 18, card
+padding 18. A screen is a stack of cards with 10pt between them.
+
+## The widget's marks, in the app
+
+- **`DotField`** — the widget's field: a run of days ending today, newest in the
+  bottom-right corner, dots sized and weighted by level, the peak squared off, today the
+  plus, three weeks or more of nothing folded into the wave with its length on it
+  (`lib/quiet.ts`). One `<Path>` per level.
+- **`DotRow`** — one row of the same dots for any series over time (a week, thirty days,
+  twelve months): the peak squared off and carrying its number, empty slots the grid's
+  ghost, a long enough empty run the wave.
+- **`Marquee`** — the widget's top strip: `repo ~~~ commit message`, travelling left on
+  the native driver. Widths are arithmetic (Plex Mono is 0.6 em a glyph), so nothing is
+  measured.
+- **`Card`** — the widget's surface and corner, with an optional name/figure caption.
+- **`StateChip`**, **`DiffDots`** — where a pull request or issue stands (a dot and the
+  word, in an outlined pill), and additions against deletions as a row of 24 dots.
 
 ## Screens — pin by pin
 
@@ -75,225 +87,124 @@ the app — the sections and their order are under "Navigation" below, and
 screen: `today · you`.
 
 ### 1. `hey` — pin04 (Pantom)
-Warm canvas. Instrument Serif 44 `Hey,` then `~{login}` on the next line.
-Below: **cross grid** — the contribution year drawn as `+` glyphs, two days to a column,
-weight and opacity stepping with level (0 → ink at 8%, 4 → ink at 100% bold). There is
-no dot matrix.
-Below: the coloured sentence, Inter 400 17/26, every figure about the same year the
-crosses draw, each inline-coloured, and any figure with nothing in it dropped rather
-than printed as a zero:
-`You made {total blue} contributions in the last year, more of them to {repo green} than
-anywhere else. You work most on {weekday yellow}s, and your longest run was {streak purple}
-days in a row. You have {prs red} pull requests still open.`
-Vanity figures (stars, followers) stay out of it; they make it read like a template.
-Then italic serif `since {year} · {activeDays} active days · {n} day streak`.
-The cross grid follows the widget's rules (`lib/quiet.ts`): the newest cross is the
-bottom-right one, and a long silence folds into the wave with its length over it
-(`6 wk`). Its crosses are two days each, so the wave here is two columns wide and keeps
-no column of empties either side — at the widget's edges a six-week break never folded.
+`hey,` in `ink40` over `~{login}`, both display. Then **the widget itself**, on its card:
+the travelling strip of your commit messages and the last few months as the widget's
+field at its own pitch (7 rows, up to 21pt a dot), today the plus in the corner.
+Then one sentence in body 15/24, the words `ink70` and every figure in full ink, medium:
+`you made {total} contributions in the last year, more of them to {repo} than anywhere
+else. you work most on {weekday}s, and your longest run was {streak} days in a row.
+{prs} pull requests are still open.` Any figure with nothing in it drops out; vanity
+figures (stars, followers) stay out. Then the aside `since {year} · {activeDays} active
+days · {n} day streak`.
 
-Then **a short feed**: a mono head naming what it lists (`pr comments` by default) with
-`change` on the right, and the newest eight rows of the inbox's own feed filtered to
-those kinds, in the inbox's row style, then `n more in the inbox →`. Nothing is fetched
-for it. Which kinds it lists is a setting on the account page (`lib/home.ts` is the
-menu: `pr comments · reviews · review requests · mentions`), so adding a kind is a line
-there rather than a new screen. It is here because the page used to end in a stretch of
-empty paper with two buttons at the bottom of it.
-
-The account itself — switching, adding, adding up, notifications, `disconnect` — is not
-on this page any more but behind the avatar in the top-right corner (below).
+Then **the feed**: a mono head naming what it lists (`pr comments` by default) with
+`change` on the right, and the rows as feed cards. It starts with the inbox's own feed
+and **keeps going**: scrolling within a screen of the bottom pages in older history —
+`fetchSocialPage`, ten of your pull requests at a time, open or not, newest activity
+first, the last twenty comments and ten reviews of each (`useFeedHistory`). The inbox's
+feed is only your *open* pull requests and the last three words on each, because it is
+also the background check; under the greeting that made the page stop after a
+screenful. The foot says which it is: `reading older pull requests…`, `older →`, or
+`that is everything, back to {month}`. Which kinds it lists is a setting on the account
+page (`lib/home.ts`).
 
 ### 2. `now` — pin02 (Ai OS)
-`canvasCool` background, dotted 4px grid behind the hero.
-Header: Inter 700 `Today` + Inter 700 ink40 `at a glance` on the next line (the Unified/Chat lockup).
-Hero: today's contribution count rendered as **LED dot-matrix numerals** on the dotted field
-(5×7 dot font, ink dots, inactive dots ink at 12%). Under it, greyed second line = yesterday's count.
-Bottom block, two columns:
- - left: circular **week dial** — 7 ticks around the rim, small ink ticks, a red tick at the peak
-   weekday, black centre disc with a 3-armed hand pointing at today.
- - right: 2×2 **dock** of pastel circles = top 4 languages, each showing the language initial in ink.
-Footer strip: black pill "ruler" = last 30 days as a tick timeline, taller tick per contribution,
-a single red hairline on today. Two circular ghost buttons flank it (`prs`, `repos` — jump links).
+Three cards. **today**: the count set in the widget's dots — lit cells are peak dots, the
+rest the grid's ghost (two paths), captioned `contributions so far today`, with
+`yesterday · best` as the card's figure. Then two half cards: **this week** (the last
+seven days as a `DotRow` with weekday initials, today the plus) and **languages** (the
+top four, name and share). Then **last 30 days** as one `DotRow`, a week of nothing a wave.
 
 ### 3. `flow` — pin05 (Sankey)
-Canvas. Title row: mono `where it went` + mono right `last 12 months`.
-Left node: `100%` Inter 700 32 with grey absolute beside it = total contributions.
-One trunk fans right into **five** nodes: commits / pull requests / issues / reviews /
-**private** — each `27.7%` Inter 700 15 + ink40 absolute in a legend row below the
-chart, never over the ribbons. Ribbon thickness ∝ share.
-
-Each kind of work carries one of the categorical brights and the legend row repeats
-it as a 10×10 swatch: commits `blue`, pull requests `purple`, issues `yellow`,
-reviews `green`. **Private is `ink40`, deliberately.** It is the one band GitHub
-will not describe — `restrictedContributionsCount` is a number and nothing else —
-so it gets no colour, and a footnote says why. Leaving the band out altogether,
-as the first version did, made this screen disagree with every other screen in the
-app by an order of magnitude on accounts whose work is private.
+Title row `where it went` / `last 12 months`, the chart on a card with `100%` and the
+total over it. One trunk fans into commits / pull requests / issues / reviews /
+**private**, and the commits band fans on into the repositories. **Weight, not colour**:
+each kind of work is one of the widget's weights of ink (commits 1, pull requests .72,
+reviews .52, issues .36, private .16), and its legend row repeats it as a dot of the
+same weight. Private is the faintest on purpose — GitHub says how much and nothing
+else — and a footnote says so. Repositories step down in weight by rank, `others` the
+ghost. Nodes are rounded bars.
 
 The second stage belongs to **the commits band alone**: `commitContributionsByRepository`
-counts commits, so the repositories hang off the commits band and are scaled to it,
-not to the trunk. They are drawn in each repository's own **language colour**, the
-same mark `cards` uses, `others` in `ink20`. A year that was mostly private therefore
-shows a thin fan — that is the shape of the year, and the legend carries the numbers.
+counts commits, so the repositories hang off the commits band and are scaled to it.
 
 ### 4. `poster` — pin09 (IBM)
-`#EFEFEF` flat canvas, **full page**: head, chart, caption and chips, with the chart taking
-every point left over (it is measured with `onLayout`, not given a fixed height).
-Top-right: `git-huh?` lockup where the IBM logo sits (serif, ink).
-Body: **pixel-rain column chart** — one column per week, height ∝ that week's contributions.
-Each column is a stack of squares; the top 30% of each column dissolves into scattered
-squares with gaps, drifting by a fraction of a *square* (at a fraction of a column they land
-on the neighbours and read as debris). Square colors cycle `black, blue, red, green` with
-black dominant (~60%). A month rule runs under the baseline, one tick per month.
-Below: mono caption `{total} contributions · busiest week {n}, in {month}`.
+**Full page**: the year and `week by week` across the top, the chart taking every point
+left over (measured with `onLayout`), the caption and the year chips at the foot.
+One column per week, each a stack of the widget's dots rising from the baseline; the top
+30% dissolves into a rain of smaller, fainter ones drifting by a fraction of a dot. The
+busiest week's column is at full weight, the rest a step back. One path per weight.
+A month rule runs under the baseline.
 
-Every year is drawn from **its own calendar** (`YearSummary.weeks`), so 2019 gets the same
-fifty-two columns as this year rather than twelve monthly bars that read as a different
-chart, and this year's label sits over this calendar year, not the trailing 365 days.
-
-Year chips are a **wrapped row, never a horizontal scroller**: nested inside the pager, a
-horizontal scroller loses every drag to the page swipe and the chips past the right edge
-could not be reached at all.
+Every year is drawn from **its own calendar** (`YearSummary.weeks`). Year chips are a
+**wrapped row, never a horizontal scroller**.
 
 ### 5. `orbit` — pin06 (letters on a spiral)
-White-ish canvas. Title mono `languages`.
-**One spiral**, not concentric rings — the pin is a single line wound outward, and the line
-*breaks* around every mark on it. Rank 0 sits at the outer end, where there is room for the
-biggest chip, and the tail walks inward; the gaps are computed in the spiral's own parameter
-so they scale with the mark. Top 6 languages get a filled chip in **their real GitHub language
-color** (square for even rank, circle for odd, mirroring the pin); the rest are the devicon
-mark in ink, or their initials where devicon has none.
-
-**The spiral turns**, one revolution every fifty seconds. The arcs are drawn once and the
-group is rotated, so a frame costs one transform rather than two hundred re-projected points;
-the marks ride the same rotation but are positioned in JS and stay upright, because a spinning
-devicon reads as a glitch rather than as an orbit. The ticker is parked whenever the page is
-off screen — thirteen screens are mounted at once.
-
-Footer: legend rows `▪ TypeScript 41.2%` sorted desc, mono 11.
+The spiral on a card, the legend on another. **One spiral** that *breaks* around every
+mark on it; rank 0 at the outer end. The top six languages are the widget's dots with
+the language's devicon mark cut out of them in `onBlack` — the first squared off, as a
+peak is — weighted by rank. The rest are the mark in ink. **The spiral turns**, one
+revolution every fifty seconds, parked off screen. Legend rows are a round chip holding
+the mark, the name and the share. GitHub's language colours are not drawn anywhere.
 
 ### 6. `weather` — pin07 (weather gradients)
-Canvas fading into a full-bleed vertical gradient in the bottom 45%.
-Centered: Inter 600 18 `~{login}`, mono 12 `{weekday}, {month} {day}, {time}`.
-Condition line Inter 400 14: derived — `severe shipping expected` (streak ≥ 7),
-`steady output` (streak 1–6), `quiet and overcast` (streak 0).
-Hero: Inter 200 86 `{todayCount}` + superscript `c` (commits) — the 54°F lockup.
-Row under: `High: {bestDay}` `Low: {avgPerDay}`.
-Frosted card, 3 columns with hairline icons: `velocity {pct}%` (this week vs last),
-`consistency {pct}%` (active days / 365), `pace {n}/day`.
-The velocity glyph **follows the sign** — rising, falling or level. A fixed upward arrow over
-a negative percentage is the one thing on this screen that can be read as a lie.
-Gradient is warm when the current streak is alive, cold when it is not; intensity ∝ streak length.
-Pill `this week` over the gradient opens a 7-bar strip; circular button at the bottom = `sync widget`.
+Centered: `~{login}`, the date, a condition — `severe shipping expected` (streak ≥ 7),
+`steady output`, `quiet and overcast`. Hero: the thin numeral, today's count, `today`
+beside it; `high {bestDay}` `low {avgPerDay}` under it. A card of three readings with
+hairline glyphs — velocity (the arrow **follows the sign**), consistency, pace — and a
+card of the last seven days as a `DotRow`.
+The sky is **a field of dots rising from the bottom of the page** instead of a gradient:
+how high it climbs and how bright it gets is the current streak, seeded so the same
+streak is the same sky. It is coarse on purpose (a dot every 19pt): at 13pt the path
+was big enough to make the x86_64 emulator's launch crash (see the SVG trap in
+`CLAUDE.md`) four times in six.
 
 ### 7. `cards` — pin08 (urbit)
-Near-white canvas, vertical stack of **black repo cards** at slight rotation offsets (−3°, 0°, 2°…),
-overlapping by ~40% so they read as a fanned deck; the focused card lifts.
-Each card: generated **sigil** top-left (2×2 grid of quarter-circle / dot-pair / dome / disc
-primitives, chosen deterministically from a hash of the repo name), mono `~{owner}-{repo}` beside it.
-Body: that repository's **commit history, one bar per month**, oldest on the left, month initials
-on the axis, the busiest month drawn solid and carrying its count. Every card in the deck shares
-**one twelve-month axis** (`monthWindow`), so a bar on one card sits over the same month as the
-bar above it. Sizing each card's axis to its own commits instead produced a card showing a single
-bar labelled `s` above a card showing twelve — two charts that look comparable and are not.
-A repo the commit sample never reached draws the same axis and says `outside the commit sample`
-across it rather than implying a year of silence.
-Bottom row of the card: mono `★ {stars}  ⑂ {forks}  {language mark + name}  {last commit}`.
-Tap opens the repo.
-
-The deck is ordered by **when the repository last had a commit written in it**,
-newest on top — not by `pushedAt`, which GitHub bumps for anything that moves a
-ref (a tag, a branch deletion, a fork sync) and which therefore opens the deck
-on repos nobody has touched in months. The sampled history answers it to the
-hour wherever it reaches; `pushedAt` is the fallback below the sample, and the
-age printed on the card is the same value the deck sorted by.
-
-Every mark on the card is a real month. A halftone keyed off `hash(repo, col, row)` would
-look like data and encode none.
+A fanned deck of the widget's cards at slight rotations, overlapping, a band of canvas
+at every seam. Each card: the generated **sigil** in ink, `~{owner}-{repo}`, and that
+repository's commit history as **a `DotRow` of months** on the deck's one shared
+twelve-month axis (`monthWindow`) — the busiest month squared off with its count, three
+quiet months or more the wave. A repo the sample never reached says `outside the commit
+sample`. Bottom row: `★ ⑂ {language mark + name} {last commit}`. Ordered by when the
+repository last had a commit written in it, not `pushedAt`.
 
 ### 8. `index` — pin03 (correspondence storage)
+`pull requests` / `{n} yours`, chips `open {n}` `draft {n}`, then **one card per
+repository**, its name and count across the top and its pull requests as rows inside:
+title, `#{n} · waiting {age}`, and a dot for how long it has waited — bigger and brighter
+by the day, week, fortnight and month, squared off past a month — so the one that has
+sat longest stands out the way a peak day does on the widget. Tapping a row opens `pull`.
 
-Canvas, **edge to edge**: masthead at the top, the drawer lip and its plate
-pinned to the bottom, and the drawer itself between them. Header centered mono
-caps `PULL REQUESTS`, left `Ch. 3 /`, right `/ {count}`. Filter tabs
-`open {n} / draft {n}` in the pin's tab style.
-
-The thing that makes the pin read as a drawer is not the rows — it is the
-**black guide tabs** standing above them, each naming the group of cards filed
-behind it. So this screen **files by repository**:
-
-- one **guide tab** per repo: solid black, mono `owner/name` in `onBlack`, its
-  open-PR count in `onBlack55`, with the tab's 2px baseline carried to the page
-  edge as the top of the folder;
-- the pull requests filed behind it as `card` rows sharing one border, each
-  with a black number tab down its left edge, the title (2 lines max) and a
-  mono `ink40` age on the right;
-- folders step right by `min(rank,4) × 8px`, cards by a further 12px;
-- the repo name appears **once, on the tab** — not repeated down every row.
-
-Under the last folder, the rest of the drawer is drawn as the **top edges of
-empty cards**: one hairline per edge at a 15px pitch, stepping right and
-pulling in from the right as it recedes, fading out with depth, with a tab
-notch every fourth edge where the next guide card would stand. How many is
-measured — the drawer's height minus the folders' — because a card is one or
-two lines deep depending on its title.
-
-**Tapping a card opens it** (`pull`, below) rather than leaving for the browser.
-
-*(Superseded twice. The first version was a flat list floating in half a page of
-nothing with the caption riding up under it. The second filled that space with
-grey slot bars and gave every draft the pin's fully-inverted treatment, which
-turned the draft tab into a black wall. Inversion now lives on the guide tabs
-alone — one strong black element per group rather than one per row.)*
-
-### 9. `dots` — pin01 (connect the dots)
-White canvas, ink only. Title mono `join the dots` + right mono `streak {n}`.
-The contribution year as a scatter of points on a 53×7 lattice with jitter:
- - level 0 → tiny 1.5px ink 20% point, no number
- - level ≥1 → filled black disc, radius 3–7 by level, with the **day's commit count** printed
-   beside it in 6px mono
- - the **longest streak** days are connected in order by a 1px ink polyline and numbered `1..N`
-   in white inside their discs, exactly like a dot-to-dot puzzle.
-Top and bottom edges get the pin's dense black "blob" treatment: months with the highest volume
-have their discs merged into solid ink masses.
-Footer: mono `{total} contributions · best day {n} · {activeDays} active days`.
+### 9. `dots` — pin01, now **the widget, zoomed out** (`lab`)
+The home-screen card with room to pull back: the strip on top, the field under it, and
+three zooms — `widget` (seven rows at the widget's own pitch, a few months), `6 mo` and
+`year`. Zooming out makes the dots smaller and the card **taller** — more rows of the
+same run of days — because the widget's rows are not weekdays either; at `year` every
+day since last year's today is on the card. Under it, four figures on a card and a line
+saying what the marks mean. (It replaced the connect-the-dots puzzle.)
 
 ### 10. `archive` — pin10 (rain years)
-Cream `#F7F5F0`. Header: italic serif `Contribution Year` left, serif centered `Today`,
-right two column heads mono `before` / `after`.
-One row per contribution year (newest last, like the pin):
- - left 60%: 12 monthly circles, radius ∝ that month's contributions, fill blue at
-   alpha ∝ intensity, olive `#8C8A5E` for months below the median; a vertical hairline runs
-   through today's month across all rows.
- - right 40%: paired horizontal bars `before` (steel `#5E86A3`) and `after` (olive `#8C8A5E`)
-   with the numeric label; the top-3 years get the saturated-blue + white-label treatment.
-Row label = year, italic serif 11, with a hairline rule per row.
+On a card: `year` / `today` / `before · after` heads, then one row per contribution year,
+oldest first: twelve monthly dots sized and weighted by volume, three quiet months a
+wave, a hairline through today's date across every row, and paired rounded bars for
+before and after today, the top three years at full weight.
 
-### 11. `loading` — pin11 (art of type)
-Full-bleed ultramarine `#1A50D5`, white uppercase grotesque, one line of type repeated down the
-page with its tracking warped line by line until the block bends into a wave. In the app the
-phrase is **your own commit messages**, taken from across your whole history, five rows per
-message so the eye can follow a letter from row to row — which is the only thing that makes the
-wave read as a wave rather than a word search.
+### 11. `loading` — the widget, waiting
+The canvas, and in the middle of it the home-screen card: **your commit messages
+travelling across the top** (`Marquee`, from the pool below) and a field of dots under
+them with **a light passing through it** from the oldest column to today's plus, over and
+over — each dot rests at a stand-in level and swells to the peak as the crest passes its
+column, the crest leaning a little down the rows. Under the card, the wordmark and what
+it is doing (`reading your year`). The card fades in over half a second.
 
-Glyphs are positioned individually (`<Text x={[…]}>`): both ends pinned to the margins, the
-letters between them pushed by one cycle of a sine whose phase slips per row and travels while
-you wait. Amplitude is capped so the tightest gap still clears a capital M.
+**Nothing about the animation runs in JavaScript.** Every dot's whole track — its scale
+and opacity at twenty-four phases of the sweep — is computed once at mount and handed to
+the native driver as an interpolation of one looping value; the strip is one native
+`translateX`. So the light keeps moving at the display's rate while the first GitHub
+response is parsed on the JS thread.
 
-**Nothing about the animation runs in JavaScript.** Every glyph is its own `Animated.Text`, and
-the whole track it will travel — its x at sixteen phases of the wave — is computed once at mount
-and handed to the native driver as an interpolation. One looping value drives all of them, on
-the UI thread, so the letters keep sliding at the display's refresh rate while the first GitHub
-response is being parsed on the JS thread. Measured: 60 fps, under 1% janky frames. The field
-fades in over half a second rather than cutting to a full page of type.
-
-*(Two superseded versions, both animating from JS. A `setInterval` stepping a counter every
-60 ms was visibly steppy at ~16 fps. A `requestAnimationFrame` ticker fixed the timing but not
-the cost: both re-rendered the whole field every frame and made react-native-svg re-shape thirty
-rows of text with it. The rAF version also had to draw one `<Svg>` per row to dodge a heap
-corruption in react-native-svg's text pass — a page of glyphs in a downloaded font inside one
-canvas kills the process with a `SIGSEGV` in Fabric's mounting coordinator. Plain text views and
-a native transform removed both problems at once, and per frame there is now nothing to do.)*
+*(Superseded: pin11's ultramarine page of warped uppercase type. It was the one screen in
+another app's colours.)*
 
 #### Where the words come from
 
@@ -306,13 +217,13 @@ oldest commits by author date and the twelve newest. `activity.ts` cannot do thi
 newest commits of your most recently pushed repos, which is only ever the last few days — and
 GraphQL has no commit search at all, hence the one REST call. Accounts whose history will not
 search fall back to the sampled history, and a first launch falls back to stand-in commit
-subjects, so the screen is always a wall of commit messages rather than the app's name six
-times.
+subjects.
 
 ### 12. `brief` — pin03's card, opened
 
-pin03's filing card with the lid off: the masthead, one pull request's cover (number tab, state
-chip, diff rule, counts, labels) and then its description.
+pin03's filing card with the lid off: `the brief` / `1 / 5`, one pull request's cover on a card
+(the number, a `StateChip`, the title, `DiffDots`, counts, labels as outlined pills) and then its
+description under a wavy rule.
 
 The description is **rendered, not printed** (`components/Markdown`). GitHub hands back raw
 Markdown, and verbatim a heading arrives as a literal `## Problem` and a list as a column of
@@ -339,7 +250,7 @@ github` and `{head} → {base}`.
 **`talk` is drawn in waves.** Every other surface in this app is ruled and filed and measured,
 and a review thread is none of those things; the wave is what marks the part of a pull request
 that is two people arguing rather than a statistic. Each comment has a vertical wavy spine in
-its own tone (comment blue, review by state, thread purple), sized to the comment it runs beside
+its own tone (a comment `ink40`, a review by state — `yes` approved, `no` changes requested, `ink70` otherwise — a thread `ink70`), sized to the comment it runs beside
 by measuring it after layout — SVG cannot stretch to a sibling. Comments are separated by wavy
 rules, each phase-shifted so stacked rules do not line up. A review thread carries the file it
 is anchored to and the few lines of diff it is arguing about, with its replies indented under
@@ -362,9 +273,10 @@ gets a readable conversation.
 pin04's feed, lifted out of the greeting and given the page. `ScreenHead`
 `what wants you` · `{n} events`, the wrapped chip filter
 (`all · comments · reviews · mentions · yours`) with counts, and up to forty
-rows. One coloured rule per category (comment blue, approval green,
-changes-requested red, review yellow, review-request purple, mention pink,
-yours ink) with the category written out in words as well, the comment text
+rows, each on its own card. One of the widget's marks per category — a dot for a
+comment, a ring for a review or a mention, a square for a review request, a
+sage dot for an approval and a clay one for changes requested, a faint ring for
+your own pull request — with the category written out in words as well, the comment text
 quoted, and the repository and number under each row.
 
 **A row opens the thing** — a pull request in `pull`, an issue or a
@@ -390,9 +302,9 @@ screen draws.
 ### 15. `thread` — an issue or a discussion
 
 The pull request's `talk` without the diff, pushed over everything. Title and
-a state chip (`open` blue, `closed` purple, `answered` green), a mono byline,
-labels as outlined pills in their own colour, the body rendered, then the
-replies on wavy spines (`Spoken`) — the discussion's accepted answer in green
+a `StateChip` (`open` ink, `closed` faint, `answered` sage) and the title on a card, a mono byline,
+labels as outlined pills, the body rendered, then the
+replies on wavy spines (`Spoken`) — the discussion's accepted answer in sage
 and marked `the answer` in words, replies to replies nested under their own
 spine. At the end, the composer: `comment` and `close issue` / `reopen` for
 an issue, `reply` for a discussion. Replies GitHub has that were not fetched
@@ -423,7 +335,7 @@ what this token may do there (`you admin`, `you read`).
 
 Line numbers, no wrapping (a horizontal scroll sized to the longest line,
 capped at 220 columns), virtualised so a long file costs what is on screen. A
-find bar with `n / m` and `↑ ↓`; the current match's line is banded yellow
+find bar with `n / m` and `↑ ↓`; the current match's line is banded in faint ink
 and each occurrence is marked. Opened from a code search, the search term is
 already in the bar.
 
@@ -453,7 +365,7 @@ then the actions: `re-run failed · {workflow}` for a failed Actions run,
 `approve and run` for a first-time contributor's held run, `approve deploy ·
 {environment}` / `reject` for a deployment waiting on a reviewer — and when
 the reviewer is somebody else, it says that instead of offering a button. A
-failed Actions job opens to the end of its log: the error annotations in red,
+failed Actions job opens to the end of its log: the error annotations in clay,
 then the last forty lines in mono.
 
 ### Writing back
@@ -469,7 +381,7 @@ account · nothing was sent`.
 - `talk` ends in `comment`, and — on someone else's open pull request —
   `approve` (no words needed) and `request changes`.
 - `files` has a find field across every file (`n lines in m files`, matching
-  lines marked with a yellow rule, files holding them opened) and every line
+  lines marked with an ink rule, files holding them opened) and every line
   is tappable: the tapped line is quoted over a compact composer, `comment on
   this line`. Deleted lines comment on the old side, everything else on the
   new — including unchanged context lines.
@@ -504,7 +416,7 @@ account asked for this: neither profile alone is what they did. Then a dashed
 
 **on the you page**: the kinds the `you` feed lists, as chips.
 
-At the foot, filled black `open github →` and outlined `disconnect ~login` (`exit
+At the foot, filled `open github →` and outlined `disconnect ~login` (`exit
 demo`). `disconnect` forgets the current account and moves to the next one if the phone
 holds another.
 
@@ -532,19 +444,19 @@ to. `STORIES.md` is why the grouping is this grouping.
 | `inbox` | `recent` | what wants me |
 | `work` | `pulls` · `brief` · `cycle` · `repos` | what am I shipping |
 | `year` | `weeks` · `split` · `languages` · `years` | what was the year |
-| `lab` | `join the dots` | not finished yet |
+| `lab` | `zoomed out` | the widget, pulled back to the whole year |
 
 - **Bar**: the system's own tab bar, through expo-router's `NativeTabs`
   (`app/(tabs)/_layout.tsx`). On iOS it is `UITabBarController` — Liquid Glass
   on iOS 26, with SF Symbols and the system's own type, minimising as you
   scroll down. On Android it is Material 3's navigation bar on canvas, mono
-  labels, Material Symbols, and the selected indicator filled black — which is
-  what filled black means everywhere else. A bar drawn in JavaScript could
+  labels, Material Symbols, and the selected indicator in the card's colour —
+  the same surface every screen above it is drawn on. A bar drawn in JavaScript could
   never look like either system's. `inbox` carries a count of the events addressed to you (review
   requests, mentions, changes requested), which is the honest version of a
   badge: it is computed from the rows that are actually there.
-- **Segments** (`Segments`): mono labels with a 2px ink rule under the
-  selected one — pin03's tab, kept from the old rail. Hidden when a section
+- **Segments** (`Segments`): mono labels, the selected one in full ink with the
+  app's wave under it — the widget's `repo ~~~ message` weights. Hidden when a section
   has one view. The row **wraps, it never scrolls**.
 - **Swiping** moves between views *within* a section and stops at its edges,
   so a drag never carries you three destinations away.
@@ -566,12 +478,12 @@ recomposed as a **4:3 card** (`ShareCard`, 640 × 480 points, captured at 1600 �
 PNG with react-native-view-shot and handed to the system share sheet with
 expo-sharing). A card is not a screenshot: a phone screen is portrait and scrolls, a
 timeline image is landscape and does neither. Every card is the same frame — wordmark
-and handle across the top, a serif title and one thin figure, the chart, and a line of
+and handle across the top, a light display title and one thin figure, the chart, and a line of
 fact with the month along the foot — so a run of them reads as a series.
 
 | views | card | chart |
 |---|---|---|
-| `you` `now` `weather` `join the dots` | a year on github | four figures and the cross field, eleven rows deep so a whole year fits |
+| `you` `now` `weather` `zoomed out` | a year on github | four figures and the widget's field, eleven rows deep so a whole year fits |
 | `weeks` | {year}, week by week | the poster for one year (chips on the share page pick it) |
 | `split` | where the year went | one ruled bar and a legend with counts and shares |
 | `languages` | what I write in | six bars and an `other` |
@@ -589,9 +501,8 @@ The widget draws three weeks or more of nothing as the app's wave with its lengt
 (`The dot field`, below). The app's charts do the same, from `lib/quiet.ts`: bars and
 rows keep their axis and the wave **bridges the empty stretch in place** — a month of
 empty weeks on the poster, three empty months on a repository card or an archive row,
-a week of empty days on `now`'s ruler, three weeks across whole columns of `join the
-dots`, an empty run of hours or years on a share card — and the cross field folds it the
-way the widget does. The part of a year that has not happened yet is never a silence.
+a week of empty days on `now`'s last thirty, an empty run of hours or years on a share
+card — and `DotField` folds it the way the widget does. The part of a year that has not happened yet is never a silence.
 
 *(Superseded: a single horizontal pager of thirteen pages under a
 horizontally scrolling name rail. Everything was one swipe from its
@@ -601,8 +512,9 @@ rank as the pull request drawer.)*
 
 ## Sign-in (`PatForm`)
 
-Pin04 treatment: serif `Hey,` / `paste a token`, cross-grid texture behind, mono input with a
-hairline underline, filled black pill `connect`, ghost pill `try the demo`. Error text in `red`.
+`hey,` / `paste a token and i'll read the year.`, a card holding a stand-in field of the
+widget's dots, mono input with a hairline underline, filled pill `connect`, ghost pill
+`try the demo`, the app's version top right. Error text in `no`.
 
 ## The widget
 

@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Composer } from './Composer';
 import { Data, Label, Micro } from './Type';
 import type { DiffFile, DiffLine } from '../lib/pullDetail';
-import { colors, fonts, radii, themed } from '../theme';
+import { colors, fonts, radii, themed, tint } from '../theme';
 
 /** Where a line comment lands: GitHub numbers new lines on the right, old on the left. */
 export interface LineTarget {
@@ -301,10 +301,10 @@ const styles = themed(() =>
       gap: 8,
     },
     add: {
-      color: colors.green,
+      color: colors.yes,
     },
     del: {
-      color: colors.red,
+      color: colors.no,
     },
     status: {
       color: colors.ink40,
@@ -320,19 +320,19 @@ const styles = themed(() =>
       paddingVertical: 1,
     },
     addRow: {
-      backgroundColor: 'rgba(31,154,83,0.12)',
+      backgroundColor: tint(colors.yes, 0.14),
     },
     delRow: {
-      backgroundColor: 'rgba(232,65,43,0.12)',
+      backgroundColor: tint(colors.no, 0.14),
     },
     // Found lines keep their add/delete band underneath the mark, so a find
     // never hides what kind of line it landed on.
     foundRow: {
-      borderLeftColor: colors.yellow,
+      borderLeftColor: colors.ink,
       borderLeftWidth: 3,
     },
     pickedRow: {
-      backgroundColor: 'rgba(47,127,224,0.16)',
+      backgroundColor: tint(colors.ink, 0.12),
     },
     hits: {
       color: colors.ink,

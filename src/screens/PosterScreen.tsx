@@ -1,12 +1,12 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Line, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Line, Path, Text as SvgText } from 'react-native-svg';
 
 import { Label } from '../components/Type';
-import { Wordmark } from '../components/Wordmark';
 import type { GitHubModel } from '../lib/contributions';
 import { howLong, howLongMonths, quietRuns, wavePath, weekOfYear } from '../lib/quiet';
-import { colors, fonts, radii, themed } from '../theme';
+import { dot } from '../components/DotField';
+import { colors, fonts, levels, radii, themed } from '../theme';
 import { fmt, hash } from './shared';
 
 const AXIS = 18;
@@ -71,9 +71,9 @@ export function seriesFor(model: GitHubModel, year: number, now: Date = new Date
 }
 
 /**
- * pin09 — the IBM poster. Columns of stacked squares rising from the
- * baseline and dissolving into pixel rain at the top, filling the page the
- * way a poster does. One column per week of the selected year; the year
+ * The year as a poster: columns of the widget's dots rising from the
+ * baseline and dissolving into a rain of smaller, fainter ones at the top,
+ * filling the page the way a poster does. One column per week of the selected year; the year
  * chips walk back through every year the account has been active.
  *
  * Every year is drawn from its *own* calendar, so 2019 gets the same
@@ -104,7 +104,7 @@ export function PosterScreen({ model }: { model: GitHubModel }) {
     <View style={styles.screen}>
       <View style={styles.head}>
         <Label style={styles.headLabel}>{active}</Label>
-        <Wordmark size={19} />
+        <Label>{series.unit === 'week' ? 'week by week' : 'month by month'}</Label>
       </View>
 
       <View
@@ -159,9 +159,9 @@ export function PosterScreen({ model }: { model: GitHubModel }) {
 }
 
 /**
- * The poster's signature move: a solid column that breaks into scattered,
- * drifting squares across its top third. Black dominates; the IBM brights
- * punctuate. A month rule runs under the baseline so a column can be placed
+ * The poster's signature move: a solid column of dots that breaks into
+ * scattered, drifting ones across its top third, the busiest week's column
+ * squared up to full weight. A month rule runs under the baseline so a column can be placed
  * in the year without counting.
  */
 export function PixelRain({
@@ -176,12 +176,14 @@ export function PixelRain({
   peak: number;
 }) {
   const { values, months, until, unit } = series;
+  const peakColumn = values.indexOf(Math.max(...values));
   const count = Math.max(values.length, 1);
   const pitch = width / count;
   const cell = Math.max(3, Math.min(10, pitch - 1));
   const rows = Math.max(1, Math.floor(height / cell));
 
-  const squares: ReactElement[] = [];
+  // One path per weight: a poster's worth of dots is five nodes.
+  const buckets: string[][] = [[], [], [], [], []];
 
   values.forEach((value, column) => {
     const filled = Math.round((value / peak) * rows);
@@ -192,30 +194,23 @@ export function PixelRain({
     for (let row = 0; row < filled; row++) {
       const seed = hash(`${column}:${row}`);
       const dissolving = row >= solid;
-      // Higher up the dissolve, the more squares drop out.
+      // Higher up the dissolve, the more dots drop out, and the fainter and
+      // smaller the ones left — the column thins into the page.
       const progress = filled > solid ? (row - solid) / (filled - solid) : 0;
       if (dissolving && (seed % 100) / 100 < progress * 0.85) continue;
 
-      // Drift is a fraction of a *square*, not of a column: at one whole
-      // pitch the loose squares landed on top of the neighbouring columns
-      // and read as debris floating in mid-air.
+      // Drift is a fraction of a *dot*, not of a column: at one whole pitch
+      // the loose dots landed on the neighbouring columns and read as debris.
       const drift = dissolving ? (((seed >> 7) % 3) - 1) * cell * 0.55 : 0;
       const x = left + drift;
       if (x < 0 || x > width - cell) continue;
 
-      squares.push(
-        <Rect
-          fill={colors.poster[seed % colors.poster.length]}
-          height={cell - 1}
-          key={`${column}-${row}`}
-          width={cell - 1}
-          x={x}
-          y={height - (row + 1) * cell}
-        />,
+      const level = dissolving ? Math.max(0, 3 - Math.floor(progress * 3)) : column === peakColumn ? 4 : 3;
+      buckets[level].push(
+        dot(x + cell / 2, height - row * cell - cell / 2, cell * 0.8 * levels.scale[level], false),
       );
     }
   });
-
   // A month or more of nothing is bridged with the app's wave, sitting on
   // the baseline where the columns would have stood, with its length over it.
   const silences = quietRuns(values, unit === 'week' ? 4 : 3, until).map((run) => {
@@ -234,7 +229,11 @@ export function PixelRain({
 
   return (
     <>
-      {squares}
+      {buckets.map((d, level) =>
+        d.length ? (
+          <Path d={d.join('')} fill={colors.ink} key={`l${level}`} opacity={levels.alpha[level]} />
+        ) : null,
+      )}
       {silences.map((silence) => (
         <Path
           d={silence.d}
@@ -303,7 +302,7 @@ function monthTicks(months: number[]): { month: number; column: number }[] {
 const styles = themed(() =>
   StyleSheet.create({
     screen: {
-      backgroundColor: colors.canvasFlat,
+      backgroundColor: colors.canvas,
       flex: 1,
       paddingHorizontal: 20,
       paddingTop: 4,
@@ -331,7 +330,7 @@ const styles = themed(() =>
       paddingTop: 14,
     },
     chip: {
-      borderColor: colors.hair,
+      borderColor: colors.hairStrong,
       borderRadius: radii.pill,
       borderWidth: 1,
       paddingHorizontal: 14,

@@ -1,63 +1,86 @@
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { CrossField } from '../components/CrossField';
+import { Card } from '../components/Card';
+import { DotField } from '../components/DotField';
+import { Marquee } from '../components/Marquee';
 import { FeedRow } from '../components/SocialFeed';
 import { Body, Display, Label, Micro, Serif } from '../components/Type';
+import { useFeedHistory } from '../hooks/useFeedHistory';
 import type { SocialState } from '../hooks/useSocial';
 import { handleOf, insights, type GitHubModel } from '../lib/contributions';
-import { HOME_BLOCKS, HOME_ROWS, homeEvents, type HomeSettings } from '../lib/home';
+import { HOME_BLOCKS, homeEvents, type HomeSettings } from '../lib/home';
+import type { CommitLine } from '../lib/messageCache';
+import { useNav } from '../lib/nav';
 import type { SocialEvent } from '../lib/social';
-import { colors, fonts, themed } from '../theme';
-import { fmt, Page } from './shared';
+import { colors, fonts, space, themed } from '../theme';
+import { fmt, historyLevels, Page } from './shared';
+
+/** The widget's card is 7 rows at up to 22dp a dot; so is this one. */
+const FIELD_ROWS = 7;
+const FIELD_PITCH = 21;
 
 /**
- * pin04 — Pantom's landing page. A serif greeting, a field of plus glyphs
- * standing in for the contribution year, and one sentence that carries the
- * year's figures in five colours.
+ * The first page is the home-screen widget, set in the app: a greeting, then
+ * the widget's own card — your commit messages travelling across the top and
+ * the last few months of days as dots under them, today the plus in the
+ * corner — and one sentence that carries the year's figures.
  *
- * Under it, a short feed — pull request comments by default, chosen on the
- * account page — so the page runs on into what people said instead of
- * ending in a stretch of empty paper. The account itself (switching, adding,
- * notifications, disconnect) lives behind the avatar in the top-right corner.
+ * Under it, what people have been saying on your work, pull request comments
+ * unless the account page says otherwise. It starts with the inbox's feed and
+ * keeps going: scrolling pages in older pull requests, so it runs as far back
+ * as the conversation does. The account itself lives behind the avatar.
  */
 export function HeyScreen({
   model,
   social,
   home,
+  lines,
+  active,
   onOpen,
-  onInbox,
   onSettings,
 }: {
   model: GitHubModel;
   social: SocialState;
   home: HomeSettings;
+  lines: readonly CommitLine[];
+  active: boolean;
   onOpen: (event: SocialEvent) => void;
-  /** The whole feed, in its own section. */
-  onInbox: () => void;
   /** The account page, where the feed's kinds are chosen. */
   onSettings: () => void;
 }) {
   const { width } = useWindowDimensions();
   const derived = insights(model);
-
-  // Two days per column keeps the crosses far enough apart to read as
-  // separate marks rather than merging into bars, the way pin04's do.
-  const levels = bucket(model.columns.flat().map((day) => day.level), 2);
+  const nav = useNav();
+  const history = useFeedHistory(nav.token, nav.login, active && home.blocks.length > 0);
+  const inner = width - space.gutter * 2 - space.card * 2;
 
   return (
-    <Page>
-      <Display>Hey,</Display>
-      <Display adjustsFontSizeToFit numberOfLines={1} style={styles.handle}>
-        {handleOf(model)}
-      </Display>
+    <Page onEnd={history.more}>
+      <View style={styles.greeting}>
+        <Display style={styles.hey}>hey,</Display>
+        <Display adjustsFontSizeToFit numberOfLines={1}>
+          {handleOf(model)}
+        </Display>
+      </View>
 
-      <CrossField
-        days={levels}
-        daysPerCell={2}
-        height={132}
-        style={styles.field}
-        width={width - 40}
-      />
+      <Card style={styles.widget}>
+        <Marquee
+          active={active}
+          items={(lines.length > 0 ? lines : FALLBACK).map((line) => ({
+            lead: line.repo,
+            text: line.message,
+          }))}
+          style={styles.strip}
+        />
+        <DotField
+          days={historyLevels(model)}
+          height={FIELD_ROWS * FIELD_PITCH}
+          maxPitch={FIELD_PITCH}
+          rows={FIELD_ROWS}
+          style={styles.field}
+          width={inner}
+        />
+      </Card>
 
       <Sentence derived={derived} model={model} />
 
@@ -69,8 +92,8 @@ export function HeyScreen({
       </Serif>
 
       <HomeFeed
+        history={history}
         home={home}
-        onInbox={onInbox}
         onOpen={onOpen}
         onSettings={onSettings}
         social={social}
@@ -79,33 +102,38 @@ export function HeyScreen({
   );
 }
 
+/** A first launch with no pool of messages yet still has a strip. */
+const FALLBACK: CommitLine[] = [
+  { repo: 'git-huh', message: 'first commit' },
+  { repo: 'git-huh', message: 'reading your year' },
+];
+
 /**
- * Under the greeting, what people have been saying on your work — pull
- * request comments unless the account page says otherwise. It is the inbox's
- * own feed, filtered; nothing is fetched for it, and it is a glance, so it
- * shows the newest few and points at the inbox for the rest.
+ * Under the greeting, what people have been saying on your work. The inbox's
+ * feed first, then the history as it pages in, the same comment once.
  */
 function HomeFeed({
   social,
+  history,
   home,
   onOpen,
-  onInbox,
   onSettings,
 }: {
   social: SocialState;
+  history: ReturnType<typeof useFeedHistory>;
   home: HomeSettings;
   onOpen: (event: SocialEvent) => void;
-  onInbox: () => void;
   onSettings: () => void;
 }) {
-  const events = social.status === 'ready' ? homeEvents(social.events, home) : [];
-  const rows = events.slice(0, HOME_ROWS);
+  const inbox = social.status === 'ready' ? social.events : [];
+  const rows = homeEvents([...inbox, ...history.events], home);
   const title =
     home.blocks.length === 0
       ? 'nothing chosen'
       : HOME_BLOCKS.filter((block) => home.blocks.includes(block.key))
           .map((block) => block.label)
           .join(' · ');
+  const oldest = rows[rows.length - 1];
 
   return (
     <View style={styles.block}>
@@ -123,35 +151,52 @@ function HomeFeed({
           pick what shows here from the account page, top right
         </Micro>
       )}
-      {home.blocks.length > 0 && social.status === 'loading' && (
-        <Micro style={styles.blockNote}>reading the room…</Micro>
-      )}
-      {home.blocks.length > 0 && social.status === 'error' && (
+      {home.blocks.length > 0 && social.status === 'error' && rows.length === 0 && (
         <Micro style={styles.blockNote}>github would not hand over the feed</Micro>
-      )}
-      {home.blocks.length > 0 && social.status === 'ready' && rows.length === 0 && (
-        <Micro style={styles.blockNote}>nothing new on your pull requests · quiet week</Micro>
       )}
 
       {rows.map((event) => (
         <FeedRow event={event} key={event.id} onOpen={() => onOpen(event)} />
       ))}
 
-      {events.length > rows.length && (
-        <Pressable accessibilityRole="button" onPress={onInbox} style={styles.more}>
-          <Label style={styles.link}>{events.length - rows.length} more in the inbox →</Label>
-        </Pressable>
+      {home.blocks.length > 0 && (
+        <View style={styles.end}>
+          {history.loading || social.status === 'loading' ? (
+            <Micro style={styles.blockNote}>reading older pull requests…</Micro>
+          ) : history.failed ? (
+            <Pressable accessibilityRole="button" onPress={history.more}>
+              <Micro style={styles.blockNote}>
+                github stopped answering · <Text style={styles.link}>try again</Text>
+              </Micro>
+            </Pressable>
+          ) : history.done ? (
+            <Micro style={styles.blockNote}>
+              {rows.length === 0
+                ? 'nothing on your pull requests yet'
+                : `that is everything${oldest ? `, back to ${monthOf(oldest.at)}` : ''}`}
+            </Micro>
+          ) : (
+            <Pressable accessibilityRole="button" hitSlop={10} onPress={history.more}>
+              <Micro style={[styles.blockNote, styles.link]}>older →</Micro>
+            </Pressable>
+          )}
+        </View>
       )}
     </View>
   );
 }
 
+function monthOf(iso: string): string {
+  return new Date(iso)
+    .toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    .toLowerCase();
+}
+
 /**
- * pin04's one sentence, five figures in five colours — all of them about the
- * same year the crosses above it draw. It says what you did, where, how
- * steadily, when, and what is still open, and a figure with nothing in it
- * drops out rather than printing a zero. Vanity figures (stars, followers)
- * stay out of it: they make it read like a template filled in.
+ * One sentence, five figures — all of them about the same year the dots above
+ * draw. The figures are set in full ink and the words around them a step
+ * back, the widget's two weights, so the numbers can be read on their own. A
+ * figure with nothing in it drops out rather than printing a zero.
  */
 function Sentence({
   model,
@@ -166,88 +211,88 @@ function Sentence({
   if (model.total === 0) {
     return (
       <Body style={styles.sentence}>
-        Nothing on the calendar in the last year. The first commit will show up
-        here as a cross.
+        nothing on the calendar in the last year. the first commit will show up
+        in the corner as a plus.
       </Body>
     );
   }
 
-  const weekday =
-    derived.busiestWeekday.charAt(0).toUpperCase() + derived.busiestWeekday.slice(1);
+  const weekday = derived.busiestWeekday;
 
   return (
     <Body style={styles.sentence}>
-      You made <Text style={styles.blue}>{fmt(model.total)}</Text>{' '}
+      you made <Text style={styles.figure}>{fmt(model.total)}</Text>{' '}
       {model.total === 1 ? 'contribution' : 'contributions'} in the last year
       {repo ? (
         <>
-          , more of them to <Text style={styles.green}>{repo}</Text> than
+          , more of them to <Text style={styles.figure}>{repo}</Text> than
           anywhere else
         </>
       ) : null}
-      . You work most on <Text style={styles.yellow}>{weekday}s</Text>
+      . you work most on <Text style={styles.figure}>{weekday}s</Text>
       {derived.longestStreak > 1 ? (
         <>
           , and your longest run was{' '}
-          <Text style={styles.purple}>{fmt(derived.longestStreak)}</Text> days
+          <Text style={styles.figure}>{fmt(derived.longestStreak)}</Text> days
           in a row
         </>
       ) : null}
       .{' '}
       {model.openPrs > 0 ? (
         <>
-          You have <Text style={styles.red}>{fmt(model.openPrs)}</Text>{' '}
-          {model.openPrs === 1 ? 'pull request' : 'pull requests'} still open.
+          <Text style={styles.figure}>{fmt(model.openPrs)}</Text>{' '}
+          {model.openPrs === 1 ? 'pull request is' : 'pull requests are'} still open.
         </>
       ) : (
-        'Nothing of yours is waiting to merge.'
+        'nothing of yours is waiting to merge.'
       )}
     </Body>
   );
 }
 
-/** Collapse `size` consecutive days into their peak, preserving intensity. */
-function bucket(levels: number[], size: number): number[] {
-  const out: number[] = [];
-  for (let i = 0; i < levels.length; i += size) {
-    out.push(Math.max(...levels.slice(i, i + size)));
-  }
-  return out;
-}
-
 const styles = themed(() =>
   StyleSheet.create({
-    handle: {
-      marginTop: -6,
+    greeting: {
+      paddingHorizontal: 4,
+      paddingTop: 6,
+    },
+    hey: {
+      color: colors.ink40,
+    },
+    widget: {
+      marginTop: 8,
+    },
+    strip: {
+      marginBottom: 14,
     },
     field: {
       alignSelf: 'center',
-      marginBottom: 20,
-      marginTop: 18,
     },
     sentence: {
-      fontSize: 17,
-      lineHeight: 26,
+      color: colors.ink70,
+      fontSize: 15,
+      lineHeight: 24,
+      marginTop: 10,
+      paddingHorizontal: 4,
     },
-    blue: { color: colors.blue },
-    green: { color: colors.green },
-    red: { color: colors.red },
-    yellow: { color: colors.yellow },
-    purple: { color: colors.purple },
+    figure: {
+      color: colors.ink,
+      fontFamily: fonts.monoMedium,
+    },
     since: {
       color: colors.ink40,
-      fontFamily: fonts.serifItalic,
-      fontSize: 13,
-      marginTop: 16,
+      paddingHorizontal: 4,
     },
     block: {
-      marginTop: 28,
+      gap: 8,
+      marginTop: 18,
     },
     blockHead: {
       alignItems: 'baseline',
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingBottom: 8,
+      paddingBottom: 2,
+      paddingHorizontal: 4,
     },
     blockTitle: {
       color: colors.ink,
@@ -255,15 +300,15 @@ const styles = themed(() =>
     },
     blockNote: {
       color: colors.ink40,
-      lineHeight: 13,
-      marginTop: 10,
+      lineHeight: 14,
+    },
+    end: {
+      alignItems: 'center',
+      paddingVertical: 14,
     },
     link: {
       color: colors.ink,
       textDecorationLine: 'underline',
-    },
-    more: {
-      paddingTop: 14,
     },
   }),
 );

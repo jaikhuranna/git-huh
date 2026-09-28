@@ -5,10 +5,12 @@
 **Make your own GitHub history worth looking at — and deal with what wants
 you without reaching for a laptop.** The numbers GitHub already has about
 you — a year of contributions, the languages, the repos, the pull requests
-and the arguments in them — rendered as a set of printed artefacts rather
-than as a dashboard: fourteen screens, each one a pin from the "nothing
-github" Pinterest board, grouped into five sections, plus
-one home-screen widget — a Glance widget on Android and a WidgetKit one on
+and the arguments in them — drawn the way the home-screen widget draws them rather than as a
+dashboard: fourteen screens, each laid out after a pin from the "nothing
+github" Pinterest board and all drawn in the widget's marks (one mono face,
+one ink, dots whose size is the data, a plus for today, a wave for a
+silence), grouped into five sections, plus
+the home-screen widget itself — a Glance widget on Android and a WidgetKit one on
 iOS, drawing the same card from the same payload. It follows the system into
 dark mode.
 
@@ -124,8 +126,9 @@ compiled on a Mac.
 
 - `src/screens/` — one file per screen: `Hey`, `Now`, `Weather`, `Clock`,
   `Inbox`, `Index`, `Brief`, `Review`, `Cards`, `Poster`, `Flow`, `Orbit`,
-  `Archive`, `Dots`, plus `Loading` (pin11, shown while the first request is
-  in flight), and the pushed pages: `Pull`, `Thread` (issue or discussion),
+  `Archive`, `Dots` (the `lab`'s *zoomed out*), plus `Loading` (the widget's
+  card with a light sweeping its dots, shown while the first request is in
+  flight), and the pushed pages: `Pull`, `Thread` (issue or discussion),
   `Repo`, `File`, `NewIssue`, `Account` (behind the avatar in every section's
   top-right corner: accounts, which are added together, notifications, what
   the `you` page lists) and `Share` (a view as a 4:3 image).
@@ -160,12 +163,16 @@ compiled on a Mac.
   handle with `handleOf(model)`, never `~${model.login}`, or a summed year is
   labelled with one account's name.
 - `src/lib/home.ts` — what the `you` page lists under the greeting (pull
-  request comments by default), a filter over the inbox's own feed. The menu
-  of kinds is `HOME_BLOCKS`; the choice is saved as `home-settings`.
+  request comments by default), a filter over the inbox's own feed **plus the
+  history paged in by `src/hooks/useFeedHistory.ts`** (`fetchSocialPage` in
+  `social.ts`: ten of your pull requests at a time, open or closed, as the page
+  is scrolled — the inbox's own feed is only your open ones, three comments
+  deep, because it is also the background check). The menu of kinds is
+  `HOME_BLOCKS`; the choice is saved as `home-settings`.
 - `src/lib/quiet.ts` — **every chart's long silences.** Past a threshold, an
   empty run is bridged with the app's wave and its length (`quietRuns`,
   `wavePath`), or folded out of a field the way the widget does (`foldField`,
-  `placeField`, used by `CrossField`). A new chart over time should use it;
+  `placeField`, used by `DotField`). A new chart over time should use it;
   pass `until` so the unfinished part of this year is not drawn as a silence.
 - `src/components/ShareCard.tsx` + `src/screens/ShareScreen.tsx` — a chart
   as a 640 × 480 card, captured at 1600 × 1200 (react-native-view-shot) and
@@ -181,7 +188,7 @@ compiled on a Mac.
   the pushed pages above the navigator, and reads which section is open from
   the path. `src/shell/sections.ts` `SECTIONS` is the whole map: `today` (you · now · weather · hours),
   `inbox` (recent), `work` (pulls · brief · cycle · repos), `year` (weeks ·
-  split · languages · years) and `lab` (join the dots), which is where an
+  split · languages · years) and `lab` (zoomed out), which is where an
   unfinished artefact lives until it earns a place in one of the other four.
   The in-section switcher is `src/components/Segments.tsx`. Apple's HIG is the reference: three to five persistent
   labelled destinations, no drawer, no hamburger, segmented control for views
@@ -267,21 +274,30 @@ and do not run `expo prebuild` without checking what it would overwrite.
 
 ## Design rules
 
-The app deliberately does **not** use the Nothing design language. No
-dot-matrix typeface, no Nothing red (`#D71921`) **anywhere**, no
-grey-paper-plus-dot-grid combination. Type is Instrument Serif (display) + Inter (body) + IBM Plex
-Mono (labels and data). Colour is six categorical brights used to distinguish
-categories, never a single brand accent.
+**The app is the widget, zoomed out** (`design/LANGUAGE.md` §1). One face —
+IBM Plex Mono in every role, `src/components/Type.tsx` — one ink in four
+weights on the widget's warm near-black card, and every chart built from the
+widget's marks: `DotField` (a run of days, today the plus, silences folded
+into the wave), `DotRow` (a series), `Marquee` (the travelling commit strip),
+`Card` (the surface). The only colour is `yes` / `no` (sage / clay) for what a
+machine says — a diff, a check, a review — always beside a word or sign.
+GitHub's language and label colours are not drawn. New screens use these
+pieces; do not bring back per-screen canvases, categorical brights or a
+second typeface.
 
-Nothing survives in exactly one place: **the widget's background**, the
-Material You neutral Nothing's own widgets sit on
-(`android.R.color.system_neutral1_50` / `_900`). It is read natively in
-`WidgetSurface.kt` each time the card is composed — never carried in the
-sync payload, which would keep the old colour after the wallpaper changed.
+Still not the Nothing design language: no dot-matrix *typeface*, no Nothing
+red (`#D71921`) **anywhere**, and dots are data, never a texture under
+something. Nothing survives in exactly one place: **the widget's background**,
+the Material You neutral Nothing's own widgets sit on
+(`android.R.color.system_neutral1_50` / `_900`), read natively in
+`WidgetSurface.kt` each time the card is composed — never carried in the sync
+payload, which would keep the old colour after the wallpaper changed.
 
-Dots as texture are allowed only where the source pin is built from them:
-`now` (LED numerals), `dots` (the puzzle), `archive` (circle rows). Everywhere else use that pin's own device — crosses, ribbons,
-stacked squares, arcs, filing rules.
+Big dot fields are **paths, not elements**: one `<Path>` per weight
+(`dot()` in `DotField.tsx` builds the path data). Hundreds of `<Circle>`s, or
+one enormous path, make the launch transaction heavy enough to trip the SVG
+trap below on the emulator — the weather sky at a 13pt pitch took it from one
+crash in six launches to four.
 
 ## Running against Metro (emulator QA)
 
@@ -394,7 +410,8 @@ Do not. (The one exception is an inbox row following a finger, which a
 `PanResponder` has to drive.) The loading wave went through a `setInterval` stepping a counter
 (~16 fps, visibly steppy) and then a `requestAnimationFrame` loop (right
 timing, still slow) before landing on the only thing that works: precompute
-every glyph's whole track at mount, hand it to one looping `Animated.Value`
+every mark's whole track at mount (today, each dot's scale and opacity as the
+light sweeps the loading card; the strip is one `translateX`), hand it to one looping `Animated.Value`
 as an interpolation, and let the native driver run it. That holds 60 fps with
 under 1% janky frames *while the JS thread is parsing the first GitHub
 response*, which is the entire point of that screen. Measure with

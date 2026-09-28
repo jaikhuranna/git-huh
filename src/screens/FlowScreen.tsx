@@ -1,26 +1,21 @@
-import { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 
 import { Data, Heading, Label, Title } from '../components/Type';
 import type { GitHubModel } from '../lib/contributions';
+import { Card } from '../components/Card';
 import { colors, themed } from '../theme';
 import { fmt, Page, ScreenHead } from './shared';
 
 /**
- * pin05 — the Madrid culture-budget Sankey. Ribbons branching left to right,
+ * The year as a budget. Ribbons branching left to right,
  * bold percentages with the grey absolute tucked underneath. Here the budget
  * is your year: total contributions fan into what kind of work they were, and
  * the commits go on to fan into the repositories that absorbed them.
  *
- * Two things the monochrome version got wrong.
- *
- * **Colour.** Every ribbon was the same ink at the same opacity, so the only
- * way to tell which band was which was to count downwards and hope the legend
- * was in the same order. Each kind of work now carries one of the board's
- * categorical brights and the legend repeats it as a swatch, so a band can be
- * identified where it is drawn. Private work is the exception and stays grey
- * on purpose — see below.
+ * **Weight, not colour.** Each kind of work is one of the widget's weights of
+ * ink, and the legend repeats it as a dot of the same weight beside the
+ * name, so a band can be identified where it is drawn without a hue.
  *
  * **The private bucket.** GitHub's four typed totals cover public work only;
  * everything done in a repository the profile does not expose arrives as a
@@ -29,21 +24,25 @@ import { fmt, Page, ScreenHead } from './shared';
  * every other screen in the app — a year of 441 contributions drawn as a flow
  * of 10. It is now its own band, and it is grey because that is the truth of
  * it: GitHub will tell you how much there was and nothing whatever about what
- * it was.
+ * it was — so it is the faintest band.
  *
  * Labels sit in rows beneath the diagram rather than on top of it — drawn over
  * the ribbons they were unreadable, and the repo names collided with the
  * percentages.
  */
 
-/** One bright per kind of work; the grey is not a colour, it is an absence. */
-const CATEGORY_COLORS = themed(() => ({
-  commits: colors.blue,
-  'pull requests': colors.purple,
-  reviews: colors.green,
-  issues: colors.yellow,
-  private: colors.ink40,
-}));
+/**
+ * One weight of ink per kind of work — the widget's own steps, heaviest for
+ * the biggest kind of work there usually is. Private work is the faintest,
+ * because that is the truth of it: GitHub says how much and nothing else.
+ */
+const CATEGORY_WEIGHT: Record<string, number> = {
+  commits: 1,
+  'pull requests': 0.72,
+  reviews: 0.52,
+  issues: 0.36,
+  private: 0.16,
+};
 
 const CHART_HEIGHT = 300;
 const GAP = 8;
@@ -54,14 +53,15 @@ interface Band<T> {
   entry: T;
   y: number;
   height: number;
-  color: string;
+  /** Opacity of the ink this band is drawn in. */
+  weight: number;
 }
 
 /** Stack values down a column, each keeping its share of the usable height. */
 function stack<T>(
   entries: T[],
   value: (entry: T) => number,
-  color: (entry: T) => string,
+  weight: (entry: T) => number,
   height: number,
 ): Band<T>[] {
   const total = entries.reduce((sum, entry) => sum + value(entry), 0) || 1;
@@ -75,7 +75,7 @@ function stack<T>(
         entry,
         y,
         height: Math.max((value(entry) / total) * usable, MIN_BAND),
-        color: color(entry),
+        weight: weight(entry),
       },
     ];
   }, []);
@@ -83,7 +83,7 @@ function stack<T>(
 
 export function FlowScreen({ model }: { model: GitHubModel }) {
   const { width } = useWindowDimensions();
-  const chartWidth = width - 40;
+  const chartWidth = width - 36 - 36;
 
   const categories = (
     [
@@ -100,16 +100,9 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
   const total = categories.reduce((sum, entry) => sum + entry.value, 0) || 1;
   const repos = model.topRepos.slice(0, 5);
 
-  /** Repos are drawn in their own language's colour, the way `cards` does. */
-  const repoColor = useMemo(() => {
-    const byName = new Map(
-      model.repos.map((repo) => [repo.nameWithOwner, repo.language?.color]),
-    );
-    return (nameWithOwner: string) =>
-      nameWithOwner === 'others'
-        ? colors.ink20
-        : byName.get(nameWithOwner) ?? colors.ink70;
-  }, [model.repos]);
+  /** Repos step down in weight by rank; `others` is the ghost. */
+  const repoWeight = (nameWithOwner: string, rank: number) =>
+    nameWithOwner === 'others' ? 0.16 : Math.max(0.3, 1 - rank * 0.18);
 
   const trunkX = 0;
   const trunkW = 8;
@@ -120,7 +113,7 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
   const catBands = stack(
     categories,
     (entry) => entry.value,
-    (entry) => CATEGORY_COLORS[entry.label],
+    (entry) => CATEGORY_WEIGHT[entry.label],
     CHART_HEIGHT,
   );
 
@@ -165,7 +158,7 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
       repoHeights.slice(0, index).reduce((sum, height) => sum + height, 0) +
       GAP * index,
     height: repoHeights[index],
-    color: repoColor(repo.nameWithOwner),
+    weight: repoWeight(repo.nameWithOwner, index),
   }));
 
   /** Where each category band leaves the trunk — the trunk has no gaps. */
@@ -178,6 +171,7 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
     <Page>
       <ScreenHead left="where it went" right="last 12 months" />
 
+      <Card>
       <View style={styles.trunkRow}>
         <Title>100%</Title>
         <Label style={styles.trunkValue}>{fmt(total)} contributions</Label>
@@ -194,9 +188,9 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
               band.y,
               band.y + band.height,
             )}
-            fill={band.color}
+            fill={colors.ink}
             key={band.entry.label}
-            opacity={0.55}
+            opacity={band.weight * 0.42}
           />
         ))}
 
@@ -213,19 +207,21 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
                 band.y,
                 band.y + band.height,
               )}
-              fill={band.color}
+              fill={colors.ink}
               key={band.entry.nameWithOwner}
-              opacity={0.45}
+              opacity={band.weight * 0.36}
             />
           );
         })}
 
-        <Rect fill={colors.ink} height={CHART_HEIGHT} width={trunkW} x={trunkX} y={0} />
+        <Rect fill={colors.ink} height={CHART_HEIGHT} rx={trunkW / 2} width={trunkW} x={trunkX} y={0} />
         {catBands.map((band) => (
           <Rect
-            fill={band.color}
+            fill={colors.ink}
             height={band.height}
             key={band.entry.label}
+            opacity={band.weight}
+            rx={midW / 2}
             width={midW}
             x={midX}
             y={band.y}
@@ -233,20 +229,23 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
         ))}
         {repoBands.map((band) => (
           <Rect
-            fill={band.color}
+            fill={colors.ink}
             height={band.height}
             key={band.entry.nameWithOwner}
+            opacity={band.weight}
+            rx={3}
             width={6}
             x={rightX}
             y={band.y}
           />
         ))}
       </Svg>
+      </Card>
 
-      <View style={styles.legend}>
+      <Card style={styles.legend}>
         {catBands.map((band) => (
           <View key={band.entry.label} style={styles.legendRow}>
-            <View style={[styles.swatch, { backgroundColor: band.color }]} />
+            <View style={[styles.swatch, { opacity: band.weight }]} />
             <Heading style={styles.pct}>
               {((band.entry.value / total) * 100).toFixed(1)}%
             </Heading>
@@ -254,7 +253,7 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
             <Data style={styles.legendValue}>{fmt(band.entry.value)}</Data>
           </View>
         ))}
-      </View>
+      </Card>
 
       {model.breakdown.private > 0 && (
         <Label style={styles.footnote}>
@@ -262,18 +261,17 @@ export function FlowScreen({ model }: { model: GitHubModel }) {
         </Label>
       )}
 
-      <Label style={styles.repoHead}>commits into</Label>
-      <View style={styles.legend}>
+      <Card style={styles.legend} title="commits into">
         {repoBands.map((band) => (
           <View key={band.entry.nameWithOwner} style={styles.legendRow}>
-            <View style={[styles.swatch, { backgroundColor: band.color }]} />
+            <View style={[styles.swatch, { opacity: band.weight }]} />
             <Data style={styles.legendName}>
               {shorten(band.entry.nameWithOwner)}
             </Data>
             <Data style={styles.legendValue}>{fmt(band.entry.count)}</Data>
           </View>
         ))}
-      </View>
+      </Card>
     </Page>
   );
 }
@@ -318,17 +316,17 @@ const styles = themed(() =>
       color: colors.ink40,
     },
     legend: {
-      marginTop: 10,
+      paddingVertical: 10,
     },
     legendRow: {
       alignItems: 'center',
-      borderTopColor: colors.hair,
-      borderTopWidth: 1,
       flexDirection: 'row',
       gap: 10,
       paddingVertical: 8,
     },
     swatch: {
+      backgroundColor: colors.ink,
+      borderRadius: 5,
       height: 10,
       width: 10,
     },
@@ -344,7 +342,7 @@ const styles = themed(() =>
     },
     footnote: {
       color: colors.ink40,
-      marginTop: 8,
+      paddingHorizontal: 4,
     },
     repoHead: {
       marginTop: 18,

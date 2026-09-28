@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { LanguageChip } from '../components/LanguageChip';
-import { Data, Label } from '../components/Type';
+import { DotRow } from '../components/DotRow';
+import { Data, Label, Micro } from '../components/Type';
 import {
   lastCommitAt,
   monthWindow,
@@ -16,15 +17,13 @@ import type { GitHubModel, RepoSummary } from '../lib/contributions';
 import { useRemote } from '../hooks/useRemote';
 import { demoSearch } from '../lib/demo';
 import { useNav } from '../lib/nav';
-import { howLongMonths, quietRuns, wavePath } from '../lib/quiet';
 import { searchCode } from '../lib/repo';
-import { colors, fonts, radii, themed } from '../theme';
+import { colors, radii, themed } from '../theme';
 import { SearchField, SearchResults } from './RepoScreen';
 import { ago, fmt, hash, Page, ScreenHead } from './shared';
 
-const CARD_HEIGHT = 176;
-const CHART_HEIGHT = 58;
-const AXIS_HEIGHT = 14;
+const CARD_HEIGHT = 168;
+const CHART_HEIGHT = 30;
 /**
  * The deck should read as fanned cards, not one black slab: at the old
  * overlap the canvas never showed between them and the stack merged into a
@@ -36,9 +35,10 @@ const OVERLAP = 16;
 const MONTHS = 12;
 
 /**
- * pin08 — the Urbit ID cards. A fanned deck of black cards, each with a
- * sigil generated from its name, a monospace handle, and that repository's
- * own commit history drawn month by month.
+ * A fanned deck of the widget's cards, one per repository, each with a
+ * sigil generated from its name, a handle, and that repository's own commit
+ * history as a row of month dots — the busiest squared off with its count,
+ * three quiet months or more folded into the wave.
  */
 export function CardsScreen({
   model,
@@ -180,20 +180,27 @@ function RepoCard({
         </Data>
       </View>
 
-      <Svg height={CHART_HEIGHT + AXIS_HEIGHT} width={width - 36}>
-        <MonthChart months={bars} sampled={sampled} width={width - 36} />
-      </Svg>
+      <View style={styles.chart}>
+        {sampled ? (
+          <DotRow
+            height={CHART_HEIGHT}
+            labels={bars.map((month) => month.initial.toLowerCase())}
+            quiet={3}
+            unit="month"
+            values={bars.map((month) => month.count)}
+            width={width - 40}
+          />
+        ) : (
+          <Micro style={styles.unsampled}>outside the commit sample</Micro>
+        )}
+      </View>
 
       <View style={styles.meta}>
         <Data style={styles.metaText}>★ {fmt(repo.stars)}</Data>
         <Data style={styles.metaText}>⑂ {fmt(repo.forks)}</Data>
         {repo.language && (
           <View style={styles.langRow}>
-            <LanguageChip
-              color={repo.language.color}
-              name={repo.language.name}
-              size={14}
-            />
+            <LanguageChip name={repo.language.name} size={16} />
             <Data style={styles.metaText}>{repo.language.name}</Data>
           </View>
         )}
@@ -203,146 +210,6 @@ function RepoCard({
         {repo.isPrivate && <Data style={styles.metaText}>private</Data>}
       </View>
     </Pressable>
-  );
-}
-
-/**
- * The repository's commit history, one bar per month, oldest on the left.
- * The busiest month is drawn solid and carries its count; the rest step down
- * in opacity. A month with no commits still gets a baseline tick, so a gap in
- * the work reads as a gap rather than as missing data — and three months or
- * more of nothing is bridged with the app's wave instead, its length over it.
- */
-function MonthChart({
-  months,
-  sampled,
-  width,
-}: {
-  months: MonthBar[];
-  sampled: boolean;
-  width: number;
-}) {
-  const peak = Math.max(...months.map((month) => month.count), 1);
-  const peakIndex = sampled ? months.findIndex((month) => month.count === peak) : -1;
-  const pitch = width / months.length;
-  const barWidth = Math.max(3, Math.min(pitch - 5, 16));
-  const base = CHART_HEIGHT - 1;
-  // Leaves room above the tallest bar for its count.
-  const tallest = CHART_HEIGHT - 12;
-
-  const silences = sampled
-    ? quietRuns(
-        months.map((month) => month.count),
-        3,
-      )
-    : [];
-  const silent = (index: number) =>
-    silences.some((run) => index >= run.start && index <= run.end);
-
-  const bars: ReactElement[] = [];
-  months.forEach((month, index) => {
-    if (silent(index)) return;
-    const x = index * pitch + (pitch - barWidth) / 2;
-    const height =
-      month.count === 0 ? 2 : Math.max(3, (month.count / peak) * tallest);
-    bars.push(
-      <Rect
-        fill={colors.onBlack}
-        height={height}
-        key={month.key}
-        opacity={month.count === 0 ? 0.18 : index === peakIndex ? 1 : 0.55}
-        rx={1.5}
-        width={barWidth}
-        x={x}
-        y={base - height}
-      />,
-    );
-  });
-
-  return (
-    <>
-      {bars}
-      {silences.map((run) => {
-        const x1 = run.start * pitch + pitch * 0.25;
-        const x2 = (run.end + 1) * pitch - pitch * 0.25;
-        return (
-          <Path
-            d={wavePath(x1, x2, base - 4, 2.2, 10)}
-            fill="none"
-            key={`w${run.start}`}
-            opacity={0.45}
-            stroke={colors.onBlack}
-            strokeLinecap="round"
-            strokeWidth={1.25}
-          />
-        );
-      })}
-      {silences.map((run) =>
-        (run.end - run.start + 1) * pitch >= 40 ? (
-          <SvgText
-            fill={colors.onBlack}
-            fontFamily={fonts.mono}
-            fontSize={8}
-            key={`t${run.start}`}
-            opacity={0.5}
-            textAnchor="middle"
-            x={((run.start + run.end + 1) / 2) * pitch}
-            y={base - 12}
-          >
-            {howLongMonths(run.end - run.start + 1)}
-          </SvgText>
-        ) : null,
-      )}
-      {!sampled && (
-        <SvgText
-          fill={colors.onBlack}
-          fontFamily={fonts.mono}
-          fontSize={9}
-          opacity={0.45}
-          textAnchor="middle"
-          x={width / 2}
-          y={base - tallest / 2}
-        >
-          outside the commit sample
-        </SvgText>
-      )}
-      <Line
-        stroke={colors.onBlack}
-        strokeWidth={1}
-        opacity={0.25}
-        x1={0}
-        x2={width}
-        y1={base + 0.5}
-        y2={base + 0.5}
-      />
-      {months.map((month, index) => (
-        <SvgText
-          fill={colors.onBlack}
-          fontFamily={fonts.mono}
-          fontSize={8}
-          key={`a-${month.key}`}
-          opacity={index === peakIndex ? 0.9 : 0.45}
-          textAnchor="middle"
-          x={index * pitch + pitch / 2}
-          y={base + 11}
-        >
-          {month.initial}
-        </SvgText>
-      ))}
-      {peakIndex >= 0 && (
-        <SvgText
-          fill={colors.onBlack}
-          fontFamily={fonts.mono}
-          fontSize={9}
-          opacity={0.75}
-          textAnchor="middle"
-          x={peakIndex * pitch + pitch / 2}
-          y={base - tallest - 3}
-        >
-          {peak}
-        </SvgText>
-      )}
-    </>
   );
 }
 
@@ -362,7 +229,7 @@ function Sigil({ seed, size }: { seed: number; size: number }) {
       parts.push(
         <Path
           d={`M${left} ${top + tile} L${left} ${top} L${left + tile} ${top} A${tile} ${tile} 0 0 1 ${left} ${top + tile} Z`}
-          fill={colors.onBlack}
+          fill={colors.ink}
           key={i}
         />,
       );
@@ -374,14 +241,14 @@ function Sigil({ seed, size }: { seed: number; size: number }) {
         <Circle
           cx={left + tile / 2 - (horizontal ? spread : 0)}
           cy={top + tile / 2 - (horizontal ? 0 : spread)}
-          fill={colors.onBlack}
+          fill={colors.ink}
           key={`${i}a`}
           r={r}
         />,
         <Circle
           cx={left + tile / 2 + (horizontal ? spread : 0)}
           cy={top + tile / 2 + (horizontal ? 0 : spread)}
-          fill={colors.onBlack}
+          fill={colors.ink}
           key={`${i}b`}
           r={r}
         />,
@@ -393,7 +260,7 @@ function Sigil({ seed, size }: { seed: number; size: number }) {
       parts.push(
         <Path
           d={`M${cx - r} ${cy} A${r} ${r} 0 0 1 ${cx + r} ${cy} Z`}
-          fill={colors.onBlack}
+          fill={colors.ink}
           key={i}
         />,
       );
@@ -402,7 +269,7 @@ function Sigil({ seed, size }: { seed: number; size: number }) {
         <Circle
           cx={left + tile / 2}
           cy={top + tile / 2}
-          fill={colors.onBlack}
+          fill={colors.ink}
           key={i}
           r={tile * 0.3}
         />,
@@ -424,7 +291,7 @@ const styles = themed(() =>
       display: 'none',
     },
     card: {
-      backgroundColor: colors.black,
+      backgroundColor: colors.card,
       borderRadius: radii.card,
       height: CARD_HEIGHT,
       padding: 18,
@@ -440,13 +307,22 @@ const styles = themed(() =>
       marginBottom: 4,
     },
     handle: {
-      color: colors.onBlack,
+      color: colors.ink,
       flex: 1,
       fontSize: 13,
     },
     headCount: {
-      color: colors.onBlack55,
-      fontSize: 9,
+      color: colors.ink40,
+      fontSize: 10,
+    },
+    chart: {
+      height: CHART_HEIGHT + 30,
+      justifyContent: 'center',
+      marginVertical: 4,
+    },
+    unsampled: {
+      color: colors.ink40,
+      textAlign: 'center',
     },
     meta: {
       alignItems: 'center',
@@ -455,7 +331,7 @@ const styles = themed(() =>
       marginTop: 4,
     },
     metaText: {
-      color: colors.onBlack55,
+      color: colors.ink40,
       fontSize: 10,
     },
     langRow: {

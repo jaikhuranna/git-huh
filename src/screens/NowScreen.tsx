@@ -1,46 +1,83 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
-import { LanguageChip } from '../components/LanguageChip';
-import { Label, Title } from '../components/Type';
+import { Card } from '../components/Card';
+import { dot } from '../components/DotField';
+import { DotRow } from '../components/DotRow';
+import { Data, Label, Micro } from '../components/Type';
 import { insights, type GitHubModel } from '../lib/contributions';
-import { howLong, quietRuns, wavePath } from '../lib/quiet';
-import { colors, fonts, radii, themed } from '../theme';
+import { colors, levels, space, themed } from '../theme';
 import { fmt, Page } from './shared';
 
 /**
- * pin02 — Ai OS. The one screen that is allowed a dot matrix, because the pin
- * itself is built on one: an LED readout of today sitting on a dotted field,
- * a dial for the week, and a dock of pastel circles for the languages.
+ * Today, at a glance, on the widget's cards: today's count lit up in the
+ * widget's own dots, the week and the last thirty days as rows of them, and
+ * the languages you write most.
  */
 export function NowScreen({ model }: { model: GitHubModel }) {
   const { width } = useWindowDimensions();
   const derived = insights(model);
-  const inner = width - 40;
+  const inner = width - space.gutter * 2 - space.card * 2;
+  const half = (width - space.gutter * 2 - 10) / 2 - space.card * 2;
+
+  const days = model.columns.flat();
+  const todayAt = days.findIndex((day) => day.isToday);
+  const upTo = todayAt >= 0 ? days.slice(0, todayAt + 1) : days;
+  const week = upTo.slice(-7);
+  const month = upTo.slice(-30);
 
   return (
-    <Page background={colors.canvasCool}>
-      <Title>Today</Title>
-      <Title style={styles.subTitle}>at a glance</Title>
-
-      <View style={styles.hero}>
-        <LedField count={model.todayCount} width={inner} />
-        <Label style={styles.heroCaption}>
-          yesterday {fmt(derived.yesterdayCount)} · best {fmt(derived.bestDay)}
-        </Label>
-      </View>
+    <Page>
+      <Card
+        figure={`yesterday ${fmt(derived.yesterdayCount)} · best ${fmt(derived.bestDay)}`}
+        title="today"
+      >
+        <Numerals count={model.todayCount} width={inner} />
+      </Card>
 
       <View style={styles.row}>
-        <WeekDial model={model} peak={derived.peakWeekday} size={(inner - 12) / 2} />
-        <Dock model={model} size={(inner - 12) / 2} />
+        <Card style={styles.half} title="this week">
+          <DotRow
+            height={26}
+            labels={week.map((day) => WEEKDAY_INITIALS[new Date(`${day.date}T00:00:00`).getDay()])}
+            today={week.length - 1}
+            values={week.map((day) => day.count)}
+            width={half}
+          />
+          <Micro style={styles.foot}>
+            {fmt(week.reduce((sum, day) => sum + day.count, 0))} in seven days
+          </Micro>
+        </Card>
+
+        <Card style={styles.half} title="languages">
+          {model.languages.slice(0, 4).map((language) => (
+            <View key={language.name} style={styles.language}>
+              <Data numberOfLines={1} style={styles.languageName}>
+                {language.name.toLowerCase()}
+              </Data>
+              <Micro style={styles.share}>{Math.round(language.share * 100)}%</Micro>
+            </View>
+          ))}
+          {model.languages.length === 0 && <Micro>no languages yet</Micro>}
+        </Card>
       </View>
 
-      <Ruler model={model} width={inner} />
+      <Card figure={`${fmt(month.reduce((sum, day) => sum + day.count, 0))}`} title="last 30 days">
+        <DotRow
+          height={24}
+          quiet={7}
+          today={month.length - 1}
+          values={month.map((day) => day.count)}
+          width={inner}
+        />
+      </Card>
     </Page>
   );
 }
 
-/** 5x7 segment font — only the digits, which is all the readout ever shows. */
+const WEEKDAY_INITIALS = ['s', 'm', 't', 'w', 't', 'f', 's'] as const;
+
+/** 5 × 7 digits — only the digits, which is all the readout ever shows. */
 const GLYPHS: Record<string, string[]> = {
   '0': ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
   '1': ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
@@ -54,283 +91,86 @@ const GLYPHS: Record<string, string[]> = {
   '9': ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
 };
 
-function LedField({ count, width }: { count: number; width: number }) {
+/**
+ * Today's count set in the widget's dots: lit cells are full peak dots, the
+ * rest the grid's ghost, so the number is drawn *in* the field rather than on
+ * top of it. Two paths, however many cells.
+ */
+function Numerals({ count, width }: { count: number; width: number }) {
   const digits = String(count).split('');
-  const height = 188;
-  const pitch = 8;
-  const dot = 2;
-
-  // The unlit field runs edge to edge; the glyphs are lit cells inside it.
-  const cols = Math.floor(width / pitch);
-  const rows = Math.floor(height / pitch);
-
-  const glyphWidth = 6; // 5 columns + 1 of tracking
-  const scale = Math.min(4, Math.floor((cols - 2) / (digits.length * glyphWidth)));
-  const litWidth = digits.length * glyphWidth * scale;
-  const originCol = Math.floor((cols - litWidth) / 2);
-  const originRow = Math.floor((rows - 7 * scale) / 2);
+  const rows = 11;
+  const glyph = 6; // five columns and one of tracking
+  const cols = Math.max(digits.length * glyph + 3, Math.floor(width / 14));
+  const pitch = width / cols;
+  const originCol = Math.floor((cols - (digits.length * glyph - 1)) / 2);
+  const originRow = 2;
 
   const lit = new Set<string>();
   digits.forEach((digit, index) => {
-    const rowsOf = GLYPHS[digit] ?? GLYPHS['0'];
-    rowsOf.forEach((bits, r) => {
+    (GLYPHS[digit] ?? GLYPHS['0']).forEach((bits, r) => {
       [...bits].forEach((bit, c) => {
-        if (bit !== '1') return;
-        for (let dy = 0; dy < scale; dy++) {
-          for (let dx = 0; dx < scale; dx++) {
-            lit.add(
-              `${originCol + index * glyphWidth * scale + c * scale + dx},${
-                originRow + r * scale + dy
-              }`,
-            );
-          }
-        }
+        if (bit === '1') lit.add(`${originCol + index * glyph + c},${originRow + r}`);
       });
     });
   });
 
-  const cells = [];
+  let on = '';
+  let off = '';
+  const cell = pitch * 0.7;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const on = lit.has(`${c},${r}`);
-      cells.push(
-        <Circle
-          cx={c * pitch + pitch / 2}
-          cy={r * pitch + pitch / 2}
-          fill={colors.ink}
-          key={`${c}-${r}`}
-          opacity={on ? 1 : 0.12}
-          r={on ? dot * 1.6 : dot * 0.6}
-        />,
-      );
+      const cx = c * pitch + pitch / 2;
+      const cy = r * pitch + pitch / 2;
+      if (lit.has(`${c},${r}`)) on += dot(cx, cy, cell * levels.scale[3], false);
+      else off += dot(cx, cy, cell * levels.scale[0], false);
     }
   }
 
   return (
-    <Svg height={rows * pitch} width={cols * pitch}>
-      {cells}
-    </Svg>
-  );
-}
-
-/** The pin's analog dial, re-read as this week: one rim tick per weekday. */
-function WeekDial({
-  model,
-  peak,
-  size,
-}: {
-  model: GitHubModel;
-  peak: number;
-  size: number;
-}) {
-  // Leave room for the caption underneath rather than overlaying it.
-  const dial = size - TILE_PADDING * 2 - CAPTION_ROW - 6;
-  const r = dial / 2;
-  const week = model.columns[model.columns.length - 1] ?? [];
-  const todayIndex = Math.max(0, week.findIndex((day) => day.isToday));
-  const angle = (todayIndex / 7) * Math.PI * 2 - Math.PI / 2;
-
-  return (
-    <View style={[styles.tile, { height: size, width: size }]}>
-      <Svg height={dial} width={dial}>
-        <Circle cx={r} cy={r} fill={colors.card} r={r - 1} />
-        {Array.from({ length: 60 }, (_, i) => {
-          const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
-          const outer = r - 7;
-          const inner = outer - 2.5;
-          return (
-            <Circle
-              cx={r + Math.cos(a) * inner}
-              cy={r + Math.sin(a) * inner}
-              fill={colors.ink}
-              key={i}
-              opacity={0.28}
-              r={0.8}
-            />
-          );
-        })}
-        {Array.from({ length: 7 }, (_, i) => {
-          const a = (i / 7) * Math.PI * 2 - Math.PI / 2;
-          const outer = r - 4;
-          const inner = r - 13;
-          const isPeak = i === peak;
-          return (
-            <Line
-              key={i}
-              stroke={isPeak ? colors.red : colors.ink}
-              strokeLinecap="round"
-              strokeWidth={isPeak ? 2.4 : 1.6}
-              x1={r + Math.cos(a) * inner}
-              x2={r + Math.cos(a) * outer}
-              y1={r + Math.sin(a) * inner}
-              y2={r + Math.sin(a) * outer}
-            />
-          );
-        })}
-        <Circle cx={r} cy={r} fill={colors.black} r={r * 0.42} />
-        <Line
-          stroke={colors.onBlack}
-          strokeLinecap="round"
-          strokeWidth={2}
-          x1={r}
-          x2={r + Math.cos(angle) * r * 0.34}
-          y1={r}
-          y2={r + Math.sin(angle) * r * 0.34}
-        />
+    <View style={styles.numerals}>
+      <Svg height={rows * pitch} width={cols * pitch}>
+        <Path d={off} fill={colors.ink} opacity={levels.alpha[0] * 0.55} />
+        <Path d={on} fill={colors.ink} />
       </Svg>
-      <Label style={styles.caption}>this week</Label>
-    </View>
-  );
-}
-
-/** The pin's app dock, re-read as the four languages you write most. */
-const TILE_PADDING = 10;
-const DOCK_GAP = 8;
-const CAPTION_ROW = 20;
-
-function Dock({ model, size }: { model: GitHubModel; size: number }) {
-  const top = model.languages.slice(0, 4);
-  const inner = size - TILE_PADDING * 2;
-  // Floor, then take a couple of pixels back, so rounding can never make the
-  // two-up row wider than the box that holds it.
-  const cell = Math.max(
-    22,
-    Math.floor((Math.min(inner, inner - CAPTION_ROW) - DOCK_GAP) / 2) - 2,
-  );
-
-  return (
-    <View style={[styles.tile, { height: size, width: size }]}>
-      <View style={[styles.dockGrid, { width: inner }]}>
-        {top.map((language) => (
-          <LanguageChip
-            color={language.color}
-            key={language.name}
-            name={language.name}
-            size={cell}
-          />
-        ))}
-      </View>
-      {top.length === 0 && <Label>no languages yet</Label>}
-      <Label style={styles.caption}>top languages</Label>
-    </View>
-  );
-}
-
-/**
- * The pin's black ruler strip: the last thirty days as tick heights. A week
- * or more of nothing is one wave across the strip instead of a row of stubs.
- */
-function Ruler({ model, width }: { model: GitHubModel; width: number }) {
-  const days = model.columns.flat().slice(-30);
-  const height = 62;
-  const step = width / days.length;
-  const peak = Math.max(1, ...days.map((day) => day.count));
-  // Today is never part of a silence: it is not over yet.
-  const silences = quietRuns(
-    days.map((day) => day.count),
-    7,
-    days.length - 1,
-  );
-  const silent = (index: number) =>
-    silences.some((run) => index >= run.start && index <= run.end);
-
-  return (
-    <View style={styles.ruler}>
-      <Svg height={height} width={width}>
-        <Rect fill={colors.black} height={height} rx={radii.tile} width={width} />
-        {silences.map((run) => (
-          <Path
-            d={wavePath(run.start * step + step * 0.3, (run.end + 1) * step - step * 0.3, height - 20, 2.4, 11)}
-            fill="none"
-            key={`w${run.start}`}
-            opacity={0.6}
-            stroke={colors.onBlack}
-            strokeLinecap="round"
-            strokeWidth={1.25}
-          />
-        ))}
-        {silences.map((run) =>
-          (run.end - run.start + 1) * step >= 40 ? (
-            <SvgText
-              fill={colors.onBlack}
-              fontFamily={fonts.mono}
-              fontSize={9}
-              key={`t${run.start}`}
-              opacity={0.7}
-              textAnchor="middle"
-              x={((run.start + run.end + 1) / 2) * step}
-              y={height - 30}
-            >
-              {howLong(run.end - run.start + 1)}
-            </SvgText>
-          ) : null,
-        )}
-        {days.map((day, index) => {
-          if (silent(index)) return null;
-          const tick = 8 + (day.count / peak) * 32;
-          const x = index * step + step / 2;
-          return (
-            <Line
-              key={day.date}
-              stroke={day.isToday ? colors.red : colors.onBlack}
-              strokeWidth={day.isToday ? 2 : 1}
-              x1={x}
-              x2={x}
-              y1={height - 14}
-              y2={height - 14 - tick}
-            />
-          );
-        })}
-      </Svg>
-      <Label style={styles.rulerLabel}>last 30 days</Label>
+      <Label style={styles.numeralsCaption}>
+        {count === 1 ? 'contribution' : 'contributions'} so far today
+      </Label>
     </View>
   );
 }
 
 const styles = themed(() =>
   StyleSheet.create({
-    subTitle: {
-      color: colors.ink40,
-      marginTop: -2,
-    },
-    hero: {
+    numerals: {
       alignItems: 'center',
-      marginTop: 18,
+      gap: 6,
     },
-    heroCaption: {
-      marginTop: 10,
+    numeralsCaption: {
+      color: colors.ink40,
     },
     row: {
       flexDirection: 'row',
-      gap: 12,
-      marginTop: 22,
+      gap: 10,
     },
-    tile: {
-      alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: radii.card,
-      justifyContent: 'center',
-      overflow: 'hidden',
-      padding: TILE_PADDING,
+    half: {
+      flex: 1,
     },
-    caption: {
-      height: CAPTION_ROW,
-      lineHeight: CAPTION_ROW,
-      textAlign: 'center',
-    },
-    dockGrid: {
-      alignItems: 'center',
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: DOCK_GAP,
-      justifyContent: 'center',
-    },
-    ruler: {
-      alignItems: 'center',
-      marginTop: 22,
-    },
-    rulerLabel: {
+    foot: {
+      color: colors.ink40,
       marginTop: 8,
+    },
+    language: {
+      alignItems: 'baseline',
+      flexDirection: 'row',
+      gap: 6,
+      paddingVertical: 3,
+    },
+    languageName: {
+      color: colors.ink,
+      flex: 1,
+    },
+    share: {
+      color: colors.ink40,
     },
   }),
 );

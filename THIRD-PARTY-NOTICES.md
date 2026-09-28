@@ -16,19 +16,7 @@ widget, and the `@expo-google-fonts/ibm-plex-mono` package the app loads.
 
 Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
 
-## Instrument Serif
-
-Loaded through `@expo-google-fonts/instrument-serif` and bundled into the app.
-
-Copyright 2022 The Instrument Serif Project Authors (https://github.com/Instrument/instrument-serif)
-
-## Inter
-
-Loaded through `@expo-google-fonts/inter` and bundled into the app.
-
-Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
-
-### SIL Open Font License, Version 1.1 (all three fonts above)
+### SIL Open Font License, Version 1.1 (IBM Plex Mono)
 
 ```
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

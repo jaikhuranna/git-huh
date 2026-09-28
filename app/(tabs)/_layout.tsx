@@ -90,8 +90,8 @@ export default function TabsLayout() {
   if (token === undefined) {
     return (
       <>
-        <StatusBar style="light" />
-        <LoadingScreen caption="opening the drawer" lines={session.said} />
+        <StatusBar style="auto" />
+        <LoadingScreen caption="opening the drawer" lines={session.lines} />
       </>
     );
   }
@@ -110,8 +110,8 @@ export default function TabsLayout() {
   if (contributions.status === 'loading' || contributions.status === 'idle') {
     return (
       <>
-        <StatusBar style="light" />
-        <LoadingScreen caption="reading your year" lines={session.said} />
+        <StatusBar style="auto" />
+        <LoadingScreen caption="reading your year" lines={session.lines} />
       </>
     );
   }
@@ -148,13 +148,14 @@ export default function TabsLayout() {
         backgroundColor={android ? colors.canvas : undefined}
         badgeBackgroundColor={colors.ink}
         badgeTextColor={colors.canvas}
-        iconColor={android ? { default: colors.ink40, selected: colors.onBlack } : undefined}
-        // The selected pill is black here as it is everywhere else in the app.
-        indicatorColor={colors.black}
+        iconColor={android ? { default: colors.ink40, selected: colors.ink } : undefined}
+        // The selected pill is the widget's card, lifted off the page — the
+        // same surface every screen above it is drawn on.
+        indicatorColor={colors.card}
         labelStyle={{
           default: {
             color: colors.ink40,
-            fontFamily: android ? fonts.monoMedium : undefined,
+            fontFamily: android ? fonts.mono : undefined,
             fontSize: 11,
           },
           selected: {
@@ -230,7 +231,7 @@ const styles = themed(() =>
       paddingHorizontal: space.gutter,
     },
     errorText: {
-      color: colors.red,
+      color: colors.no,
       textAlign: 'center',
     },
     reset: {

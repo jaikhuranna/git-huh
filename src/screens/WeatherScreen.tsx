@@ -1,32 +1,36 @@
+import { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, {
-  Defs,
-  LinearGradient,
-  Path,
-  Rect,
-  Stop,
-} from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
-import { Body, Data, Heading, Label, Numeral } from '../components/Type';
+import { dot } from '../components/DotField';
+import { DotRow } from '../components/DotRow';
+import { Data, Heading, Label, Numeral } from '../components/Type';
 import { insights, type GitHubModel } from '../lib/contributions';
-import { colors, radii, themed } from '../theme';
-import { fmt } from './shared';
+import { colors, levels, radii, space, themed } from '../theme';
+import { fmt, hash } from './shared';
 
 /**
- * pin07 — the weather app. Airy off-white at the top, an ultra-thin hero
- * numeral, a frosted three-stat card, and a full-bleed gradient filling the
- * bottom. Warm while a streak is alive, cold when it is not: your commit
- * weather.
+ * Your commit weather: a place (your handle), a date, a condition, one thin
+ * numeral for today and a card of readings under it — laid out like a
+ * weather app, drawn in the widget's dots.
+ *
+ * The sky is a field of them rising from the bottom of the page. How high it
+ * climbs and how bright it gets is the current streak: a long run fills the
+ * page, a quiet spell leaves a low, faint haze. Seeded, so the same streak is
+ * the same sky.
  */
 export function WeatherScreen({ model }: { model: GitHubModel }) {
   const { width, height } = useWindowDimensions();
   const derived = insights(model);
   const warm = derived.currentStreak > 0;
-  const stops = warm ? colors.warmGradient : colors.coldGradient;
-
-  // A long streak saturates sooner, so the gradient reads as intensity.
-  const intensity = Math.min(1, 0.45 + derived.currentStreak / 24);
+  // A long streak saturates sooner, so the sky reads as intensity.
+  const intensity = warm ? Math.min(1, 0.45 + derived.currentStreak / 24) : 0.22;
   const now = new Date();
+  // The last seven days, ending today — not the calendar week, whose
+  // unhappened days would be drawn as ghosts of a silence.
+  const days = model.columns.flat();
+  const todayAt = days.findIndex((day) => day.isToday);
+  const week = (todayAt >= 0 ? days.slice(0, todayAt + 1) : days).slice(-7);
 
   const condition = warm
     ? derived.currentStreak >= 7
@@ -36,43 +40,33 @@ export function WeatherScreen({ model }: { model: GitHubModel }) {
 
   return (
     <View style={styles.screen}>
-      {/* Full-bleed gradient, fading up into the canvas with no seam. */}
-      <View pointerEvents="none" style={styles.gradient}>
-        <Svg height={height * 0.62} width={width}>
-          <Defs>
-            <LinearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
-              <Stop offset="0" stopColor={colors.canvas} stopOpacity="0" />
-              <Stop offset="0.42" stopColor={stops[0]} stopOpacity={intensity * 0.85} />
-              <Stop offset="1" stopColor={stops[1]} stopOpacity={intensity} />
-            </LinearGradient>
-          </Defs>
-          <Rect fill="url(#sky)" height={height * 0.62} width={width} />
-        </Svg>
-      </View>
+      <Sky height={height * 0.5} intensity={intensity} width={width} />
 
       <View style={styles.content}>
         <Heading style={styles.place}>~{model.login.toLowerCase()}</Heading>
         <Data style={styles.stamp}>
-          {now.toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-          })}
+          {now
+            .toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+            })
+            .toLowerCase()}
         </Data>
 
-        <Body style={styles.condition}>{condition}</Body>
+        <Data style={styles.condition}>{condition}</Data>
 
         <View style={styles.heroRow}>
           <Numeral style={styles.hero}>{fmt(model.todayCount)}</Numeral>
-          <Label style={styles.unit}>c</Label>
+          <Label style={styles.unit}>today</Label>
         </View>
 
         <View style={styles.range}>
           <Data style={styles.rangeText}>
-            High: <Data style={styles.rangeValue}>{fmt(derived.bestDay)}</Data>
+            high <Data style={styles.rangeValue}>{fmt(derived.bestDay)}</Data>
           </Data>
           <Data style={styles.rangeText}>
-            Low: <Data style={styles.rangeValue}>{derived.avgPerDay.toFixed(1)}</Data>
+            low <Data style={styles.rangeValue}>{derived.avgPerDay.toFixed(1)}</Data>
           </Data>
         </View>
 
@@ -98,30 +92,54 @@ export function WeatherScreen({ model }: { model: GitHubModel }) {
 
         <View style={styles.weekCard}>
           <Label style={styles.weekLabel}>this week</Label>
-          <View style={styles.weekStrip}>
-            {(model.columns[model.columns.length - 1] ?? []).map((day) => {
-              const tall =
-                46 * (day.count / Math.max(1, derived.bestDay)) + 6;
-              return (
-                <View key={day.date} style={styles.weekCol}>
-                  <View
-                    style={[
-                      styles.weekBar,
-                      { height: tall },
-                      day.isToday && styles.weekBarToday,
-                    ]}
-                  />
-                  <Label style={styles.weekDay}>
-                    {WEEKDAY_INITIALS[
-                      new Date(`${day.date}T00:00:00`).getDay()
-                    ]}
-                  </Label>
-                </View>
-              );
-            })}
-          </View>
+          <DotRow
+            height={28}
+            labels={week.map((day) => WEEKDAY_INITIALS[new Date(`${day.date}T00:00:00`).getDay()])}
+            today={week.length - 1}
+            values={week.map((day) => day.count)}
+            width={width - space.gutter * 2 - 60}
+          />
         </View>
       </View>
+    </View>
+  );
+}
+
+/**
+ * The sky: dots rising from the bottom edge, thinning and fading as they go
+ * up. One path per weight, so a page of dots is five nodes.
+ */
+function Sky({ width, height, intensity }: { width: number; height: number; intensity: number }) {
+  const pitch = 19;
+  const paths = useMemo(() => {
+    const buckets: string[][] = [[], [], [], [], []];
+    const cols = Math.ceil(width / pitch);
+    const rows = Math.ceil(height / pitch);
+    for (let r = 0; r < rows; r++) {
+      // 0 at the bottom edge, 1 at the top of the sky.
+      const up = r / rows;
+      const reach = Math.max(0, 1 - up / Math.max(0.15, intensity));
+      for (let c = 0; c < cols; c++) {
+        const roll = (hash(`${c}:${r}`) % 1000) / 1000;
+        if (roll > reach * 0.95) continue;
+        const level = Math.min(4, Math.floor(reach * 4 * (0.4 + roll * 0.9)));
+        const cx = c * pitch + pitch / 2;
+        const cy = height - r * pitch - pitch / 2;
+        buckets[level].push(dot(cx, cy, pitch * 0.7 * levels.scale[level], false));
+      }
+    }
+    return buckets.map((parts) => parts.join(''));
+  }, [height, intensity, width]);
+
+  return (
+    <View pointerEvents="none" style={styles.sky}>
+      <Svg height={height} width={width}>
+        {paths.map((d, level) =>
+          d ? (
+            <Path d={d} fill={colors.ink} key={level} opacity={levels.alpha[level] * 0.55} />
+          ) : null,
+        )}
+      </Svg>
     </View>
   );
 }
@@ -183,7 +201,7 @@ const styles = themed(() =>
       backgroundColor: colors.canvas,
       flex: 1,
     },
-    gradient: {
+    sky: {
       bottom: 0,
       left: 0,
       position: 'absolute',
@@ -192,31 +210,32 @@ const styles = themed(() =>
     content: {
       alignItems: 'center',
       flex: 1,
-      paddingHorizontal: 20,
+      paddingHorizontal: space.gutter,
       paddingTop: 12,
     },
     place: {
-      fontSize: 18,
+      fontSize: 17,
     },
     stamp: {
-      color: colors.ink70,
+      color: colors.ink40,
       marginTop: 4,
     },
     condition: {
       color: colors.ink70,
-      marginTop: 26,
+      marginTop: 22,
     },
     hero: {
-      fontSize: 124,
-      lineHeight: 132,
+      fontSize: 120,
+      lineHeight: 130,
     },
     heroRow: {
       alignItems: 'flex-start',
       flexDirection: 'row',
+      gap: 4,
       marginTop: 2,
     },
     unit: {
-      color: colors.ink70,
+      color: colors.ink40,
       marginTop: 30,
     },
     range: {
@@ -225,19 +244,19 @@ const styles = themed(() =>
       marginTop: 2,
     },
     rangeText: {
-      color: colors.ink70,
+      color: colors.ink40,
     },
     rangeValue: {
       color: colors.ink,
     },
     frosted: {
       alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.55)',
+      backgroundColor: colors.card,
       borderRadius: radii.card,
       flexDirection: 'row',
       justifyContent: 'space-around',
-      marginTop: 28,
-      paddingVertical: 14,
+      marginTop: 26,
+      paddingVertical: 16,
       width: '100%',
     },
     stat: {
@@ -246,7 +265,7 @@ const styles = themed(() =>
       flex: 1,
     },
     statValue: {
-      fontSize: 16,
+      fontSize: 15,
     },
     divider: {
       backgroundColor: colors.hair,
@@ -255,33 +274,13 @@ const styles = themed(() =>
     },
     weekCard: {
       alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.55)',
+      backgroundColor: colors.card,
       borderRadius: radii.card,
-      gap: 10,
-      marginTop: 26,
+      gap: 6,
+      marginTop: 10,
       paddingBottom: 12,
-      paddingTop: 12,
+      paddingTop: 14,
       width: '100%',
-    },
-    weekStrip: {
-      alignItems: 'flex-end',
-      flexDirection: 'row',
-      gap: 10,
-    },
-    weekCol: {
-      alignItems: 'center',
-      gap: 5,
-    },
-    weekBar: {
-      backgroundColor: 'rgba(17,16,16,0.30)',
-      borderRadius: 3,
-      width: 16,
-    },
-    weekBarToday: {
-      backgroundColor: colors.ink,
-    },
-    weekDay: {
-      color: colors.ink70,
     },
     weekLabel: {
       color: colors.ink,

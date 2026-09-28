@@ -14,9 +14,9 @@ import {
   type ShareKind,
 } from '../lib/shareData';
 import { PixelRain, seriesFor } from '../screens/PosterScreen';
-import { colors, fonts, themed } from '../theme';
-import { CrossField } from './CrossField';
-import { Data, Label, Micro, Numeral, Serif } from './Type';
+import { colors, fonts, levels, themed, tint } from '../theme';
+import { dot, DotField } from './DotField';
+import { Data, Display, Label, Micro, Numeral } from './Type';
 import { Wordmark } from './Wordmark';
 
 /** The card's own size, in points. 4:3, and captured at 1600 × 1200. */
@@ -46,7 +46,7 @@ export const ShareCard = forwardRef<
   const content = compose(kind, model, activity, year);
   const now = new Date();
   return (
-    <View collapsable={false} ref={ref} style={[styles.card, content.flat && styles.flat]}>
+    <View collapsable={false} ref={ref} style={styles.card}>
       <View style={styles.top}>
         <Wordmark size={22} />
         <Label numberOfLines={1} style={styles.handle}>
@@ -55,9 +55,9 @@ export const ShareCard = forwardRef<
       </View>
 
       <View style={styles.titleRow}>
-        <Serif numberOfLines={1} style={styles.title}>
+        <Display numberOfLines={1} style={styles.title}>
           {content.title}
-        </Serif>
+        </Display>
         {content.figure ? (
           <View style={styles.figure}>
             <Numeral numberOfLines={1} style={styles.figureValue}>
@@ -87,8 +87,6 @@ interface Composed {
   figure?: { value: string; unit: string };
   body: ReactNode;
   caption: string;
-  /** The poster's flat grey rather than the paper. */
-  flat?: boolean;
 }
 
 function compose(kind: ShareKind, model: GitHubModel, activity: Activity, year: number): Composed {
@@ -108,12 +106,12 @@ function compose(kind: ShareKind, model: GitHubModel, activity: Activity, year: 
   }
 }
 
-/** The contribution year as crosses, eleven rows deep so a whole year fits, and four figures. */
+/** The contribution year as the widget's dots, eleven rows deep so a whole year fits, and four figures. */
 function yearCard(model: GitHubModel): Composed {
   const derived = insights(model);
   const days = model.columns.flat();
   const todayAt = days.findIndex((day) => day.isToday);
-  const levels = (todayAt >= 0 ? days.slice(0, todayAt + 1) : days).map((day) => day.level);
+  const dayLevels = (todayAt >= 0 ? days.slice(0, todayAt + 1) : days).map((day) => day.level);
   const stats = [
     { value: compact(derived.activeDays), label: 'active days' },
     { value: compact(derived.longestStreak), label: 'longest streak' },
@@ -121,7 +119,7 @@ function yearCard(model: GitHubModel): Composed {
     { value: derived.avgPerDay.toFixed(1), label: 'per day' },
   ];
   return {
-    title: 'A year on github',
+    title: 'a year on github',
     figure: { value: compact(model.total), unit: 'contributions' },
     body: (
       <View style={styles.stack}>
@@ -135,7 +133,7 @@ function yearCard(model: GitHubModel): Composed {
             </View>
           ))}
         </View>
-        <CrossField columnsHint={34} days={levels} height={172} rows={11} width={INNER} />
+        <DotField columnsHint={34} days={dayLevels} height={172} rows={11} width={INNER} />
       </View>
     ),
     caption:
@@ -164,25 +162,25 @@ function weeksCard(model: GitHubModel, year: number): Composed {
       total > 0
         ? `busiest ${series.unit} ${compact(peak)}, in ${peakMonth}`
         : `nothing recorded in ${year}`,
-    flat: true,
   };
 }
 
 /** Where the year went: one ruled bar, and the legend with the figures. */
 function splitCard(model: GitHubModel): Composed {
+  // The weights the `split` view draws each kind of work in.
   const slices = splitOf(model.breakdown, {
-    commits: colors.blue,
-    pullRequests: colors.purple,
-    reviews: colors.green,
-    issues: colors.yellow,
-    private: colors.ink40,
+    commits: tint(colors.ink, 1),
+    pullRequests: tint(colors.ink, 0.72),
+    reviews: tint(colors.ink, 0.52),
+    issues: tint(colors.ink, 0.36),
+    private: tint(colors.ink, 0.16),
   });
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
   const gap = 3;
   const usable = INNER - gap * Math.max(0, slices.length - 1);
   let x = 0;
   return {
-    title: 'Where the year went',
+    title: 'where the year went',
     figure: { value: compact(total), unit: 'contributions' },
     body:
       slices.length === 0 ? (
@@ -231,14 +229,14 @@ function languagesCard(model: GitHubModel): Composed {
   const slices = topLanguages(model.languages, 6, colors.ink20);
   const widest = Math.max(0.0001, ...slices.map((slice) => slice.share));
   return {
-    title: 'What I write in',
+    title: 'what i write in',
     figure: { value: String(model.languages.length), unit: 'languages' },
     body:
       slices.length === 0 ? (
         <Empty text="no languages yet" />
       ) : (
         <View style={styles.bars}>
-          {slices.map((slice) => (
+          {slices.map((slice, rank) => (
             <View key={slice.label} style={styles.barRow}>
               <Data numberOfLines={1} style={styles.barName}>
                 {slice.label}
@@ -248,7 +246,7 @@ function languagesCard(model: GitHubModel): Composed {
                   style={[
                     styles.barFill,
                     {
-                      backgroundColor: slice.color,
+                      backgroundColor: tint(colors.ink, Math.max(0.2, 1 - rank * 0.14)),
                       width: `${Math.max(1.5, (slice.share / widest) * 100)}%`,
                     },
                   ]}
@@ -271,7 +269,7 @@ function yearsCard(model: GitHubModel): Composed {
   const total = model.years.reduce((sum, year) => sum + year.total, 0);
   const chart = BODY - 30;
   const pitch = INNER / Math.max(1, years.length);
-  const bar = Math.min(34, pitch * 0.62);
+  const bar = Math.min(16, pitch * 0.5);
   const base = chart - 1;
   const tallest = chart - 22;
   const silences = quietRuns(
@@ -279,7 +277,7 @@ function yearsCard(model: GitHubModel): Composed {
     2,
   );
   return {
-    title: 'Every year on github',
+    title: 'every year on github',
     figure: { value: compact(total), unit: 'contributions' },
     body:
       years.length === 0 ? (
@@ -287,19 +285,13 @@ function yearsCard(model: GitHubModel): Composed {
       ) : (
         <View>
           <Svg height={chart} width={INNER}>
-            {years.map((year, index) =>
-              year.total > 0 ? (
-                <Rect
-                  fill={index === peakIndex ? colors.ink : colors.ink40}
-                  height={Math.max(3, (year.total / peak) * tallest)}
-                  key={year.year}
-                  rx={2}
-                  width={bar}
-                  x={index * pitch + (pitch - bar) / 2}
-                  y={base - Math.max(3, (year.total / peak) * tallest)}
-                />
-              ) : null,
-            )}
+            <DotColumns
+              base={base}
+              pitch={pitch}
+              size={bar}
+              tallest={tallest}
+              values={years.map((year) => year.total)}
+            />
             {silences.map((run) => (
               <Path
                 d={wavePath(run.start * pitch + pitch * 0.2, (run.end + 1) * pitch - pitch * 0.2, base - 5)}
@@ -346,12 +338,12 @@ function hoursCard(activity: Activity): Composed {
   const peakHour = hours.indexOf(peak);
   const chart = BODY - 30;
   const pitch = INNER / 24;
-  const bar = pitch * 0.6;
+  const bar = pitch * 0.62;
   const base = chart - 1;
   const tallest = chart - 22;
   const silences = quietRuns(hours, 4);
   return {
-    title: 'When I commit',
+    title: 'when i commit',
     figure: sampled > 0 ? { value: `${String(peakHour).padStart(2, '0')}:00`, unit: 'busiest' } : undefined,
     body:
       sampled === 0 ? (
@@ -359,19 +351,7 @@ function hoursCard(activity: Activity): Composed {
       ) : (
         <View>
           <Svg height={chart} width={INNER}>
-            {hours.map((count, hour) =>
-              count > 0 ? (
-                <Rect
-                  fill={hour === peakHour ? colors.ink : colors.ink40}
-                  height={Math.max(3, (count / peak) * tallest)}
-                  key={hour}
-                  rx={2}
-                  width={bar}
-                  x={hour * pitch + (pitch - bar) / 2}
-                  y={base - Math.max(3, (count / peak) * tallest)}
-                />
-              ) : null,
-            )}
+            <DotColumns base={base} pitch={pitch} size={bar} tallest={tallest} values={hours} />
             {silences.map((run) => (
               <Path
                 d={wavePath(run.start * pitch + pitch * 0.2, (run.end + 1) * pitch - pitch * 0.2, base - 5)}
@@ -410,6 +390,46 @@ function hoursCard(activity: Activity): Composed {
   };
 }
 
+/**
+ * Bars as columns of the widget's dots, stacked from the baseline — the
+ * tallest in full ink with its top one squared off, the rest a step back.
+ */
+function DotColumns({
+  values,
+  pitch,
+  size,
+  base,
+  tallest,
+}: {
+  values: readonly number[];
+  pitch: number;
+  size: number;
+  base: number;
+  tallest: number;
+}) {
+  const peak = Math.max(1, ...values);
+  const peakIndex = values.indexOf(peak);
+  const step = size * 1.3;
+  let top = '';
+  let rest = '';
+  values.forEach((value, index) => {
+    if (value <= 0) return;
+    const count = Math.max(1, Math.round(((value / peak) * tallest) / step));
+    const cx = index * pitch + pitch / 2;
+    for (let k = 0; k < count; k++) {
+      const mark = dot(cx, base - k * step - step / 2, size, index === peakIndex && k === count - 1);
+      if (index === peakIndex) top += mark;
+      else rest += mark;
+    }
+  });
+  return (
+    <>
+      {rest ? <Path d={rest} fill={colors.ink} opacity={levels.alpha[2]} /> : null}
+      {top ? <Path d={top} fill={colors.ink} /> : null}
+    </>
+  );
+}
+
 function Empty({ text }: { text: string }) {
   return (
     <View style={styles.empty}>
@@ -421,13 +441,10 @@ function Empty({ text }: { text: string }) {
 const styles = themed(() =>
   StyleSheet.create({
     card: {
-      backgroundColor: colors.canvas,
+      backgroundColor: colors.card,
       height: CARD_HEIGHT,
       padding: PAD,
       width: CARD_WIDTH,
-    },
-    flat: {
-      backgroundColor: colors.canvasFlat,
     },
     top: {
       alignItems: 'baseline',
@@ -449,8 +466,8 @@ const styles = themed(() =>
     },
     title: {
       flexShrink: 1,
-      fontSize: 38,
-      lineHeight: 44,
+      fontSize: 32,
+      lineHeight: 40,
     },
     figure: {
       alignItems: 'flex-end',
@@ -512,7 +529,7 @@ const styles = themed(() =>
       gap: 10,
     },
     swatch: {
-      borderRadius: 2,
+      borderRadius: 6,
       height: 12,
       width: 12,
     },
@@ -546,7 +563,7 @@ const styles = themed(() =>
       height: 14,
     },
     barFill: {
-      borderRadius: 2,
+      borderRadius: 7,
       height: 14,
     },
     barShare: {

@@ -1,32 +1,35 @@
 # git-huh?
 
-Your GitHub history as a set of printed artefacts, an inbox you can clear from
-your phone, and a home-screen widget that runs your own commit messages.
+Your GitHub history drawn the way its home-screen widget draws it — your own
+commit messages travelling across a card, the days as dots under them — plus an
+inbox you can clear from your phone.
 
 > **Alpha.** Built and used daily on Android. The iOS app and widget are
 > generated from the same code but have not been through a device yet.
 
 <p>
-  <img src="docs/screenshots/today.png" width="24%" alt="The today section: a greeting, the year drawn as crosses, and one sentence about it">
+  <img src="docs/screenshots/today.png" width="24%" alt="The today section: a greeting, the widget's card with the year as dots, and one sentence about it">
   <img src="docs/screenshots/inbox.png" width="24%" alt="The inbox: review requests, mentions and comments, each one swipeable">
-  <img src="docs/screenshots/pulls.png" width="24%" alt="Open pull requests filed in folders by repository">
-  <img src="docs/screenshots/year.png" width="24%" alt="A year of contributions as columns of stacked squares">
+  <img src="docs/screenshots/pulls.png" width="24%" alt="Open pull requests on one card per repository">
+  <img src="docs/screenshots/year.png" width="24%" alt="A year of contributions as columns of dots dissolving at the top">
 </p>
 
 ## What it is
 
 GitHub already knows a lot about how you work. git-huh draws it: fourteen
-screens, each one modelled on a pin from a moodboard (an IBM poster, a
+screens, each laid out after a pin from a moodboard (an IBM poster, a
 correspondence drawer, a Sankey diagram, a weather app, letters on a
-spiral), in five sections on the system's own tab bar.
+spiral) and drawn in the home-screen widget's marks — one mono face, one ink,
+dots whose size is the data, a plus for today, a wave for a silence — in five
+sections on the system's own tab bar.
 
 | section | views | |
 |---|---|---|
-| **today** | you · now · weather · hours | the year as crosses, today in LED numerals, your streak as a forecast, when in the day you commit |
+| **today** | you · now · weather · hours | the widget with room to breathe and a feed that keeps going, today in lit dots, your streak as a forecast, when in the day you commit |
 | **inbox** | recent | review requests, mentions, reviews and replies — swipe to mark done or snooze until morning |
 | **work** | pulls · brief · cycle · repos | your open pull requests, one read in full, time to merge, a deck of repositories |
 | **year** | weeks · split · languages · years | every year of contributions, where they went, what they were written in |
-| **lab** | join the dots | an unfinished idea, kept apart until it earns a place |
+| **lab** | zoomed out | the widget pulled back from a few months to the whole year |
 
 It also does the things that usually end with "I'll do it on the laptop":
 

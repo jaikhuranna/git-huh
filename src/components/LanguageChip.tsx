@@ -5,41 +5,34 @@ import { languageMark } from '../lib/languageMarks';
 import { colors, fonts, themed } from '../theme';
 import { Heading } from './Type';
 
-/** White or ink, whichever stays legible on `background`. */
-function onColor(background: string): string {
-  const hex = background.replace('#', '');
-  const int = parseInt(hex.length === 3 ? hex.replace(/./g, '$&$&') : hex, 16);
-  const [r, g, b] = [(int >> 16) & 255, (int >> 8) & 255, int & 255];
-  return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? colors.ink : colors.onBlack;
-}
-
 /**
- * A language's real mark, tinted to sit on a chip filled with GitHub's colour
- * for that language. Languages devicon does not cover fall back to a
- * monogram, which is what the whole app used before.
+ * A language's real mark in the app's one ink. Languages devicon does not
+ * cover fall back to a two-letter monogram. GitHub's colour for the language
+ * is not drawn: the name always sits beside the mark, and the name is what
+ * tells two languages apart.
  */
 export function LanguageMarkIcon({
   name,
   size,
-  color,
+  tint = colors.ink,
 }: {
   name: string;
   size: number;
-  color: string;
+  tint?: string;
 }) {
   const mark = languageMark(name);
-  const tint = onColor(color);
 
   if (!mark) {
     return (
       <Heading
         style={{
           color: tint,
-          fontFamily: fonts.sansBold,
-          fontSize: Math.max(9, size * 0.5),
+          fontFamily: fonts.monoSemi,
+          fontSize: Math.max(8, size * 0.5),
+          lineHeight: Math.max(10, size * 0.62),
         }}
       >
-        {name.slice(0, 2)}
+        {name.slice(0, 2).toLowerCase()}
       </Heading>
     );
   }
@@ -53,15 +46,13 @@ export function LanguageMarkIcon({
   );
 }
 
-/** The mark on its language-coloured chip — used by the `now` dock. */
+/** The mark on a round chip of the card's inset — the widget's dot, holding a glyph. */
 export function LanguageChip({
   name,
-  color,
   size,
   round = true,
 }: {
   name: string;
-  color: string;
   size: number;
   round?: boolean;
 }) {
@@ -70,14 +61,13 @@ export function LanguageChip({
       style={[
         styles.chip,
         {
-          backgroundColor: color,
           borderRadius: round ? size / 2 : 6,
           height: size,
           width: size,
         },
       ]}
     >
-      <LanguageMarkIcon color={color} name={name} size={size * 0.52} />
+      <LanguageMarkIcon name={name} size={size * 0.54} />
     </View>
   );
 }
@@ -86,6 +76,7 @@ const styles = themed(() =>
   StyleSheet.create({
     chip: {
       alignItems: 'center',
+      backgroundColor: colors.recess,
       justifyContent: 'center',
     },
   }),

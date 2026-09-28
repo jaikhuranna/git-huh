@@ -109,7 +109,7 @@ one keeps those endings inside.
     in `lab` is allowed to be a toy, to be slow, or to be wrong on an empty
     account. Nothing in `lab` is linked to from anywhere else, and a screen
     leaves `lab` by earning a place in one of the four sections above.
-    → `join the dots` today.
+    → `zoomed out` today: the widget, pulled back to the whole year.
 
 ### writing back
 

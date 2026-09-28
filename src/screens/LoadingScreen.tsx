@@ -1,88 +1,64 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { Marquee } from '../components/Marquee';
 import { Label } from '../components/Type';
-import { colors, fonts, themed } from '../theme';
+import { Wordmark } from '../components/Wordmark';
+import type { CommitLine } from '../lib/messageCache';
+import { colors, levels, radii, space, themed } from '../theme';
 
-const PITCH = 26;
-const FONT = 13;
-const MARGIN = 16;
-/** Clear of the status bar at the top and the caption at the bottom. */
-const TOP = 62;
-const BOTTOM = 58;
+const ROWS = 7;
+const PITCH = 22;
+/** The gap between two marks, as a share of the pitch — the widget's. */
+const GAP_SHARE = 0.3;
+/** One sweep of the light across the card. */
+const CYCLE_MS = 2600;
 /**
- * Depth of the ripple. The warp stays monotonic below 1, but letters also have
- * width: at this amplitude the tightest gap still clears a capital M.
+ * Phases the sweep is sampled at before it is handed to the native driver,
+ * which interpolates linearly between them. Twenty-four samples of a crest
+ * this wide are smooth to well under a pixel of dot size.
  */
-const AMPLITUDE = 0.38;
-/** How far the wave slips between one row and the next. */
-const ROW_SLIP = 0.05;
-/** One full cycle of the wave. */
-const CYCLE_MS = 5000;
-/** Every glyph is placed on its own, so a long message would flatten the wave. */
-const MAX_GLYPHS = 20;
-/**
- * Rows per message. pin11 reads as a wave because it is one phrase over and
- * over — the eye follows a letter from row to row. A different message on
- * every row destroys that and the field turns into a word search, so each
- * message holds for a band of rows before the next one takes over.
- */
-const BAND = 5;
-/**
- * Phases the wave is sampled at before it is handed to the native animation
- * driver, which interpolates linearly between them. Sixteen samples of a sine
- * are accurate to about a sixth of a pixel at this amplitude — far below the
- * point where a letter looks like it is in the wrong place.
- */
-const SAMPLES = 16;
+const SAMPLES = 24;
 const PHASES = Array.from({ length: SAMPLES + 1 }, (_, i) => i / SAMPLES);
+/** Width of the travelling crest, as a share of one sweep. */
+const CREST = 0.09;
 
 /**
- * pin11 — one phrase set again and again, its tracking warped line by line
- * until the block bends into a wave.
+ * The first thing on screen, and the only moment with nothing to show — so
+ * it shows the widget, waiting. The card is the home-screen card: your own
+ * commit messages travel across the top, taken from across your history, and
+ * under them a field of dots with a light passing through it from the oldest
+ * column to today's plus, over and over, until the year arrives.
  *
- * Here the phrase is not one phrase: every row is one of your own commit
- * messages, taken from across your whole history. Loading is the only moment
- * in the app with nothing to show, so it shows what you have already written.
- *
- * **Nothing about this animation runs in JavaScript.** Every glyph is its own
- * `Animated.Text`, and the whole track it will travel — its x at sixteen
- * phases of the wave — is computed once at mount and handed to the native
- * driver as an interpolation. One looping value drives all of them, on the
- * UI thread, so the letters keep sliding at the display's refresh rate even
- * while the first GitHub request is parsing on the JS thread.
- *
- * Driving it from JavaScript — a timer or `requestAnimationFrame` — means
- * re-rendering the whole field every frame, which no scheduling makes cheap
- * and which stalls exactly when the first response is being parsed. Plain
- * text views and a transform cost nothing per frame, because per frame there
- * is nothing left to do.
+ * **Nothing about this animation runs in JavaScript.** Every dot's whole
+ * track — its size and weight at twenty-four phases of the sweep — is
+ * computed once at mount and handed to the native driver as an
+ * interpolation of one looping value, so the light keeps moving at the
+ * display's rate while the JS thread is parsing the first GitHub response,
+ * which is the entire point of this screen. The strip is the same
+ * (`Marquee`). A timer or `requestAnimationFrame` was tried on the old
+ * version of this page and stuttered exactly then.
  */
 export function LoadingScreen({
   lines,
   caption,
 }: {
-  lines: string[];
+  lines: readonly CommitLine[];
   caption: string;
 }) {
-  // Measured from the window rather than onLayout: this screen is full-bleed,
-  // and in a release build the first layout event for a freshly mounted root
-  // is dropped ("instanceHandle is null, event of type topLayout"), which left
-  // the field blank with only the caption drawn.
-  const { width, height } = useWindowDimensions();
+  // Measured from the window rather than onLayout: in a release build the
+  // first layout event for a freshly mounted root is dropped ("instanceHandle
+  // is null, event of type topLayout"), which left the card empty.
+  const { width } = useWindowDimensions();
+  const inner = width - space.gutter * 2 - space.card * 2;
+  const columns = Math.max(8, Math.floor(inner / PITCH));
 
-  const [wave] = useState(() => new Animated.Value(0));
+  const [sweep] = useState(() => new Animated.Value(0));
   const [enter] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const loop = Animated.loop(
-      Animated.timing(wave, {
+      Animated.timing(sweep, {
         duration: CYCLE_MS,
         easing: Easing.linear,
         toValue: 1,
@@ -91,10 +67,9 @@ export function LoadingScreen({
     );
     loop.start();
     return () => loop.stop();
-  }, [wave]);
+  }, [sweep]);
 
-  // The field arrives rather than appearing — a hard cut to a full page of
-  // type is the one moment this screen looks like a crash.
+  // The card arrives rather than appearing — a hard cut reads as a crash.
   useEffect(() => {
     Animated.timing(enter, {
       duration: 520,
@@ -103,173 +78,164 @@ export function LoadingScreen({
     }).start();
   }, [enter]);
 
+  // Built with the field, not per render, so a new caption does not hand the
+  // native driver a few hundred fresh nodes.
+  const dots = useMemo(() => field(columns, sweep), [columns, sweep]);
+  const cell = PITCH * (1 - GAP_SHARE);
   const source = lines.length > 0 ? lines : PLACEHOLDER;
-  const rows = Math.max(1, Math.floor((height - TOP - BOTTOM) / PITCH));
-  // The interpolations are built with the field, not per render, so a new
-  // caption does not hand the native driver five hundred fresh nodes.
-  const field = useMemo(
-    () =>
-      build(source, rows, width).map((glyph) => ({
-        key: glyph.key,
-        char: glyph.char,
-        place: {
-          top: glyph.top,
-          transform: [
-            { translateX: wave.interpolate({ inputRange: PHASES, outputRange: glyph.track }) },
-          ],
-        },
-      })),
-    [rows, source, wave, width],
-  );
 
   return (
-    <View style={styles.field}>
-      <Animated.View style={[styles.block, { opacity: enter }]}>
-        {field.map((glyph) => (
-          <Animated.Text key={glyph.key} style={[styles.glyph, glyph.place]}>
-            {glyph.char}
-          </Animated.Text>
-        ))}
-      </Animated.View>
+    <View style={styles.screen}>
+      <Animated.View style={[styles.stack, { opacity: enter }]}>
+        <View style={styles.card}>
+          <Marquee
+            items={source.map((line) => ({ lead: line.repo, text: line.message }))}
+            style={styles.strip}
+          />
+          <View style={{ height: ROWS * PITCH, width: columns * PITCH }}>
+            {dots.map((one) => (
+              <Animated.View
+                key={one.key}
+                style={[
+                  styles.dot,
+                  {
+                    borderRadius: cell / 2,
+                    height: cell,
+                    left: one.column * PITCH + (PITCH - cell) / 2,
+                    opacity: one.opacity,
+                    top: one.row * PITCH + (PITCH - cell) / 2,
+                    transform: [{ scale: one.scale }],
+                    width: cell,
+                  },
+                ]}
+              />
+            ))}
+            <View
+              style={[
+                styles.plus,
+                { left: (columns - 1) * PITCH + (PITCH - cell) / 2, top: (ROWS - 1) * PITCH + (PITCH - cell) / 2 },
+                { height: cell, width: cell },
+              ]}
+            >
+              <View style={[styles.bar, { height: cell * 0.22, width: cell }]} />
+              <View style={[styles.bar, { height: cell, width: cell * 0.22 }]} />
+            </View>
+          </View>
+        </View>
 
-      <View style={styles.caption}>
-        <Label style={styles.captionText}>git huh</Label>
-        <Label style={styles.captionText}>{caption}</Label>
-      </View>
+        <View style={styles.caption}>
+          <Wordmark size={15} />
+          <Label>{caption}</Label>
+        </View>
+      </Animated.View>
     </View>
   );
 }
 
-interface Glyph {
+interface Dot {
   key: string;
-  char: string;
-  top: number;
-  /** x at each phase in `PHASES`, which is the whole animation. */
-  track: number[];
+  column: number;
+  row: number;
+  scale: Animated.AnimatedInterpolation<number>;
+  opacity: Animated.AnimatedInterpolation<number>;
 }
 
 /**
- * Every glyph on screen, with the path it will follow.
- *
- * Spaces are dropped rather than laid out: they are a third of some commit
- * messages and a view that draws nothing is still a view to mount.
+ * Every dot with the path it will follow. Each one rests at a level of its
+ * own — a stand-in year, so the card is a field and not a blank — and swells
+ * to the peak as the crest passes over its column. The crest leans a little
+ * down the rows, so it reads as light moving through the field rather than a
+ * column flashing.
  */
-function build(source: string[], rows: number, width: number): Glyph[] {
-  const out: Glyph[] = [];
-
-  for (let row = 0; row < rows; row++) {
-    const text = clipped(source[Math.floor(row / BAND) % source.length]);
-    const top = TOP + row * PITCH - FONT;
-
-    for (let index = 0; index < text.length; index++) {
-      const char = text[index];
-      if (char === ' ') continue;
+function field(columns: number, sweep: Animated.Value): Dot[] {
+  const out: Dot[] = [];
+  let seed = 0x9e3779b9;
+  for (let column = 0; column < columns; column++) {
+    for (let row = 0; row < ROWS; row++) {
+      if (column === columns - 1 && row === ROWS - 1) continue; // today's plus
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      const roll = seed / 0xffffffff;
+      const rest = roll < 0.45 ? 0 : Math.min(3, Math.floor(roll * 4));
+      const at = (column / columns) * (1 - CREST * 2) + CREST + row * 0.012;
+      const crest = PHASES.map((phase) => {
+        const distance = Math.min(Math.abs(phase - at), 1 - Math.abs(phase - at));
+        return Math.exp(-(distance * distance) / (2 * CREST * CREST));
+      });
       out.push({
-        key: `${row}:${index}`,
-        char,
-        top,
-        // Each row's own phase offset is baked in here, which is what makes
-        // the wave travel down the block instead of every row moving as one.
-        track: PHASES.map((phase) =>
-          positionAt(index, text.length, width, phase + row * ROW_SLIP),
-        ),
+        key: `${column}:${row}`,
+        column,
+        row,
+        scale: sweep.interpolate({
+          inputRange: PHASES,
+          outputRange: crest.map(
+            (lift) => levels.scale[rest] + (1 - levels.scale[rest]) * lift,
+          ),
+        }),
+        opacity: sweep.interpolate({
+          inputRange: PHASES,
+          outputRange: crest.map(
+            (lift) => levels.alpha[rest] + (1 - levels.alpha[rest]) * lift,
+          ),
+        }),
       });
     }
   }
-
   return out;
 }
 
 /**
- * The glyphs of one line, upper case and clipped. Every glyph is placed
- * individually below, so a long message would squeeze the tracking flat and
- * lose the wave.
- */
-function clipped(message: string): string {
-  const upper = message.toUpperCase().trim();
-  return upper.length > MAX_GLYPHS ? upper.slice(0, MAX_GLYPHS) : upper;
-}
-
-/**
- * Where one glyph of a row sits at one phase of the wave.
- *
- * Both ends of the row are pinned to the margins and the letters between them
- * are pushed around by one cycle of a sine, so a row is bunched where the
- * previous row is spread. Slipping the phase row by row turns that into a
- * wave travelling down the block — which is the whole of pin11.
- */
-function positionAt(
-  index: number,
-  count: number,
-  width: number,
-  phase: number,
-): number {
-  // The last glyph is drawn *from* its x, so the track stops a glyph short of
-  // the right margin — otherwise wide rows run off the edge.
-  const span = width - MARGIN * 2 - FONT * 0.72;
-  if (count <= 1) return MARGIN;
-
-  const t = index / (count - 1);
-  const base = Math.sin(-2 * Math.PI * phase);
-  const warped =
-    t + (AMPLITUDE / (2 * Math.PI)) * (Math.sin(2 * Math.PI * (t - phase)) - base);
-  return MARGIN + warped * span;
-}
-
-/**
  * First launch, or a token whose history will not search: stand-in commit
- * subjects, so the screen is still a wall of commit messages rather than the
- * app's name six times.
+ * subjects, so the strip still reads as commit messages.
  */
-const PLACEHOLDER = [
-  'INITIAL COMMIT',
-  'FIX THE OBVIOUS THING',
-  'REFACTOR THE LAYOUT PASS',
-  'ADD A README',
-  'REVERT THAT LAST ONE',
-  'TIDY UP THE IMPORTS',
-  'MAKE IT ACTUALLY BUILD',
-  'RENAME EVERYTHING AGAIN',
-  'WIP DO NOT MERGE',
-  'SHIP IT',
+const PLACEHOLDER: CommitLine[] = [
+  { repo: 'git-huh', message: 'first commit' },
+  { repo: 'dotfiles', message: 'fix the obvious thing' },
+  { repo: 'git-huh', message: 'refactor the layout pass' },
+  { repo: 'notes', message: 'add a readme' },
+  { repo: 'git-huh', message: 'revert that last one' },
+  { repo: 'scratch', message: 'make it actually build' },
+  { repo: 'git-huh', message: 'ship it' },
 ];
 
 const styles = themed(() =>
   StyleSheet.create({
-    field: {
-      backgroundColor: colors.klein,
+    screen: {
+      backgroundColor: colors.canvas,
       flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: space.gutter,
     },
-    block: {
-      bottom: 0,
-      left: 0,
+    stack: {
+      gap: 14,
+    },
+    card: {
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: radii.sheet,
+      padding: space.card,
+    },
+    strip: {
+      alignSelf: 'stretch',
+      marginBottom: 16,
+    },
+    dot: {
+      backgroundColor: colors.ink,
       position: 'absolute',
-      right: 0,
-      top: 0,
     },
-    glyph: {
-      color: colors.onKlein,
-      fontFamily: fonts.sansBold,
-      fontSize: FONT,
-      // Android pads text views by the font's own ascent, which would put every
-      // row a few points below where the wave says it is.
-      includeFontPadding: false,
-      left: 0,
-      lineHeight: FONT * 1.3,
+    plus: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'absolute',
+    },
+    bar: {
+      backgroundColor: colors.ink,
       position: 'absolute',
     },
     caption: {
-      bottom: 0,
+      alignItems: 'baseline',
       flexDirection: 'row',
       justifyContent: 'space-between',
-      left: 0,
-      paddingBottom: 18,
-      paddingHorizontal: MARGIN,
-      position: 'absolute',
-      right: 0,
-    },
-    captionText: {
-      color: colors.onKlein55,
+      paddingHorizontal: 6,
     },
   }),
 );

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Label } from '../components/Type';
+import type { GitHubModel } from '../lib/contributions';
 import { colors, space, themed } from '../theme';
 
 /**
@@ -24,6 +25,7 @@ export function Page({
   background,
   gutter = true,
   fill = false,
+  onEnd,
 }: {
   children: ReactNode;
   background?: string;
@@ -34,9 +36,22 @@ export function Page({
    * down to the bottom edge, which reads as laid out rather than unfinished.
    */
   fill?: boolean;
+  /**
+   * Called as the bottom of the page comes within a screen of view — the
+   * `you` page's feed pages in older history with it.
+   */
+  onEnd?: () => void;
 }) {
   return (
     <ScrollView
+      onScroll={
+        onEnd
+          ? ({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+              if (contentOffset.y + layoutMeasurement.height * 2 >= contentSize.height) onEnd();
+            }
+          : undefined
+      }
+      scrollEventThrottle={onEnd ? 250 : undefined}
       contentContainerStyle={[
         styles.page,
         fill && styles.fill,
@@ -48,6 +63,17 @@ export function Page({
       {children}
     </ScrollView>
   );
+}
+
+/**
+ * The year's days as levels, oldest first and ending on today — what every
+ * dot field draws. The calendar can run on past today to the end of the
+ * week; those days have not happened and are never drawn.
+ */
+export function historyLevels(model: Pick<GitHubModel, 'columns'>): number[] {
+  const days = model.columns.flat();
+  const today = days.findIndex((day) => day.isToday);
+  return (today >= 0 ? days.slice(0, today + 1) : days).map((day) => day.level);
 }
 
 export function fmt(value: number): string {
@@ -89,14 +115,16 @@ const styles = themed(() =>
       alignItems: 'baseline',
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingBottom: 14,
+      paddingBottom: 12,
+      paddingHorizontal: 4,
     },
     headLeft: {
       color: colors.ink,
     },
     page: {
+      gap: 10,
       paddingBottom: 28,
-      paddingTop: 4,
+      paddingTop: 6,
     },
     fill: {
       flexGrow: 1,

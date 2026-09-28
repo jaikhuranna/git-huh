@@ -24,9 +24,6 @@ export interface HomeSettings {
 
 export const DEFAULT_HOME: HomeSettings = { blocks: ['pr-comments'] };
 
-/** How many rows the page shows before pointing at the inbox. */
-export const HOME_ROWS = 8;
-
 export function blockOf(event: SocialEvent): HomeBlock | null {
   switch (event.kind) {
     case 'comment':
@@ -42,13 +39,19 @@ export function blockOf(event: SocialEvent): HomeBlock | null {
   }
 }
 
-/** The rows for the page, newest first, from whatever the inbox already fetched. */
+/**
+ * The rows for the page, newest first: the inbox's feed and however much of
+ * the history has been paged in, the same comment counted once.
+ */
 export function homeEvents(events: readonly SocialEvent[], settings: HomeSettings): SocialEvent[] {
   const on = new Set(settings.blocks);
+  const seen = new Set<string>();
   return events
     .filter((event) => {
       const block = blockOf(event);
-      return block != null && on.has(block);
+      if (block == null || !on.has(block) || seen.has(event.id)) return false;
+      seen.add(event.id);
+      return true;
     })
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }

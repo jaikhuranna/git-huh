@@ -167,17 +167,13 @@ export function SectionScreen({ index }: { index: number }) {
   const section = SECTIONS[index];
   const loadingActivity = activityState.status === 'loading';
 
-  const { goToPage, goToTab } = session;
+  const { goToPage } = session;
   const openPull = useCallback(
     (pr: { repo: string; number: number }) =>
       nav.open({ kind: 'pull', repo: pr.repo, number: pr.number }),
     [nav],
   );
   const openAccount = useCallback(() => nav.open({ kind: 'account' }), [nav]);
-  const openInbox = useCallback(
-    () => goToTab(SECTIONS.findIndex((candidate) => candidate.key === 'inbox')),
-    [goToTab],
-  );
   const view = section.views[pages[index]]?.name ?? section.views[0].name;
   const shareable = shareKindOf(view) != null;
   const onPage = useCallback((page: number) => goToPage(index, page), [goToPage, index]);
@@ -188,9 +184,10 @@ export function SectionScreen({ index }: { index: number }) {
       case 'hey':
         return (
           <HeyScreen
+            active={live}
             home={session.home}
+            lines={session.lines}
             model={model}
-            onInbox={openInbox}
             onOpen={session.openEvent}
             onSettings={openAccount}
             social={social}
@@ -225,14 +222,14 @@ export function SectionScreen({ index }: { index: number }) {
       case 'archive':
         return <ArchiveScreen model={model} />;
       case 'dots':
-        return <DotsScreen model={model} />;
+        return <DotsScreen active={live} lines={session.lines} model={model} />;
     }
   };
 
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
       <View style={styles.chrome}>
-        <Wordmark size={20} />
+        <Wordmark size={17} />
         <View style={styles.corner}>
           {contributions.status === 'ready' &&
             contributions.offline &&
@@ -314,7 +311,7 @@ const styles = themed(() =>
       flexShrink: 1,
     },
     share: {
-      borderColor: colors.hair,
+      borderColor: colors.hairStrong,
       borderRadius: radii.pill,
       borderWidth: 1,
       paddingHorizontal: 11,
@@ -331,7 +328,8 @@ const styles = themed(() =>
     },
     notice: {
       alignItems: 'center',
-      backgroundColor: colors.recess,
+      backgroundColor: colors.card,
+      borderRadius: radii.tile,
       flexDirection: 'row',
       gap: 8,
       marginBottom: 6,
@@ -340,7 +338,7 @@ const styles = themed(() =>
       paddingVertical: 7,
     },
     noticeDot: {
-      backgroundColor: colors.red,
+      backgroundColor: colors.no,
       borderRadius: 3,
       height: 6,
       width: 6,

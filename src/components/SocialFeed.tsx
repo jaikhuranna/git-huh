@@ -226,30 +226,50 @@ function SwipeRow({
 }
 
 interface Mark {
-  color: string;
+  /** The widget's marks: a dot, a ring, or the squared-off peak. */
+  shape: 'dot' | 'ring' | 'square';
+  tone: string;
   phrase: string;
 }
 
-/** Colour marks the category; the phrase says it in words as well. */
+/**
+ * Shape and weight mark the kind, the way the widget's dots mark a day; the
+ * phrase says it in words as well. The only colour is the machine's yes and
+ * no — an approval, a request for changes.
+ */
 function markOf(event: SocialEvent): Mark {
   switch (event.kind) {
     case 'comment':
-      return { color: colors.blue, phrase: 'commented on' };
+      return { shape: 'dot', tone: colors.ink, phrase: 'commented on' };
     case 'review':
       if (event.state === 'APPROVED') {
-        return { color: colors.green, phrase: 'approved' };
+        return { shape: 'dot', tone: colors.yes, phrase: 'approved' };
       }
       if (event.state === 'CHANGES_REQUESTED') {
-        return { color: colors.red, phrase: 'requested changes on' };
+        return { shape: 'dot', tone: colors.no, phrase: 'requested changes on' };
       }
-      return { color: colors.yellow, phrase: 'reviewed' };
+      return { shape: 'ring', tone: colors.ink, phrase: 'reviewed' };
     case 'review-request':
-      return { color: colors.purple, phrase: 'asked you to review' };
+      return { shape: 'square', tone: colors.ink, phrase: 'asked you to review' };
     case 'mention':
-      return { color: colors.pink, phrase: 'mentioned you in' };
+      return { shape: 'ring', tone: colors.ink70, phrase: 'mentioned you in' };
     case 'open':
-      return { color: colors.ink, phrase: 'your pull request' };
+      return { shape: 'ring', tone: colors.ink40, phrase: 'your pull request' };
   }
+}
+
+function Glyph({ mark }: { mark: Mark }) {
+  return (
+    <View
+      style={[
+        styles.glyph,
+        mark.shape === 'ring'
+          ? { borderColor: mark.tone }
+          : { backgroundColor: mark.tone, borderColor: mark.tone },
+        mark.shape === 'square' && styles.glyphSquare,
+      ]}
+    />
+  );
 }
 
 export function FeedRow({
@@ -270,36 +290,35 @@ export function FeedRow({
 
   return (
     <Pressable accessibilityRole="button" onPress={onOpen} style={styles.row}>
-      <View style={[styles.rule, { backgroundColor: mark.color }]} />
-
-      <View style={styles.rowBody}>
-        <View style={styles.rowTop}>
-          <Data numberOfLines={1} style={styles.actor}>
-            {event.kind === 'open' ? mark.phrase : `${event.actor} ${mark.phrase}`}
-          </Data>
-          <Micro style={styles.age}>{ago(event.at)}</Micro>
-        </View>
-
-        <Body numberOfLines={2} style={styles.title}>
-          {event.title}
-        </Body>
-
-        {quote && (
-          <Body numberOfLines={2} style={styles.quote}>
-            “{quote}”
-          </Body>
-        )}
-
-        <View style={styles.rowFoot}>
-          <Micro style={styles.repo}>
-            {event.repo} #{event.number}
-          </Micro>
-          {status && (
-            <View style={styles.statusChip}>
-              <Micro style={styles.statusText}>{status}</Micro>
-            </View>
+      <View style={styles.rowTop}>
+        <Glyph mark={mark} />
+        <Data numberOfLines={1} style={styles.actor}>
+          {event.kind === 'open' ? (
+            mark.phrase
+          ) : (
+            <>
+              {event.actor} <Data style={styles.phrase}>{mark.phrase}</Data>
+            </>
           )}
-        </View>
+        </Data>
+        <Micro style={styles.age}>{ago(event.at)}</Micro>
+      </View>
+
+      <Body numberOfLines={2} style={styles.title}>
+        {event.title}
+      </Body>
+
+      {quote && (
+        <Body numberOfLines={3} style={styles.quote}>
+          {quote}
+        </Body>
+      )}
+
+      <View style={styles.rowFoot}>
+        <Micro numberOfLines={1} style={styles.repo}>
+          {event.repo} #{event.number}
+        </Micro>
+        {status && <Micro style={styles.statusText}>{status}</Micro>}
       </View>
     </Pressable>
   );
@@ -308,18 +327,18 @@ export function FeedRow({
 const styles = themed(() =>
   StyleSheet.create({
     section: {
-      marginTop: 2,
+      gap: 8,
     },
     chips: {
       // Wrapped rather than scrolled: the feed sits inside a horizontal pager,
       // and a nested horizontal scroller there fights the page swipe.
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 8,
-      marginTop: 12,
+      gap: 6,
+      marginBottom: 4,
     },
     chip: {
-      borderColor: colors.hair,
+      borderColor: colors.hairStrong,
       borderRadius: radii.pill,
       borderWidth: 1,
       paddingHorizontal: 12,
@@ -339,9 +358,10 @@ const styles = themed(() =>
     },
     hint: {
       color: colors.ink40,
-      marginTop: 12,
+      paddingHorizontal: 4,
     },
     swipe: {
+      borderRadius: radii.tile + 6,
       overflow: 'hidden',
     },
     under: {
@@ -351,7 +371,7 @@ const styles = themed(() =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       left: 0,
-      paddingHorizontal: 14,
+      paddingHorizontal: 18,
       position: 'absolute',
       right: 0,
       top: 0,
@@ -366,68 +386,69 @@ const styles = themed(() =>
       backgroundColor: colors.canvas,
     },
     row: {
-      borderTopColor: colors.hair,
-      borderTopWidth: 1,
-      flexDirection: 'row',
-      gap: 10,
-      paddingVertical: 11,
-    },
-    rule: {
-      borderRadius: 2,
-      marginTop: 3,
-      width: 3,
-    },
-    rowBody: {
-      flex: 1,
-      gap: 3,
+      backgroundColor: colors.card,
+      borderRadius: radii.tile + 6,
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
     },
     rowTop: {
-      alignItems: 'baseline',
+      alignItems: 'center',
       flexDirection: 'row',
-      gap: 8,
-      justifyContent: 'space-between',
+      gap: 9,
+    },
+    glyph: {
+      borderRadius: 4,
+      borderWidth: 1.5,
+      height: 8,
+      width: 8,
+    },
+    glyphSquare: {
+      borderRadius: 2,
     },
     actor: {
       color: colors.ink,
       flex: 1,
       fontSize: 11,
     },
+    phrase: {
+      color: colors.ink40,
+      fontSize: 11,
+    },
     age: {
       color: colors.ink40,
     },
     title: {
-      fontSize: 14,
+      color: colors.ink,
+      fontSize: 13,
       lineHeight: 19,
     },
     quote: {
+      borderLeftColor: colors.ink20,
+      borderLeftWidth: 1.5,
       color: colors.ink70,
       fontSize: 12,
-      lineHeight: 17,
+      lineHeight: 18,
+      paddingLeft: 10,
     },
     rowFoot: {
       alignItems: 'center',
       flexDirection: 'row',
       gap: 8,
-      marginTop: 1,
     },
     repo: {
       color: colors.ink40,
       flex: 1,
-    },
-    statusChip: {
-      backgroundColor: colors.ink20,
-      borderRadius: 3,
-      paddingHorizontal: 5,
-      paddingVertical: 1,
     },
     statusText: {
       color: colors.ink70,
     },
     note: {
       marginTop: 16,
+      textAlign: 'center',
     },
     error: {
-      color: colors.red,
+      color: colors.no,
       lineHeight: 16,
       marginTop: 16,
     },

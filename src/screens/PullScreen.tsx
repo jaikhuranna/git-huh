@@ -14,9 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChecksPanel } from '../components/ChecksPanel';
 import { Composer } from '../components/Composer';
 import { Diff } from '../components/Diff';
+import { DiffDots } from '../components/DiffDots';
 import { Markdown } from '../components/Markdown';
 import { SavedNote } from '../components/Overlay';
+import { Segments } from '../components/Segments';
 import { Squiggle } from '../components/Squiggle';
+import { StateChip } from '../components/StateChip';
 import { Body, Data, Heading, Label, Micro } from '../components/Type';
 import { usePullDetail } from '../hooks/usePullDetail';
 import { useNav } from '../lib/nav';
@@ -27,6 +30,13 @@ import { colors, fonts, radii, space, themed } from '../theme';
 import { ago, fmt } from './shared';
 
 type Tab = 'brief' | 'talk' | 'diff' | 'checks';
+
+const TABS: readonly (readonly [Tab, string])[] = [
+  ['brief', 'the brief'],
+  ['talk', 'talk'],
+  ['diff', 'files'],
+  ['checks', 'checks'],
+];
 
 /**
  * A pull request, opened.
@@ -111,30 +121,19 @@ export function PullScreen({ repo, number }: { repo: string; number: number }) {
 
       {pull && (
         <>
-          <Header pull={pull} width={body} />
+          <Header pull={pull} />
 
-          <View style={styles.tabs}>
-            {(
-              [
-                ['brief', 'the brief'],
-                ['talk', `talk ${pull.comments.length}`],
-                ['diff', `files ${pull.changedFiles}`],
-                ['checks', 'checks'],
-              ] as const
-            ).map(([value, label]) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: tab === value }}
-                key={value}
-                onPress={() => setTab(value)}
-                style={[styles.tab, tab === value && styles.tabOn]}
-              >
-                <Label style={tab === value ? styles.tabLabelOn : undefined}>
-                  {label}
-                </Label>
-              </Pressable>
-            ))}
-          </View>
+          <Segments
+            current={TABS.findIndex(([value]) => value === tab)}
+            items={TABS.map(([value, label]) =>
+              value === 'talk'
+                ? `${label} ${pull.comments.length}`
+                : value === 'diff'
+                  ? `${label} ${pull.changedFiles}`
+                  : label,
+            )}
+            onSelect={(index) => setTab(TABS[index][0])}
+          />
 
           <ScrollView
             contentContainerStyle={styles.page}
@@ -235,60 +234,40 @@ export function PullScreen({ repo, number }: { repo: string; number: number }) {
   );
 }
 
-function Header({ pull, width }: { pull: PullDetailFull; width: number }) {
-  const total = Math.max(1, pull.additions + pull.deletions);
-  const addShare = pull.additions / total;
-
+/** The cover of the pull request, on the widget's card. */
+function Header({ pull }: { pull: PullDetailFull }) {
   return (
     <View style={styles.header}>
-      <View style={styles.titleRow}>
-        <Heading style={styles.title}>{pull.title}</Heading>
-        <StateChip pull={pull} />
-      </View>
+      <PullState pull={pull} />
+      <Heading style={styles.title}>{pull.title}</Heading>
 
-      <View style={styles.diffTrack}>
-        <View style={[styles.diffAdd, { flex: Math.max(addShare, 0.02) }]} />
-        <View style={[styles.diffDel, { flex: Math.max(1 - addShare, 0.02) }]} />
+      <View style={styles.diff}>
+        <DiffDots additions={pull.additions} deletions={pull.deletions} />
       </View>
 
       <View style={styles.statRow}>
-        <Data style={styles.add}>+{fmt(pull.additions)}</Data>
-        <Data style={styles.del}>−{fmt(pull.deletions)}</Data>
         <Data style={styles.stat}>{fmt(pull.changedFiles)} files</Data>
         <Data style={styles.stat}>{fmt(pull.commits)} commits</Data>
         <Data style={styles.stat}>~{pull.author}</Data>
         <Data style={styles.stat}>{ago(pull.createdAt)}</Data>
       </View>
-
-      <Squiggle
-        amplitude={2.6}
-        length={width}
-        opacity={0.4}
-        style={styles.headerRule}
-        wavelength={14}
-      />
     </View>
   );
 }
 
-function StateChip({ pull }: { pull: PullDetailFull }) {
+function PullState({ pull }: { pull: PullDetailFull }) {
   const [text, tone] = pull.isDraft
     ? ['draft', colors.ink40]
     : pull.state === 'MERGED'
-      ? ['merged', colors.purple]
+      ? ['merged', colors.ink]
       : pull.state === 'CLOSED'
-        ? ['closed', colors.red]
+        ? ['closed', colors.no]
         : pull.reviewDecision === 'APPROVED'
-          ? ['approved', colors.green]
+          ? ['approved', colors.yes]
           : pull.reviewDecision === 'CHANGES_REQUESTED'
-            ? ['changes', colors.yellow]
-            : ['open', colors.blue];
-
-  return (
-    <View style={[styles.stateChip, { backgroundColor: tone }]}>
-      <Data style={styles.stateText}>{text}</Data>
-    </View>
-  );
+            ? ['changes', colors.no]
+            : ['open', colors.ink];
+  return <StateChip text={text} tone={tone} />;
 }
 
 function Conversation({ pull, width }: { pull: PullDetailFull; width: number }) {
@@ -318,9 +297,9 @@ function Conversation({ pull, width }: { pull: PullDetailFull; width: number }) 
 }
 
 const TONE = themed<Record<string, string>>(() => ({
-  APPROVED: colors.green,
-  CHANGES_REQUESTED: colors.red,
-  COMMENTED: colors.blue,
+  APPROVED: colors.yes,
+  CHANGES_REQUESTED: colors.no,
+  COMMENTED: colors.ink70,
 }));
 
 function Comment({
@@ -334,10 +313,10 @@ function Comment({
 }) {
   const tone =
     comment.kind === 'review'
-      ? (TONE[comment.state ?? ''] ?? colors.yellow)
+      ? (TONE[comment.state ?? ''] ?? colors.ink70)
       : comment.kind === 'thread'
-        ? colors.purple
-        : colors.blue;
+        ? colors.ink70
+        : colors.ink40;
 
   // The spine is sized off the body it runs beside; there is no way to ask
   // an SVG to be "as tall as my sibling", so it is measured after layout.
@@ -454,7 +433,7 @@ const styles = themed(() =>
     },
     find: {
       backgroundColor: colors.card,
-      borderColor: colors.hair,
+      borderColor: colors.hairStrong,
       borderRadius: radii.pill,
       borderWidth: 1,
       color: colors.ink,
@@ -465,83 +444,30 @@ const styles = themed(() =>
       paddingVertical: 7,
     },
     header: {
-      paddingHorizontal: space.gutter,
-      paddingTop: 10,
-    },
-    titleRow: {
-      alignItems: 'flex-start',
-      flexDirection: 'row',
+      backgroundColor: colors.card,
+      borderRadius: radii.card,
       gap: 10,
+      marginBottom: 12,
+      marginHorizontal: space.gutter,
+      marginTop: 10,
+      padding: space.card,
+    },
+    diff: {
+      marginTop: 4,
     },
     title: {
-      flex: 1,
-      fontSize: 18,
-      lineHeight: 24,
-    },
-    stateChip: {
-      borderRadius: radii.pill,
-      paddingHorizontal: 11,
-      paddingVertical: 3,
-    },
-    stateText: {
-      color: colors.onBlack,
-      fontSize: 10,
-    },
-    diffTrack: {
-      borderRadius: 2,
-      flexDirection: 'row',
-      gap: 2,
-      height: 5,
-      marginTop: 14,
-      overflow: 'hidden',
-    },
-    diffAdd: {
-      backgroundColor: colors.green,
-    },
-    diffDel: {
-      backgroundColor: colors.red,
+      fontSize: 16,
+      lineHeight: 23,
     },
     statRow: {
       alignItems: 'center',
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 12,
-      marginTop: 9,
-    },
-    add: {
-      color: colors.green,
-      fontSize: 11,
-    },
-    del: {
-      color: colors.red,
-      fontSize: 11,
     },
     stat: {
-      color: colors.ink70,
+      color: colors.ink40,
       fontSize: 11,
-    },
-    headerRule: {
-      marginTop: 10,
-    },
-    tabs: {
-      flexDirection: 'row',
-      gap: 8,
-      paddingHorizontal: space.gutter,
-      paddingTop: 4,
-    },
-    tab: {
-      borderColor: colors.hair,
-      borderRadius: radii.pill,
-      borderWidth: 1,
-      paddingHorizontal: 14,
-      paddingVertical: 6,
-    },
-    tabOn: {
-      backgroundColor: colors.black,
-      borderColor: colors.black,
-    },
-    tabLabelOn: {
-      color: colors.onBlack,
     },
     page: {
       paddingBottom: 26,
@@ -596,10 +522,10 @@ const styles = themed(() =>
       lineHeight: 14,
     },
     hunkAdd: {
-      color: colors.green,
+      color: colors.yes,
     },
     hunkDel: {
-      color: colors.red,
+      color: colors.no,
     },
     footer: {
       alignItems: 'center',
@@ -617,7 +543,7 @@ const styles = themed(() =>
     },
     pill: {
       alignItems: 'center',
-      borderColor: colors.hair,
+      borderColor: colors.hairStrong,
       borderRadius: radii.pill,
       borderWidth: 1,
       paddingHorizontal: 18,
@@ -645,7 +571,7 @@ const styles = themed(() =>
       marginTop: 30,
     },
     error: {
-      color: colors.red,
+      color: colors.no,
     },
     underline: {
       color: colors.ink,

@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,7 +17,7 @@ import { GitHubError, verifyToken } from '../lib/github';
 import { DEMO_TOKEN } from '../lib/token';
 import { colors, fonts, radii, space, themed } from '../theme';
 
-import { CrossField } from './CrossField';
+import { DotField } from './DotField';
 import { Body, Display, Label, Serif } from './Type';
 import { Wordmark } from './Wordmark';
 
@@ -85,15 +86,17 @@ export function PatForm({ onTokenVerified, onCancel }: PatFormProps) {
               <Label style={{ color: colors.ink }}>cancel</Label>
             </Pressable>
           ) : (
-            <Label>3.1</Label>
+            <Label>{Constants.expoConfig?.version ?? ''}</Label>
           )}
         </View>
 
         <View style={styles.stack}>
-          <Display>Hey,</Display>
-          <Serif style={styles.sub}>paste a token and I&apos;ll read the year.</Serif>
+          <Display>hey,</Display>
+          <Serif style={styles.sub}>paste a token and i&apos;ll read the year.</Serif>
 
-          <CrossField height={130} style={styles.field} width={width - 40} />
+          <View style={styles.field}>
+            <DotField height={7 * 21} maxPitch={21} width={width - space.gutter * 2 - space.card * 2} />
+          </View>
 
           <TextInput
             accessibilityLabel="GitHub personal access token"
@@ -188,7 +191,12 @@ const styles = themed(() =>
       lineHeight: 22,
     },
     field: {
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: radii.card,
       marginBottom: 4,
+      marginTop: 8,
+      padding: space.card,
     },
     input: {
       borderBottomColor: colors.hairStrong,
@@ -203,7 +211,7 @@ const styles = themed(() =>
       lineHeight: 16,
     },
     error: {
-      color: colors.red,
+      color: colors.no,
       fontSize: 12,
     },
     actions: {

@@ -1,19 +1,12 @@
 import {
+  IBMPlexMono_200ExtraLight,
+  IBMPlexMono_300Light,
   IBMPlexMono_400Regular,
+  IBMPlexMono_400Regular_Italic,
   IBMPlexMono_500Medium,
-} from '@expo-google-fonts/ibm-plex-mono';
-import {
-  InstrumentSerif_400Regular,
-  InstrumentSerif_400Regular_Italic,
-} from '@expo-google-fonts/instrument-serif';
-import {
-  Inter_200ExtraLight,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
+  IBMPlexMono_600SemiBold,
   useFonts,
-} from '@expo-google-fonts/inter';
+} from '@expo-google-fonts/ibm-plex-mono';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme, View } from 'react-native';
@@ -31,16 +24,14 @@ export default function RootLayout() {
   // A font failure must not block the app: Type.tsx declares a platform
   // fallback on every primitive, so we render either way.
   const [loaded, error] = useFonts({
+    IBMPlexMono_200ExtraLight,
+    IBMPlexMono_300Light,
     IBMPlexMono_400Regular,
+    IBMPlexMono_400Regular_Italic,
     IBMPlexMono_500Medium,
-    InstrumentSerif_400Regular,
-    InstrumentSerif_400Regular_Italic,
-    Inter_200ExtraLight,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+    IBMPlexMono_600SemiBold,
   });
+
 
   if (!loaded && !error) {
     return <View style={{ backgroundColor: colors.canvas, flex: 1 }} />;

@@ -19,7 +19,7 @@ import { useNav } from '../lib/nav';
 import { explain } from '../lib/rest';
 import { fetchFile, type RepoFile } from '../lib/repo';
 import { commitDirect, encodePath, proposeChange, type ProposalResult } from '../lib/writes';
-import { colors, fonts, radii, space, themed } from '../theme';
+import { colors, fonts, radii, space, themed, tint } from '../theme';
 
 /** IBM Plex Mono at 11pt, measured — the width of one column of code. */
 const CHAR = 6.62;
@@ -430,7 +430,7 @@ const styles = themed(() =>
       paddingLeft: space.gutter - 12,
     },
     lineOn: {
-      backgroundColor: 'rgba(245,180,38,0.22)',
+      backgroundColor: tint(colors.ink, 0.12),
     },
     lineNo: {
       color: colors.ink20,
@@ -446,7 +446,7 @@ const styles = themed(() =>
       lineHeight: 15,
     },
     hitText: {
-      backgroundColor: 'rgba(245,180,38,0.55)',
+      backgroundColor: tint(colors.ink, 0.3),
       color: colors.ink,
     },
     editPage: {
@@ -482,7 +482,7 @@ const styles = themed(() =>
       borderRadius: radii.tile,
       borderWidth: 1,
       color: colors.ink,
-      fontFamily: fonts.sans,
+      fontFamily: fonts.mono,
       fontSize: 14,
       paddingHorizontal: 12,
       paddingVertical: 9,
@@ -549,17 +549,17 @@ const styles = themed(() =>
       opacity: 0.4,
     },
     failed: {
-      color: colors.red,
+      color: colors.no,
     },
     sent: {
-      color: colors.green,
+      color: colors.yes,
     },
     note: {
       marginTop: 26,
       textAlign: 'center',
     },
     error: {
-      color: colors.red,
+      color: colors.no,
       marginTop: 26,
       paddingHorizontal: space.gutter,
       textAlign: 'center',

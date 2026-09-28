@@ -314,7 +314,7 @@ const styles = themed(() =>
       color: colors.ink40,
     },
     bad: {
-      color: colors.red,
+      color: colors.no,
     },
     ink: {
       color: colors.ink,

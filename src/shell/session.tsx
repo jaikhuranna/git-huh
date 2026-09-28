@@ -78,8 +78,8 @@ export interface Session {
   activityState: ActivityState;
   activity: Activity;
   accounts: Account[];
-  /** Commit subjects for the loading screen. */
-  said: string[];
+  /** Commit subjects and their repositories, for the travelling strip. */
+  lines: CommitLine[];
   /** Which section is on screen, from the route. */
   tab: number;
   goToTab: (index: number) => void;
@@ -367,9 +367,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // whatever the history sample has, rather than the placeholder.
   const shuffledSample = useMemo(() => shuffle(sampled), [sampled]);
   const words = lines.length > 0 ? lines : shuffledSample;
-  // The loading screen is built from the words alone; the repository only
-  // means something on the widget, where there is room to place a line.
-  const said = useMemo(() => words.map((word) => word.message), [words]);
 
   useEffect(() => {
     tokenStore.get().then((stored) => {
@@ -472,7 +469,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activityState,
       activity,
       accounts,
-      said,
+      lines: words,
       tab,
       goToTab,
       pages,
@@ -499,8 +496,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       openEvent,
       pages,
       prs,
-      said,
       scopes,
+      words,
       setHome,
       setToken,
       social,

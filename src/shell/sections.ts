@@ -96,7 +96,7 @@ export const SECTIONS: readonly Section[] = [
   {
     key: 'lab',
     route: 'lab',
-    views: [{ name: 'dots', label: 'join the dots' }],
+    views: [{ name: 'dots', label: 'zoomed out' }],
     sf: { default: 'flask', selected: 'flask.fill' },
     md: 'science',
   },

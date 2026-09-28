@@ -3,12 +3,13 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { LanguageChip } from '../components/LanguageChip';
+import { Card } from '../components/Card';
 import { Data, Label } from '../components/Type';
 import { useTicker } from '../hooks/useTicker';
 import type { GitHubModel, LanguageShare } from '../lib/contributions';
 import { languageMark } from '../lib/languageMarks';
 import { colors, fonts, themed } from '../theme';
-import { onColor, Page, ScreenHead } from './shared';
+import { Page, ScreenHead } from './shared';
 
 /** Turns of the spiral from the centre to the outer end. */
 const TURNS = 2.35;
@@ -22,10 +23,10 @@ const ON_SPIRAL = 14;
 const CHIPS = 6;
 
 /**
- * pin06 — letters strung along a single spiral, the line breaking around
- * each one, a handful of them lifted out into filled colour chips. The
- * letters are your languages; the chip colour is GitHub's own colour for
- * that language, and distance from the centre is its rank.
+ * Your languages strung along a single spiral, the line breaking around
+ * each one, the top six lifted out into the widget's dots with the language's
+ * mark cut out of them — the first squared off, as a peak is — and distance
+ * from the centre is rank.
  *
  * The spiral turns. It is the one screen in the app whose subject is
  * literally an orbit, and a still frame of it was only ever half the pin —
@@ -39,7 +40,7 @@ export function OrbitScreen({
   active?: boolean;
 }) {
   const { width } = useWindowDimensions();
-  const size = Math.min(width - 40, 340);
+  const size = Math.min(width - 72, 320);
   const languages = model.languages.slice(0, ON_SPIRAL);
   // Parked while the page is off screen: thirteen screens are mounted at
   // once and only the one being looked at should be burning frames.
@@ -50,20 +51,16 @@ export function OrbitScreen({
     <Page>
       <ScreenHead left="languages" right={`${model.languages.length} in play`} />
 
-      <View style={styles.stage}>
+      <Card style={styles.stage}>
         <Svg height={size} width={size}>
           <Spiral languages={languages} size={size} spin={spin} />
         </Svg>
-      </View>
+      </Card>
 
-      <View style={styles.legend}>
+      <Card style={styles.legend}>
         {model.languages.slice(0, 8).map((language) => (
           <View key={language.name} style={styles.legendRow}>
-            <LanguageChip
-              color={language.color}
-              name={language.name}
-              size={20}
-            />
+            <LanguageChip name={language.name} size={22} />
             <Data style={styles.legendName}>{language.name}</Data>
             <Data style={styles.legendShare}>
               {(language.share * 100).toFixed(1)}%
@@ -73,7 +70,7 @@ export function OrbitScreen({
         {model.languages.length === 0 && (
           <Label>no language data on these repos</Label>
         )}
-      </View>
+      </Card>
     </Page>
   );
 }
@@ -162,6 +159,8 @@ function Spiral({
 
 function Mark({ seat, x, y }: { seat: Seat; x: number; y: number }) {
   const { language, rank, half } = seat;
+  // The widget's weights, heaviest for the language you write most.
+  const weight = [1, 0.9, 0.8, 0.72, 0.64, 0.58][rank] ?? 0.5;
 
   if (rank >= CHIPS) {
     // Off-chip languages get the mark in ink, or their initials when
@@ -172,18 +171,21 @@ function Mark({ seat, x, y }: { seat: Seat; x: number; y: number }) {
   // Squares and circles alternating, exactly as the pin alternates them.
   return (
     <G>
-      {rank % 2 === 0 ? (
+      {rank === 0 ? (
+        // The first language is the peak, and a peak squares off.
         <Rect
-          fill={language.color}
+          fill={colors.ink}
           height={half * 2}
+          opacity={weight}
+          rx={half * 0.44}
           width={half * 2}
           x={x - half}
           y={y - half}
         />
       ) : (
-        <Circle cx={x} cy={y} fill={language.color} r={half} />
+        <Circle cx={x} cy={y} fill={colors.ink} opacity={weight} r={half} />
       )}
-      {mark(language.name, x, y, half * 1.1, onColor(language.color))}
+      {mark(language.name, x, y, half * 1.1, colors.onBlack)}
     </G>
   );
 }
@@ -247,7 +249,7 @@ function mark(
     return (
       <SvgText
         fill={tint}
-        fontFamily={fonts.sansBold}
+        fontFamily={fonts.monoSemi}
         fontSize={11}
         key={`letter-${name}`}
         textAnchor="middle"
@@ -278,12 +280,10 @@ const styles = themed(() =>
     },
     legend: {
       gap: 2,
-      marginTop: 18,
+      paddingVertical: 10,
     },
     legendRow: {
       alignItems: 'center',
-      borderTopColor: colors.hair,
-      borderTopWidth: 1,
       flexDirection: 'row',
       gap: 10,
       paddingVertical: 7,

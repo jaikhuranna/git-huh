@@ -1,12 +1,17 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Line, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Path } from 'react-native-svg';
 
-import { Data, Heading, Label, Serif } from '../components/Type';
+import { Card } from '../components/Card';
+import { dot } from '../components/DotField';
+
+import { Data, Heading, Label } from '../components/Type';
 import { cycleStats, type Activity } from '../lib/activity';
-import { colors, fonts, themed } from '../theme';
+import { colors, themed } from '../theme';
 import { Page, ScreenHead } from './shared';
 
 const ROW = 30;
+/** Spacing of the dots along a pull request's track. */
+const DOT_PITCH = 9;
 
 /**
  * Derived from pin10's rainfall chart: one row per pull request, a bar for
@@ -22,7 +27,7 @@ export function ReviewScreen({
   loading: boolean;
 }) {
   const { width } = useWindowDimensions();
-  const chartWidth = width - 40;
+  const chartWidth = width - 36 - 36;
   const stats = cycleStats(activity.pulls);
 
   // Oldest first, and only the ones that actually closed — an open PR has no
@@ -66,11 +71,12 @@ export function ReviewScreen({
             />
           </View>
 
-          <Svg height={rows.length * ROW + 18} width={chartWidth}>
+          <Card>
+          <Svg height={rows.length * ROW + 4} width={chartWidth}>
             {/* The median, carried down every row — pin10's centre line. */}
             <Line
-              stroke={colors.ink}
-              strokeDasharray="3 3"
+              stroke={colors.ink40}
+              strokeDasharray="2 4"
               strokeWidth={1}
               x1={trackX + (median / longest) * trackWidth}
               x2={trackX + (median / longest) * trackWidth}
@@ -82,17 +88,22 @@ export function ReviewScreen({
               const opened = Date.parse(pr.createdAt);
               const hours = (Date.parse(pr.mergedAt ?? pr.createdAt) - opened) / 3_600_000;
               const y = index * ROW + ROW / 2;
-              const barWidth = Math.max(3, (hours / longest) * trackWidth);
+              const barWidth = Math.max(DOT_PITCH, (hours / longest) * trackWidth);
               const slow = hours > median;
+              // Open to merge as a run of the widget's dots, one every few
+              // points; the last one is the merge, and a slow one squares off.
+              const count = Math.max(1, Math.round(barWidth / DOT_PITCH));
+              let d = '';
+              for (let i = 0; i < count; i++) {
+                const last = i === count - 1;
+                d += dot(trackX + i * DOT_PITCH + DOT_PITCH / 2, y, last ? 8 : 5, last && slow);
+              }
               return (
-                <Rect
-                  fill={slow ? colors.steel : colors.olive}
-                  height={11}
+                <Path
+                  d={d}
+                  fill={colors.ink}
                   key={pr.number}
-                  rx={2}
-                  width={barWidth}
-                  x={trackX}
-                  y={y - 5.5}
+                  opacity={slow ? 1 : 0.5}
                 />
               );
             })}
@@ -108,22 +119,25 @@ export function ReviewScreen({
                 <Circle
                   cx={trackX + Math.min(wait / longest, 1) * trackWidth}
                   cy={y}
-                  fill={colors.ink}
+                  fill={colors.card}
                   key={`r-${pr.number}`}
-                  r={3}
+                  r={4.5}
+                  stroke={colors.ink}
+                  strokeWidth={1.5}
                 />
               );
             })}
           </Svg>
+          </Card>
 
-          <View style={styles.rows}>
+          <Card style={styles.rows}>
             {rows.map((pr) => {
               const hours =
                 (Date.parse(pr.mergedAt ?? pr.createdAt) - Date.parse(pr.createdAt)) /
                 3_600_000;
               return (
                 <View key={pr.number} style={styles.row}>
-                  <Serif style={styles.number}>#{pr.number}</Serif>
+                  <Data style={styles.number}>#{pr.number}</Data>
                   <Data numberOfLines={1} style={styles.repo}>
                     {pr.repo.split('/').pop()}
                   </Data>
@@ -131,10 +145,10 @@ export function ReviewScreen({
                 </View>
               );
             })}
-          </View>
+          </Card>
 
           <Label style={styles.legend}>
-            bar · open to merge &nbsp;·&nbsp; dot · first review &nbsp;·&nbsp;
+            dots · open to merge &nbsp;·&nbsp; ring · first review &nbsp;·&nbsp;
             dashed · median
           </Label>
         </>
@@ -164,12 +178,11 @@ const styles = themed(() =>
   StyleSheet.create({
     summary: {
       flexDirection: 'row',
-      gap: 10,
-      marginBottom: 20,
+      gap: 8,
     },
     stat: {
       backgroundColor: colors.card,
-      borderRadius: 14,
+      borderRadius: 20,
       flex: 1,
       gap: 4,
       paddingHorizontal: 12,
@@ -179,19 +192,16 @@ const styles = themed(() =>
       fontSize: 18,
     },
     rows: {
-      marginTop: 10,
+      paddingVertical: 8,
     },
     row: {
       alignItems: 'baseline',
-      borderTopColor: colors.hair,
-      borderTopWidth: 1,
       flexDirection: 'row',
       gap: 10,
       paddingVertical: 7,
     },
     number: {
-      fontFamily: fonts.serifItalic,
-      fontSize: 13,
+      color: colors.ink40,
       minWidth: 46,
     },
     repo: {
@@ -203,7 +213,7 @@ const styles = themed(() =>
     },
     legend: {
       lineHeight: 16,
-      marginTop: 14,
+      paddingHorizontal: 4,
     },
     note: {
       marginTop: 24,

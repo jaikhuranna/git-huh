@@ -6,6 +6,7 @@ import { Markdown } from '../components/Markdown';
 import { OverlayFrame, SavedNote } from '../components/Overlay';
 import { Spoken } from '../components/Spoken';
 import { Squiggle } from '../components/Squiggle';
+import { StateChip } from '../components/StateChip';
 import { Body, Data, Heading, Label, Micro } from '../components/Type';
 import { useRemote } from '../hooks/useRemote';
 import { demoThread } from '../lib/demo';
@@ -87,22 +88,17 @@ export function ThreadScreen({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.titleRow}>
+            <StateChip
+              text={thread.state.toLowerCase()}
+              tone={
+                thread.state === 'CLOSED'
+                  ? colors.ink40
+                  : thread.state === 'ANSWERED'
+                    ? colors.yes
+                    : colors.ink
+              }
+            />
             <Heading style={styles.title}>{thread.title}</Heading>
-            <View
-              style={[
-                styles.state,
-                {
-                  backgroundColor:
-                    thread.state === 'CLOSED'
-                      ? colors.purple
-                      : thread.state === 'ANSWERED'
-                        ? colors.green
-                        : colors.blue,
-                },
-              ]}
-            >
-              <Data style={styles.stateText}>{thread.state.toLowerCase()}</Data>
-            </View>
           </View>
 
           <View style={styles.meta}>
@@ -110,7 +106,7 @@ export function ThreadScreen({
             <Data style={styles.metaText}>{ago(thread.createdAt)}</Data>
             {thread.category && <Data style={styles.metaText}>{thread.category}</Data>}
             {thread.labels.map((label) => (
-              <View key={label.name} style={[styles.label, { borderColor: `#${label.color}` }]}>
+              <View key={label.name} style={styles.label}>
                 <Micro>{label.name}</Micro>
               </View>
             ))}
@@ -145,7 +141,7 @@ export function ThreadScreen({
                 body={comment.body}
                 kind={comment.isAnswer ? 'the answer' : 'replied'}
                 seed={comment.id}
-                tone={comment.isAnswer ? colors.green : colors.blue}
+                tone={comment.isAnswer ? colors.yes : colors.ink70}
                 width={body}
               >
                 {comment.replies.map((reply) => (
@@ -157,7 +153,7 @@ export function ThreadScreen({
                     kind="replied"
                     reply
                     seed={reply.id}
-                    tone={colors.purple}
+                    tone={colors.ink40}
                     width={body - 20}
                   />
                 ))}
@@ -210,23 +206,15 @@ const styles = themed(() =>
       paddingTop: 6,
     },
     titleRow: {
-      alignItems: 'flex-start',
-      flexDirection: 'row',
+      backgroundColor: colors.card,
+      borderRadius: radii.card,
       gap: 10,
+      marginBottom: 4,
+      padding: space.card,
     },
     title: {
-      flex: 1,
-      fontSize: 18,
-      lineHeight: 24,
-    },
-    state: {
-      borderRadius: radii.pill,
-      paddingHorizontal: 11,
-      paddingVertical: 3,
-    },
-    stateText: {
-      color: colors.onBlack,
-      fontSize: 10,
+      fontSize: 16,
+      lineHeight: 23,
     },
     meta: {
       alignItems: 'center',
@@ -240,6 +228,7 @@ const styles = themed(() =>
       fontSize: 11,
     },
     label: {
+      borderColor: colors.hairStrong,
       borderRadius: radii.pill,
       borderWidth: 1,
       paddingHorizontal: 8,
@@ -269,7 +258,7 @@ const styles = themed(() =>
       paddingHorizontal: space.gutter,
     },
     error: {
-      color: colors.red,
+      color: colors.no,
       textAlign: 'center',
     },
     underline: {

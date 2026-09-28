@@ -373,7 +373,7 @@ const styles = themed(() =>
       marginTop: 16,
     },
     heading: {
-      fontFamily: fonts.serif,
+      fontFamily: fonts.light,
       fontSize: 19,
       lineHeight: 24,
     },
@@ -436,13 +436,13 @@ const styles = themed(() =>
     },
     bold: {
       color: colors.ink,
-      fontFamily: fonts.sansSemi,
+      fontFamily: fonts.monoMedium,
     },
     italic: {
       fontStyle: 'italic',
     },
     link: {
-      color: colors.blue,
+      color: colors.ink,
       textDecorationLine: 'underline',
     },
   }),

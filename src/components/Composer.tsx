@@ -130,7 +130,7 @@ const styles = themed(() =>
       borderRadius: radii.tile,
       borderWidth: 1,
       color: colors.ink,
-      fontFamily: fonts.sans,
+      fontFamily: fonts.mono,
       fontSize: 14,
       lineHeight: 20,
       minHeight: 84,
@@ -166,10 +166,10 @@ const styles = themed(() =>
       color: colors.onBlack,
     },
     sent: {
-      color: colors.green,
+      color: colors.yes,
     },
     failed: {
-      color: colors.red,
+      color: colors.no,
     },
   }),
 );

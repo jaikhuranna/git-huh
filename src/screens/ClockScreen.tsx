@@ -1,5 +1,8 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Text as SvgText } from 'react-native-svg';
+
+import { Card } from '../components/Card';
+import { dot } from '../components/DotField';
 
 import { Data, Heading, Label, Title } from '../components/Type';
 import {
@@ -7,7 +10,7 @@ import {
   ledger,
   type Activity,
 } from '../lib/activity';
-import { colors, fonts, themed } from '../theme';
+import { colors, fonts, levels, themed } from '../theme';
 import { fmt, Page, ScreenHead } from './shared';
 
 /**
@@ -23,7 +26,7 @@ export function ClockScreen({
   loading: boolean;
 }) {
   const { width } = useWindowDimensions();
-  const size = Math.min(width - 40, 340);
+  const size = Math.min(width - 72, 320);
   const hours = hourHistogram(activity.commits);
   const totals = ledger(activity.commits);
   const peak = Math.max(...hours, 1);
@@ -55,21 +58,20 @@ export function ClockScreen({
 
       {sampled > 0 && (
         <>
-          <View style={styles.stage}>
+          <Card style={styles.stage}>
             <Svg height={size} width={size}>
               <Dial hours={hours} peak={peak} size={size} />
             </Svg>
-          </View>
+            <Title style={styles.verdict}>
+              {nightShare > 0.35 ? 'night owl' : nightShare < 0.12 ? 'early bird' : 'daylight hours'}
+            </Title>
+            <Label style={styles.verdictSub}>
+              peak at {String(peakHour).padStart(2, '0')}:00 ·{' '}
+              {Math.round(nightShare * 100)}% after dark
+            </Label>
+          </Card>
 
-          <Title style={styles.verdict}>
-            {nightShare > 0.35 ? 'Night owl' : nightShare < 0.12 ? 'Early bird' : 'Daylight hours'}
-          </Title>
-          <Label style={styles.verdictSub}>
-            peak at {String(peakHour).padStart(2, '0')}:00 ·{' '}
-            {Math.round(nightShare * 100)}% after dark
-          </Label>
-
-          <View style={styles.ledger}>
+          <Card style={styles.ledger}>
             <View style={styles.ledgerRow}>
               <Heading style={styles.plus}>+{fmt(totals.additions)}</Heading>
               <Data style={styles.ledgerName}>lines added</Data>
@@ -87,13 +89,21 @@ export function ClockScreen({
                 net · median diff {fmt(totals.medianDiff)}
               </Data>
             </View>
-          </View>
+          </Card>
         </>
       )}
     </Page>
   );
 }
 
+/**
+ * Twenty-four spokes of the widget's dots, midnight at the top, clockwise.
+ * Each spoke is a short run of dots outward from the centre, as many lit as
+ * the hour's share of the peak, the outermost lit one carrying the weight; an
+ * hour with nothing in it is a single ghost. The night hours (22–05) are in
+ * full ink and the day a step back, which is what the verdict under the dial
+ * is about.
+ */
 function Dial({
   hours,
   peak,
@@ -105,51 +115,41 @@ function Dial({
 }) {
   const cx = size / 2;
   const cy = size / 2;
-  const inner = size * 0.17;
-  const outer = size * 0.39;
+  const inner = size * 0.2;
+  const outer = size * 0.4;
+  const STEPS = 6;
+  const pitch = (outer - inner) / (STEPS - 1);
+  const cell = Math.min(pitch * 0.8, size * 0.035);
+
+  const night: string[] = [];
+  const day: string[] = [];
+  const ghost: string[] = [];
+  hours.forEach((count, hour) => {
+    const angle = (hour / 24) * Math.PI * 2 - Math.PI / 2;
+    const lit = count === 0 ? 0 : Math.max(1, Math.round((count / peak) * STEPS));
+    const isNight = hour >= 22 || hour < 5;
+    for (let step = 0; step < STEPS; step++) {
+      const r = inner + step * pitch;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      if (step < lit) {
+        const scale = levels.scale[Math.min(4, 1 + Math.floor((step / STEPS) * 4))];
+        (isNight ? night : day).push(dot(x, y, cell * scale, count === peak && step === lit - 1));
+      } else {
+        ghost.push(dot(x, y, cell * levels.scale[0], false));
+      }
+    }
+  });
 
   return (
     <>
-      <Circle
-        cx={cx}
-        cy={cy}
-        fill="none"
-        r={outer}
-        stroke={colors.hairStrong}
-        strokeWidth={1}
-      />
-      <Circle
-        cx={cx}
-        cy={cy}
-        fill="none"
-        r={(inner + outer) / 2}
-        stroke={colors.hair}
-        strokeWidth={1}
-      />
-
-      {hours.map((count, hour) => {
-        // Midnight at the top, clockwise, like a real clock face.
-        const angle = (hour / 24) * Math.PI * 2 - Math.PI / 2;
-        const length = inner + (count / peak) * (outer - inner);
-        const isNight = hour >= 22 || hour < 5;
-        return (
-          <Line
-            key={hour}
-            stroke={colors.ink}
-            strokeLinecap="round"
-            strokeWidth={size * 0.026}
-            opacity={count === 0 ? 0.12 : isNight ? 1 : 0.55}
-            x1={cx + Math.cos(angle) * inner}
-            x2={cx + Math.cos(angle) * length}
-            y1={cy + Math.sin(angle) * inner}
-            y2={cy + Math.sin(angle) * length}
-          />
-        );
-      })}
+      <Path d={ghost.join('')} fill={colors.ink} opacity={levels.alpha[0] * 0.5} />
+      <Path d={day.join('')} fill={colors.ink} opacity={levels.alpha[2]} />
+      <Path d={night.join('')} fill={colors.ink} />
 
       {[0, 6, 12, 18].map((hour) => {
         const angle = (hour / 24) * Math.PI * 2 - Math.PI / 2;
-        const r = outer + 17;
+        const r = outer + 18;
         return (
           <SvgText
             fill={colors.ink40}
@@ -165,16 +165,25 @@ function Dial({
         );
       })}
 
-      <Circle cx={cx} cy={cy} fill={colors.black} r={inner * 0.82} />
       <SvgText
-        fill={colors.onBlack}
-        fontFamily={fonts.sansBold}
-        fontSize={inner * 0.5}
+        fill={colors.ink}
+        fontFamily={fonts.light}
+        fontSize={inner * 0.62}
         textAnchor="middle"
         x={cx}
-        y={cy + inner * 0.18}
+        y={cy + inner * 0.2}
       >
         {peak}
+      </SvgText>
+      <SvgText
+        fill={colors.ink40}
+        fontFamily={fonts.mono}
+        fontSize={9}
+        textAnchor="middle"
+        x={cx}
+        y={cy + inner * 0.52}
+      >
+        at peak
       </SvgText>
     </>
   );
@@ -184,41 +193,38 @@ const styles = themed(() =>
   StyleSheet.create({
     stage: {
       alignItems: 'center',
-      marginTop: 8,
     },
     verdict: {
-      marginTop: 18,
+      marginTop: 6,
     },
     verdictSub: {
       marginTop: 4,
     },
     ledger: {
-      marginTop: 22,
+      paddingVertical: 6,
     },
     ledgerRow: {
       alignItems: 'baseline',
-      borderTopColor: colors.hair,
-      borderTopWidth: 1,
       flexDirection: 'row',
       gap: 12,
       paddingVertical: 9,
     },
     plus: {
-      color: colors.green,
-      fontSize: 16,
+      color: colors.yes,
+      fontSize: 15,
       minWidth: 92,
     },
     minus: {
-      color: colors.red,
-      fontSize: 16,
+      color: colors.no,
+      fontSize: 15,
       minWidth: 92,
     },
     net: {
-      fontSize: 16,
+      fontSize: 15,
       minWidth: 92,
     },
     ledgerName: {
-      color: colors.ink70,
+      color: colors.ink40,
       flex: 1,
     },
     note: {

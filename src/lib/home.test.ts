@@ -43,3 +43,18 @@ test('a saved setting with unknown blocks keeps only the ones it knows', () => {
   assert.deepEqual(readHome({ blocks: ['mentions', 'weather'] }), { blocks: ['mentions'] });
   assert.deepEqual(readHome(null), DEFAULT_HOME);
 });
+
+test('a comment in both the inbox feed and the paged history is listed once', () => {
+  const rows = homeEvents(
+    [
+      event('a', 'comment', '2026-01-02T00:00:00Z'),
+      event('b', 'comment', '2026-01-01T00:00:00Z'),
+      event('a', 'comment', '2026-01-02T00:00:00Z'),
+    ],
+    DEFAULT_HOME,
+  );
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    ['a', 'b'],
+  );
+});

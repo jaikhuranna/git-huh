@@ -1,10 +1,9 @@
 /**
  * Design tokens: every colour, font, size and radius the app draws with.
  *
- * Every value is lifted from the "nothing github" pinboard, and the board is
- * emphatically *not* Nothing OS: warm paper instead of cold grey, crosses and
- * bars instead of dot matrices, a serif display face beside a grotesque, and
- * six categorical brights instead of one brand red. The raw palettes live in
+ * Every value is the home-screen widget's: one mono face, one ink in four
+ * weights on a warm near-black card, dots whose size and weight are the data,
+ * a plus for today and a wave for a silence. The raw palettes live in
  * `palette.ts`; this module decides which one is in force.
  */
 
@@ -65,54 +64,65 @@ export function themed<T extends object>(build: () => T): T {
 }
 
 
+/** A palette colour at a given opacity — a band under a diff line, a found line. */
+export function tint(hex: string, alpha: number): string {
+  const int = parseInt(hex.replace('#', ''), 16);
+  return `rgba(${(int >> 16) & 255},${(int >> 8) & 255},${int & 255},${alpha})`;
+}
+
 export const fonts = {
-  /** pin04's display serif — greetings, hero words, pin10's year labels. */
-  serif: 'InstrumentSerif_400Regular',
-  serifItalic: 'InstrumentSerif_400Regular_Italic',
-  /** pin02's grotesque — titles, body, the pin07 thin numeral. */
-  sans: 'Inter_400Regular',
-  sansMedium: 'Inter_500Medium',
-  sansSemi: 'Inter_600SemiBold',
-  sansBold: 'Inter_700Bold',
-  sansThin: 'Inter_200ExtraLight',
-  /** pin03's typewriter index, pin08's ~names, pin09's IBM caption. */
+  /**
+   * The widget's one face, IBM Plex Mono, in every role. The keys name the
+   * role rather than the face: `light` for the big quiet words, `thin` for a
+   * numeral at poster scale, `italic` for an aside.
+   */
+  thin: 'IBMPlexMono_200ExtraLight',
+  light: 'IBMPlexMono_300Light',
   mono: 'IBMPlexMono_400Regular',
+  italic: 'IBMPlexMono_400Regular_Italic',
   monoMedium: 'IBMPlexMono_500Medium',
+  monoSemi: 'IBMPlexMono_600SemiBold',
 } as const;
 
 export const type = {
-  display: { fontFamily: fonts.serif, fontSize: 44, lineHeight: 46 },
-  displaySm: { fontFamily: fonts.serif, fontSize: 30, lineHeight: 34 },
-  title: { fontFamily: fonts.sansBold, fontSize: 24, lineHeight: 28 },
-  heading: { fontFamily: fonts.sansSemi, fontSize: 15, lineHeight: 20 },
-  body: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20 },
-  /** pin07's 54°F lockup. */
-  numeral: { fontFamily: fonts.sansThin, fontSize: 86, lineHeight: 90 },
+  /** A greeting, a handle — light, large, tight. */
+  display: { fontFamily: fonts.light, fontSize: 34, lineHeight: 40, letterSpacing: -0.8 },
+  displaySm: { fontFamily: fonts.light, fontSize: 24, lineHeight: 30, letterSpacing: -0.4 },
+  title: { fontFamily: fonts.monoMedium, fontSize: 19, lineHeight: 25, letterSpacing: -0.3 },
+  heading: { fontFamily: fonts.monoMedium, fontSize: 14, lineHeight: 20 },
+  body: { fontFamily: fonts.mono, fontSize: 13, lineHeight: 20 },
+  /** One figure at poster scale. */
+  numeral: { fontFamily: fonts.thin, fontSize: 86, lineHeight: 92, letterSpacing: -4 },
   label: {
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.mono,
     fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: 0.8,
+    lineHeight: 15,
+    letterSpacing: 0.4,
   },
   data: { fontFamily: fonts.mono, fontSize: 12, lineHeight: 16 },
-  micro: { fontFamily: fonts.mono, fontSize: 9, lineHeight: 12 },
+  micro: { fontFamily: fonts.mono, fontSize: 10, lineHeight: 13 },
 } as const;
 
 export const radii = {
+  /** The widget's corner, on every card. */
   sheet: 28,
-  card: 20,
+  card: 24,
   tile: 14,
   pill: 999,
 } as const;
 
 export const space = {
-  gutter: 20,
+  gutter: 18,
   card: 18,
   row: 14,
 } as const;
 
-/** Level → opacity/scale ramps shared by every field that reads intensity. */
+/**
+ * Level → alpha/scale ramps shared by every field that reads intensity — the
+ * widget's own (`DotFieldRenderer.SCALES` / `ALPHAS`), so a dot in the app
+ * and a dot on the home screen are the same dot.
+ */
 export const levels = {
-  alpha: [0.08, 0.3, 0.52, 0.76, 1],
-  scale: [0.22, 0.44, 0.64, 0.84, 1],
+  alpha: [0.26, 0.46, 0.66, 0.84, 1],
+  scale: [0.26, 0.44, 0.62, 0.82, 1],
 } as const;

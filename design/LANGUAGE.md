@@ -11,182 +11,152 @@ alters this file in the same commit.
 
 ## 1. The idea
 
-**Printed matter that happens to be alive.** Every screen is a real printed
-artefact — a poster, a filing drawer, a weather page, an ID card, a page of
-type — that has been handed live data. The app never invents a "UI look"; it
-borrows one that already existed on paper and then makes it move only where
-motion earns its place.
+**The app is the widget, zoomed out.** The home-screen widget came last and
+turned out to be the clearest thing the app ever made: a warm near-black card,
+one mono face, your own commit messages travelling across the top, the days
+under them as dots whose size and weight are the data, a plus for today, and a
+hand-drawn wave where nothing happened, with how long it lasted written on it.
+Every screen is that card with more room. The layouts still come from the
+board's pins — a poster, a filing drawer, a weather page, a spiral — but the
+marks, the type and the surface are the widget's, so fourteen screens read as
+one thing.
 
 Three consequences, and they settle most arguments:
 
-1. **Every mark is a measurement.** If a shape is not data, it is a rule, a
-   tab or a margin. There is no decorative texture anywhere in the app. The
-   repo cards once carried a halftone field keyed off a hash of the name — it
-   looked like data and encoded none, and it was deleted for that reason.
-2. **The artefact sets the layout, the data sets the shape.** A poster fills
-   the page because posters do; a drawer runs edge to edge and has a lip at
-   the bottom because drawers do. Content that runs short does not leave the
-   artefact half-built — it leaves it *empty*, visibly, in the artefact's own
-   terms (an empty folder slot, not blank canvas).
+1. **Every mark is a measurement.** A dot is a day, a week, a month, an hour or
+   a pull request's wait; its size and its weight say how much. If a shape is
+   not data it is a rule, a card or a margin. There is no decorative texture —
+   the sign-in page's stand-in field is the one exception, and it is labelled
+   by being on the sign-in page.
+2. **The artefact sets the layout, the data sets the shape.** A poster fills the
+   page because posters do. Content that runs short leaves the artefact
+   visibly empty in its own terms (a ghost dot, a wave), not blank canvas.
 3. **Say the honest thing.** A missing number says it is missing. A sample
-   says it is a sample. No zero is ever drawn where the truth is "we did not
-   look".
+   says it is a sample. No zero is drawn where the truth is "we did not look".
 
 ## 2. What this is not
 
-The board this is drawn from is called "nothing github", and the app
-deliberately does **not** use the Nothing design language.
+The board this is drawn from is called "nothing github", and the app still
+does **not** use the Nothing design language:
 
-- No dot-matrix typeface. No DotGothic16 anywhere in `src/` or `app/`.
-- No Nothing red (`#D71921`). The `?` in the wordmark is ink.
-- No grey-paper-plus-dot-grid combination.
-- Dots as texture are allowed **only** where the source pin is built from
-  them: `now` (LED numerals), `dots` (the puzzle), `archive` (circle rows).
-  Everywhere else the texture is that pin's own device — crosses, ribbons,
-  stacked squares, arcs, filing rules.
+- No dot-matrix *typeface* — no DotGothic16 anywhere in `src/` or `app/`. The
+  dots are data, set in a plain grid; the type is IBM Plex Mono.
+- No Nothing red (`#D71921`), anywhere.
+- No dots laid *under* something as a texture. A field of dots is always the
+  thing being read.
 
 Nothing survives in exactly one place: **the widget's background**, the
 Material You neutral Nothing's own widgets sit on, read natively from the
-device's live palette (`WidgetSurface.kt`). Nothing red appears nowhere.
+device's live palette (`WidgetSurface.kt`). The app's `card` is the same warm
+neutral at night, which is why the two sit together on a phone.
 
 ## 3. Colour
 
-All values live in `src/theme/index.ts`. Screens use the tokens; they never
-write a hex literal.
+All values live in `src/theme/palette.ts`. Screens use the tokens; they never
+write a hex literal (`tint(colour, alpha)` makes a band from a token).
 
 ### Surfaces
 
-| token | value | where |
-|---|---|---|
-| `canvas` | `#F2F0EB` | warm paper — the app's default |
-| `canvasCool` | `#E4E3DE` | `now` only |
-| `canvasFlat` | `#EFEFEF` | `poster` only |
-| `canvasCream` | `#F7F5F0` | `archive` only |
-| `card` | `#FBFAF7` | raised surface |
-| `recess` | `#E9E7E1` | inset, track, code block |
-| `black` | `#0B0B0A` | filing tabs, repo cards, filled pills |
-| `klein` | `#1A50D5` | `loading` only, where it is the whole page |
+| token | day | night | where |
+|---|---|---|---|
+| `canvas` | `#ECE8E4` | `#141110` | the page — a step darker than a card |
+| `card` | `#F8F5F2` | `#221C1A` | the widget's card; every raised surface |
+| `recess` | `#E0DBD6` | `#2D2624` | inset: a track, a code block, a swiped row's underside |
+| `black` / `onBlack` | ink / card | ink / card | the solid surface — a selected chip, the one button that is the point |
 
-A screen gets its own canvas only when the source pin has one. Four of
-thirteen do.
+There are no per-screen canvases any more. The poster's flat grey, the
+archive's cream, `now`'s cool grey and the loading page's ultramarine are gone:
+each was a screen dressed as a different app.
 
 ### Ink
 
-`ink` `#111110` → `ink70` `#5B5A55` → `ink40` `#93918B` → `ink20` `#C6C4BE`,
-plus `hair` and `hairStrong` for rules. On black: `onBlack`, `onBlack55`,
-`onBlack25`.
+`ink` → `ink70` → `ink40` → `ink20`, plus `hair` and `hairStrong` for rules.
+Four steps, and they mean four things: **statement, support, annotation,
+structure.** A dot's weight uses the widget's own ramp instead (`levels`).
 
-Four steps of ink, and they mean four things: **statement, support,
-annotation, structure.** A fifth grey would be a decision nobody can
-reproduce.
+### Yes and no — the only colour
 
-### The brights
+`yes` (sage) and `no` (clay), muted so they sit in the widget's world. They
+are the two words a machine has to say: a line added or removed, a check
+passed or failed, a review approved or asking for changes, an issue closed.
+They are **never the only signal** — a diff line is banded *and* signed, a
+check is named, a review says `approved` in words.
 
-`blue #2F7FE0` · `red #E8412B` · `green #1F9A53` · `yellow #F5B426` ·
-`purple #6B4FBB` · `pink #F2A0C4`
-
-These are **categorical**. They separate kinds of thing — comment from
-review, addition from deletion, one language from another. None of them is a
-brand accent, and **none of them is ever the only thing carrying meaning**: a
-diff line is banded *and* signed, a feed event is coloured *and* named in
-words, a velocity is tinted *and* has an arrow pointing the right way.
-
-Language colours are the exception that proves it: those are GitHub's own
-colour for the language, not ours, and they are always paired with the name.
+Everything that used to be a categorical bright is now a weight of ink or a
+shape: the kinds of work in `split` are five weights, the feed's kinds are a
+dot, a ring and a square, languages are their mark and their name. GitHub's
+language colours and label colours are not drawn.
 
 ### Night
 
-The app follows the system: `useColorScheme` in `app/_layout.tsx` picks the
-palette, and every token has a night value in `src/theme/index.ts`. It is the
-same paper at night, not an inverted screenshot:
-
-| token | night | |
-|---|---|---|
-| `canvas` | `#141312` | warm near-black — the board's ink, lifted a step |
-| `card` · `recess` | `#1E1D1B` · `#282724` | a card still sits *on* the page |
-| `ink` → `ink20` | `#F2F0EB` → `#45433F` | the day's paper is the night's ink |
-| `black` · `onBlack` | `#F2F0EB` · `#111110` | the solid surface inverts with everything else |
-
-`black` means "the solid surface" — a selected pill, a filing tab, the
-`now` ruler — so at night it is the light one, and still the strongest thing
-on the page. The brights keep their hue; blue, red and green lift a step so
-they hold their contrast on dark. `klein` does not change: the loading page is
-that blue in any light.
-
-Two rules make this work, and both are mechanical:
+The app follows the system (`useColorScheme` in `app/_layout.tsx`), and night
+is the widget as most people see it: the warm near-black card on a page one
+step darker, the ink the colour of the widget's strip. `black` means "the solid
+surface", so at night it is the light one.
 
 - **Read a colour at render, never at import.** `colors.x` is a getter on the
-  palette in force. A module-level style sheet is `themed(() =>
-  StyleSheet.create({...}))`, which rebuilds after the scheme changes; a
-  module-level lookup table of colours is wrapped the same way.
+  palette in force; a module-level sheet is `themed(() => StyleSheet.create(…))`.
 - **The screens remount when the scheme changes.** The session sits above the
   keyed tree, so the account, the year and any pushed page survive it.
 
 ## 4. Type
 
-Three voices, from `src/components/Type.tsx`. Screens use the primitives;
-they do not set `fontFamily`.
+One face, the widget's: **IBM Plex Mono**, in the roles of
+`src/components/Type.tsx`. Screens use the primitives; they do not set
+`fontFamily` except to pick a weight inside a sentence.
 
-| voice | face | for |
+| role | cut | for |
 |---|---|---|
-| display | Instrument Serif | greetings, hero words, year labels, section heads |
-| body | Inter | everything read as prose — titles, sentences, PR bodies |
-| data | IBM Plex Mono | labels, numbers, handles, paths, code, captions |
+| `Display` | 300 Light, 34/40 | greetings, a handle — large and quiet |
+| `Title` | 500 Medium, 19/25 | a verdict (`night owl`), a figure in a card |
+| `Heading` | 500 Medium, 14/20 | a pull request's title, a stat |
+| `Body` | 400, 13/20 | prose: sentences, comments, descriptions |
+| `Numeral` | 200 ExtraLight, 86 | `weather`'s one figure |
+| `Label` / `Data` / `Micro` | 400, 11 / 12 / 10 | names, numbers, captions |
+| `Serif` (historic name) | 400 Italic, 12 | the aside: `since 2021 · …` |
 
-The split is semantic, not decorative: **serif announces, sans explains, mono
-measures.** A number that can be compared is mono. A number inside a sentence
-is not.
-
-Sizes are the `type` scale in the theme — `display` 44, `displaySm` 30,
-`title` 24, `heading` 15, `body` 14, `numeral` 86 (thin, `weather` only),
-`label` 11 mono with 0.8 tracking, `data` 12 mono, `micro` 9 mono.
-
-Labels are **lowercase**. Mastheads are **upper case with wide tracking**.
-Both are typewriter conventions and the app keeps them consistently.
-
-Every primitive declares a platform fallback, so a failed font download
-degrades to readable type rather than a blank screen.
+Inside a sentence the words are `ink70` and **the figures full ink in
+Medium** — the widget's two weights, so the numbers can be read on their own.
+Everything is **lower case**, the way the widget's strip is.
 
 ## 5. Space and geometry
 
-`gutter` 20 · `card` 18 · `row` 14. Radii: `sheet` 28 · `card` 20 ·
-`tile` 14 · `pill` 999.
+`gutter` 18 · `card` 18 · 10 between cards. Radii: `card` 24 · `sheet` 28 (the
+widget's own corner) · `tile` 14 · `pill` 999.
 
-- **Hairlines over boxes.** Structure is a 1px rule wherever a rule will do.
-  Borders are for things you can pick up: cards, chips, tabs.
-- **Pills are actions; rectangles are objects.** Anything with a `pill`
-  radius does something when tapped. Anything square is a thing.
-- **Filled black means selected or primary**, everywhere, without exception:
-  the on-state of a chip, the guide tab of a folder, the one button on the
-  page that is the point.
+- **A screen is a stack of cards.** A chart, a list, a set of figures: each on
+  its own card, on the canvas. Hairlines still divide rows *inside* a card.
+- **Pills are actions; cards are objects.** Anything with a `pill` radius does
+  something when tapped.
+- **Filled means selected or primary**: the on-state of a chip, the one button
+  on the page that is the point.
 - **Full-bleed is allowed only when the artefact is the page** — `poster`,
-  `weather`, `loading`, `index`. Everything else lives inside the gutter.
+  `weather`'s sky.
 
 ## 6. Motion
 
-Motion is rare and it is never decoration. Two screens move, and both move
-because the subject is motion: the language **spiral turns**, and the
-**loading wave travels**.
+Motion is still rare, and now it is the widget's: things **travel**.
 
-Three rules, all of them learned the hard way:
+- **The strip travels** (`Marquee`) — your commit messages, `repo ~~~ message`,
+  sliding left on the `you` page, the lab and the loading card.
+- **The light sweeps** through the loading card's dots towards today.
+- **The spiral turns** on `languages`.
 
-1. **Never animate from JavaScript.** Both moving screens run entirely on the
-   native driver. The loading field precomputes each glyph's whole track at
-   mount and hands it to one looping `Animated.Value` as an interpolation, so
-   a frame costs nothing — which matters most on the loading screen, where
-   the JS thread is busy parsing the first GitHub response. Two earlier
-   versions animated from JS (a `setInterval` stepping a counter, then
-   `requestAnimationFrame`) and both visibly stuttered.
-2. **Park what is off screen.** A section mounts the first time it is opened
-   and stays mounted after that, so several screens are always live at once.
-   An animation takes an `active` prop and stops when its view is not the one
-   being looked at — which now means *its section is current and its page is
-   the visible one*.
-3. **Arrive, don't appear.** Anything full-page fades in over ~500 ms. A hard
-   cut to a full page of type reads as a crash.
+Three rules, all learned the hard way:
 
-Everything else is still. There are no hover states, no spinners, no
-skeletons — a screen that is loading says so in words.
+1. **Never animate from JavaScript.** Everything above runs on the native
+   driver from values computed once at mount: the strip is one `translateX`
+   over a sequence drawn twice, the sweep is one looping value interpolated
+   into each dot's scale and opacity. Two earlier loading screens animated from
+   JS (a `setInterval`, then `requestAnimationFrame`) and both stuttered exactly
+   while the first response was being parsed.
+2. **Park what is off screen.** A section stays mounted once opened, so every
+   animation takes an `active` prop and stops when its page is not the one
+   being looked at.
+3. **Arrive, don't appear.** Anything full-page fades in over ~500 ms.
+
+There are no hover states, no spinners, no skeletons — a screen that is loading
+says so in words.
 
 The one exception to rule 1 is a **row under a finger**: an inbox row
 follows the drag through a `PanResponder`, because there is no other way to
@@ -197,9 +167,9 @@ then lets go.
 
 **Navigation is two levels and both are visible.** A bar of five sections at
 the bottom — the platform's own tab bar (Liquid Glass on iOS 26, Material 3's
-navigation bar on Android, where the selected pill is filled black) — and a
-segmented control at the top for the views inside one section (`Segments`,
-2px ink rule = the view you are in). Nothing lives behind a menu, a drawer or
+navigation bar on Android, where the selected pill is the card's colour) —
+and a segmented control at the top for the views inside one section
+(`Segments`: the view you are in is in full ink with the app's wave under it). Nothing lives behind a menu, a drawer or
 a scrolling list of names; if a screen exists, one tap and at most one swipe
 reaches it. Sections are content — never actions — and there are never more
 than five. `DESIGN.md` § Navigation has the table; `STORIES.md` has the
@@ -209,10 +179,10 @@ argument.
 a mono name on the left, a mono figure on the right (`ScreenHead`). It is the
 single strongest thing holding thirteen very different layouts together.
 
-**Chapter masthead.** The two filing screens (`index`, `brief`) use the book
-form instead: `Ch. N /` · `TITLE` · `/ n`, over a full-width ink rule.
+**Card head.** A card that holds one thing names it the same way, smaller:
+`Card`'s `title` and `figure`.
 
-**Chips.** Outlined pill, mono label, filled black when on. Used for filters,
+**Chips.** Outlined pill, mono label, filled when on. Used for filters,
 years, tabs. **Chips wrap; they never scroll horizontally** — the app is one
 big horizontal pager and a nested horizontal scroller loses every drag to the
 page swipe. This is not a preference, it is a bug that has been fixed twice.
@@ -234,7 +204,7 @@ alerts" is a different sentence from "no open alerts".
 **Writing is one object.** Every write goes through `Composer`: one box, a
 row of verbs, a line under them. The verb names the act (`approve`,
 `request changes`, `comment on this line`, `propose change`), nothing leaves
-until it is pressed, the result is said in words in green or red, and a
+until it is pressed, the result is said in words in `yes` or `no`, and a
 failure keeps the text. The words for a failure name the one thing that
 would change it — the scope, the connection, the token.
 
@@ -249,14 +219,22 @@ Nothing in the bar ever pushes.
 
 ## 8. Charts
 
+**Every chart is made of the widget's dots.** A field of days is `DotField`; a
+series over time is a `DotRow` or a column of dots; a count is lit cells in a
+grid of ghosts. Nothing is a filled bar except where two quantities are laid
+side by side (`years`' before and after, the share card's split), and those are
+rounded like a stretched dot.
+
 - **One axis per comparison.** Cards in a deck share a single twelve-month
   window, because two charts that look comparable must *be* comparable. A
   per-card axis was shipped once and pulled: one card showed a single bar
   labelled `s` above a card showing twelve.
-- **Label the extreme, not every point.** The peak bar carries its number;
-  the rest carry none.
-- **Bars are ink on paper, not gradients.** Fills are solid; intensity is
-  opacity (`levels.alpha`) or size (`levels.scale`), never hue.
+- **Label the extreme, not every point.** The peak dot squares off and carries
+  its number; the rest carry none.
+- **Intensity is size and weight, never hue** — the widget's `levels.scale`
+  and `levels.alpha`, so a dot in the app and a dot on the home screen agree.
+- **Today is the plus**, in the bottom-right corner of a field and at the end
+  of a row, wherever a chart reaches today.
 - **A gap in the data is drawn as a gap** — a baseline tick, not a missing
   bar and not a zero. **A long gap is a wave**: past a threshold each chart
   sets (a month of weeks, three months, a week of days), the empty stretch is
@@ -281,7 +259,7 @@ marks, no second person imperative unless it is a button.
 
 - Every `Pressable` carries an `accessibilityRole`, and toggles carry
   `accessibilityState`.
-- No colour-only signal (see §3).
+- No colour-only signal (see §3): `yes` and `no` always sit beside a word or a sign.
 - Contrast: `ink` on `canvas` and `onBlack` on `black` are both well past
   AA. `ink40` is annotation only and never carries the sole meaning of a row.
 - Type scales with the system; nothing is locked to a pixel height that a

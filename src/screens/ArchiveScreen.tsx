@@ -1,7 +1,8 @@
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
-import { Serif } from '../components/Type';
+import { Card } from '../components/Card';
+import { Label } from '../components/Type';
 import type { GitHubModel, YearSummary } from '../lib/contributions';
 import { howLongMonths, quietRuns, wavePath } from '../lib/quiet';
 import { colors, fonts, themed } from '../theme';
@@ -10,15 +11,15 @@ import { fmt, Page, ScreenHead } from './shared';
 const ROW_HEIGHT = 44;
 
 /**
- * pin10 — the Valentine's Day rainfall chart. One row per year, circles
- * sized by monthly volume, a single vertical line carrying today's date back
+ * Every year as a row of the widget's dots, one per month, sized and
+ * weighted by that month's volume, a single vertical line carrying today's date back
  * through every year, and paired before/after bars down the right. Three
  * months or more without a circle is bridged with the app's wave, so a quiet
  * season reads as one stretch rather than as circles that failed to draw.
  */
 export function ArchiveScreen({ model }: { model: GitHubModel }) {
   const { width } = useWindowDimensions();
-  const chartWidth = width - 40;
+  const chartWidth = width - 36 - 36;
 
   // The pin runs oldest at the top, newest at the bottom.
   const years = [...model.years].sort((a, b) => a.year - b.year);
@@ -44,15 +45,16 @@ export function ArchiveScreen({ model }: { model: GitHubModel }) {
   const chartHeight = years.length * ROW_HEIGHT + 12;
 
   return (
-    <Page background={colors.canvasCream}>
+    <Page>
       <ScreenHead left="every year" right={`${years.length} on record`} />
 
+      <Card>
       <View style={styles.heads}>
-        <Serif style={styles.headYear}>Contribution Year</Serif>
-        <Serif style={styles.headToday}>Today</Serif>
-        <Serif numberOfLines={1} style={styles.headSplit}>
+        <Label style={styles.headYear}>year</Label>
+        <Label style={styles.headToday}>today</Label>
+        <Label numberOfLines={1} style={styles.headSplit}>
           before · after
-        </Serif>
+        </Label>
       </View>
 
       <Svg height={chartHeight} width={chartWidth}>
@@ -80,6 +82,7 @@ export function ArchiveScreen({ model }: { model: GitHubModel }) {
           />
         ))}
       </Svg>
+      </Card>
     </Page>
   );
 }
@@ -128,8 +131,8 @@ function Row({
 
       <SvgText
         fill={colors.ink70}
-        fontFamily={fonts.serifItalic}
-        fontSize={11}
+        fontFamily={fonts.mono}
+        fontSize={10}
         x={0}
         y={mid + 3}
       >
@@ -138,16 +141,16 @@ function Row({
 
       {year.months.map((value, month) => {
         if (value === 0) return null;
-        const r = 2 + (value / peakMonth) * 11;
+        const r = 1.8 + (value / peakMonth) * Math.min(9, step * 0.48);
         // Quiet months take the pin's olive; busy ones its saturated blue.
         const quiet = value < median;
         return (
           <Circle
             cx={28 + month * step + step / 2}
             cy={mid}
-            fill={quiet ? colors.olive : colors.rain}
+            fill={colors.ink}
             key={month}
-            opacity={quiet ? 0.5 : 0.35 + (value / peakMonth) * 0.5}
+            opacity={quiet ? 0.3 : 0.45 + (value / peakMonth) * 0.55}
             r={r}
           />
         );
@@ -185,25 +188,29 @@ function Row({
       )}
 
       <Rect
-        fill={highlighted ? colors.rain : colors.steel}
-        height={11}
+        fill={colors.ink}
+        height={9}
+        opacity={highlighted ? 1 : 0.55}
+        rx={4.5}
         width={Math.max(beforeW, 2)}
         x={barsX + barsWidth * 0.46 - Math.max(beforeW, 2)}
-        y={mid - 5.5}
+        y={mid - 4.5}
       />
       <Rect
-        fill={colors.olive}
-        height={11}
+        fill={colors.ink}
+        height={9}
+        opacity={0.26}
+        rx={4.5}
         width={Math.max(afterW, 2)}
         x={barsX + barsWidth * 0.5}
-        y={mid - 5.5}
+        y={mid - 4.5}
       />
       <SvgText
-        fill={highlighted ? colors.onBlack : colors.ink70}
+        fill={colors.ink70}
         fontFamily={fonts.mono}
         fontSize={8}
         textAnchor="end"
-        x={barsX + barsWidth * 0.46 - 3}
+        x={barsX + barsWidth * 0.46 - Math.max(beforeW, 2) - 3}
         y={mid + 3}
       >
         {fmt(year.beforeToday)}
@@ -229,20 +236,15 @@ const styles = themed(() =>
       paddingBottom: 8,
     },
     headYear: {
-      color: colors.ink70,
-      fontFamily: fonts.serifItalic,
-      fontSize: 12,
+      color: colors.ink40,
     },
     headToday: {
-      color: colors.ink70,
-      fontSize: 12,
+      color: colors.ink40,
     },
     headSplit: {
+      color: colors.ink40,
       flexShrink: 0,
       paddingRight: 2,
-      color: colors.ink70,
-      fontFamily: fonts.serifItalic,
-      fontSize: 12,
     },
   }),
 );
