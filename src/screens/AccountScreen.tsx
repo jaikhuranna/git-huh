@@ -7,6 +7,8 @@ import { Data, Label, Micro } from '../components/Type';
 import { handleOf } from '../lib/contributions';
 import { HOME_BLOCKS } from '../lib/home';
 import { useNav } from '../lib/nav';
+import { authorizedAppUrl, tokenKind } from '../lib/oauth';
+import { GITHUB_CLIENT_ID } from '../lib/oauthConfig';
 import {
   DEFAULT_SETTINGS,
   disableNotifications,
@@ -21,6 +23,20 @@ import {
 import { DEMO_TOKEN } from '../lib/token';
 import { useSession } from '../shell/session';
 import { colors, radii, space, themed } from '../theme';
+
+/** How an account came in, in the words the account rows use. */
+function how(token: string | null | undefined): string {
+  switch (tokenKind(token ?? '')) {
+    case 'oauth':
+      return 'signed in with github';
+    case 'fine-grained':
+      return 'fine-grained token';
+    case 'classic':
+      return 'token';
+    default:
+      return '';
+  }
+}
 
 /**
  * Everything about *who* is looking, behind the avatar in the top-right
@@ -40,6 +56,8 @@ export function AccountScreen() {
   const demo = session.token === DEMO_TOKEN;
   const others = accounts.filter((account) => account.login.toLowerCase() !== current);
   const summed = model?.accounts && model.accounts.length > 1;
+  const oauth = tokenKind(session.token ?? '') === 'oauth';
+  const clientId = GITHUB_CLIENT_ID;
 
   return (
     <OverlayFrame onBack={nav.close} where="account">
@@ -53,7 +71,10 @@ export function AccountScreen() {
           <Avatar login={current || 'demo'} size={34} />
           <View style={styles.rowText}>
             <Data numberOfLines={1}>~{current}{demo ? ' · demo' : ''}</Data>
-            <Micro style={styles.dim}>in use · inbox, pull requests and replies</Micro>
+            <Micro style={styles.dim}>
+              in use · inbox, pull requests and replies
+              {how(session.token) ? ` · ${how(session.token)}` : ''}
+            </Micro>
           </View>
           <View style={[styles.tag, styles.tagOn]}>
             <Label style={styles.onBlack}>in use</Label>
@@ -80,7 +101,7 @@ export function AccountScreen() {
                       ? 'could not be read · left out of the charts'
                       : ticked
                         ? `added into ~${current}'s charts`
-                        : 'tap to switch'}
+                        : `tap to switch${how(account.token) ? ` · ${how(account.token)}` : ''}`}
                   </Micro>
                 </View>
               </Pressable>
@@ -155,6 +176,26 @@ export function AccountScreen() {
             );
           })}
         </View>
+
+        {oauth && clientId && (
+          <>
+            <Label style={[styles.head, styles.gap]}>github access</Label>
+            <Micro style={styles.note}>
+              signed in with github · disconnecting forgets the token on this phone; github keeps
+              the grant until it is revoked there · an organisation that restricts apps stays
+              hidden until it approves git-huh, which is asked for on the same page
+            </Micro>
+            <View style={styles.chips}>
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => Linking.openURL(authorizedAppUrl(clientId)).catch(() => {})}
+                style={styles.chip}
+              >
+                <Label style={styles.ink}>organisations and revoking →</Label>
+              </Pressable>
+            </View>
+          </>
+        )}
 
         <View style={styles.actions}>
           <Pressable

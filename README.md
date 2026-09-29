@@ -16,7 +16,7 @@ inbox you can clear from your phone.
 
 ## What it is
 
-GitHub already knows a lot about how you work. git-huh draws it: fourteen
+GitHub already knows a lot about how you work. git-huh draws it: seventeen
 screens, each laid out after a pin from a moodboard (an IBM poster, a
 correspondence drawer, a Sankey diagram, a weather app, letters on a
 spiral) and drawn in the home-screen widget's marks — one mono face, one ink,
@@ -26,9 +26,9 @@ sections on the system's own tab bar.
 | section | views | |
 |---|---|---|
 | **today** | you · now · weather · hours | the widget with room to breathe and a feed that keeps going, today in lit dots, your streak as a forecast, when in the day you commit |
-| **inbox** | recent | review requests, mentions, reviews and replies — swipe to mark done or snooze until morning |
+| **inbox** | recent · review · assigned | review requests, mentions, reviews and replies — swipe to mark done or snooze until morning; the review queue, longest wait first, with what moved since you looked; everything assigned to you across every repository |
 | **work** | pulls · brief · cycle · repos | your open pull requests, one read in full, time to merge, a deck of repositories |
-| **year** | weeks · split · languages · years | every year of contributions, where they went, what they were written in |
+| **year** | weeks · split · languages · years · people | every year of contributions, where they went, what they were written in, and who you reviewed with |
 | **lab** | zoomed out | the widget pulled back from a few months to the whole year |
 
 It also does the things that usually end with "I'll do it on the laptop":
@@ -52,7 +52,7 @@ It also does the things that usually end with "I'll do it on the laptop":
   into one year if your work is split between a work login and your own.
 - **Share a chart** as a 4:3 image, drawn for a timeline rather than cropped
   from the phone.
-- A **demo** with generated data if you want to look before pasting a token.
+- A **demo** with generated data if you want to look before signing in.
 
 The widget is the dot field and a line from your own history, travelling
 across the card: no counts, no badges, today marked with a plus in the corner.
@@ -72,8 +72,15 @@ and open it on your phone (Android 7 or newer; the widget's travelling line and
 wallpaper colour need Android 12). You will be asked to allow installs from
 your browser or file manager.
 
-Then paste a [classic personal access token](https://github.com/settings/tokens/new?scopes=read:user,repo,read:discussion,write:discussion,security_events&description=git-huh)
-with these scopes, or tap **try the demo**:
+Then tap **sign in with github**: the app shows an eight-letter code, you
+enter it at github.com/login/device, and it signs in. There is no password
+field and no redirect, and the app has no client secret. It uses OAuth's device flow, so
+nothing but GitHub ever sees the token. An organisation that restricts
+third-party apps stays hidden until it approves git-huh; the account page
+links to where you ask.
+
+Or paste a [classic personal access token](https://github.com/settings/tokens/new?scopes=read:user,repo,read:discussion,write:discussion,security_events&description=git-huh)
+with the same scopes (a fine-grained token works too), or tap **try the demo**:
 
 | scope | what it is for |
 |---|---|
@@ -107,6 +114,12 @@ cd android
 
 It signs with `GITHUH_UPLOAD_*` from `~/.gradle/gradle.properties` if you
 have set them, and with the debug key if you have not.
+
+**Sign in with GitHub** needs an OAuth app. [Register one](https://github.com/settings/applications/new)
+(any homepage and callback URL; neither is used), tick **Enable Device
+Flow**, and put its client id in `app.json` → `expo.extra.githubClientId`. A
+client id is not a secret, and no secret is needed. With the field empty the
+sign-in page offers the token field alone.
 
 Checks:
 

@@ -23,6 +23,9 @@ import type {
   RepoInfo,
 } from './repo';
 import type { Thread } from './thread';
+import type { Queue } from './queue';
+import type { Task, Tasks } from './assigned';
+import { tallyPeople, type People } from './people';
 
 /** Mulberry32 — tiny seeded PRNG so demo data is stable across renders. */
 function rng(seed: number): () => number {
@@ -1085,4 +1088,194 @@ export function demoTemplates(): IssueTemplate[] {
       fields: [],
     },
   ];
+}
+
+const daysAgo = (days: number, now: number = Date.now()) =>
+  new Date(now - days * 86_400_000).toISOString();
+
+/**
+ * A review queue with every kind of wait in it — asked this morning, asked a
+ * fortnight ago, asked through a team — and reviews that have moved since.
+ */
+export function demoQueue(): Queue {
+  const pull = (repo: string, number: number) => `https://github.com/${repo}/pull/${number}`;
+  return {
+    askedTotal: 4,
+    asked: [
+      {
+        repo: 'halftone-labs/tokens',
+        number: 81,
+        title: 'refactor: one source for the spacing scale',
+        url: pull('halftone-labs/tokens', 81),
+        author: 'marcusleroy',
+        askedAt: daysAgo(33),
+        viaTeam: true,
+        draft: false,
+        additions: 412,
+        deletions: 388,
+        files: 23,
+      },
+      {
+        repo: 'halftone-labs/tokens',
+        number: 88,
+        title: 'fix: keystore path on fresh clones',
+        url: pull('halftone-labs/tokens', 88),
+        author: 'siyakapoor',
+        askedAt: daysAgo(9),
+        viaTeam: false,
+        draft: false,
+        additions: 14,
+        deletions: 6,
+        files: 2,
+      },
+      {
+        repo: 'annapetrova/plotter-fonts',
+        number: 12,
+        title: 'feat: single-stroke numerals for the pen plotter',
+        url: pull('annapetrova/plotter-fonts', 12),
+        author: 'annapetrova',
+        askedAt: daysAgo(3),
+        viaTeam: false,
+        draft: false,
+        additions: 96,
+        deletions: 3,
+        files: 5,
+      },
+      {
+        repo: `${DEMO_LOGIN}/git-huh`,
+        number: 147,
+        title: 'widget: honour the launcher corner radius',
+        url: pull(`${DEMO_LOGIN}/git-huh`, 147),
+        author: 'devonwrites',
+        askedAt: daysAgo(0.2),
+        viaTeam: false,
+        draft: true,
+        additions: 38,
+        deletions: 21,
+        files: 3,
+      },
+    ],
+    reviewed: [
+      {
+        repo: 'halftone-labs/tokens',
+        number: 79,
+        title: 'chore: drop the node 18 matrix',
+        url: pull('halftone-labs/tokens', 79),
+        author: 'siyakapoor',
+        state: 'CHANGES_REQUESTED',
+        reviewedAt: daysAgo(4),
+        since: 3,
+      },
+      {
+        repo: 'annapetrova/plotter-fonts',
+        number: 9,
+        title: 'docs: how the kerning table is generated',
+        url: pull('annapetrova/plotter-fonts', 9),
+        author: 'annapetrova',
+        state: 'APPROVED',
+        reviewedAt: daysAgo(2),
+        since: 0,
+      },
+      {
+        repo: 'marcusleroy/dotfiles',
+        number: 30,
+        title: 'zsh: lazy-load the version managers',
+        url: pull('marcusleroy/dotfiles', 30),
+        author: 'marcusleroy',
+        state: 'COMMENTED',
+        reviewedAt: daysAgo(11),
+        since: 0,
+      },
+    ],
+  };
+}
+
+/** Assigned work and filed issues across a few repositories, some with dates. */
+export function demoTasks(): Tasks {
+  const task = (
+    kind: Task['kind'],
+    repo: string,
+    number: number,
+    title: string,
+    quiet: number,
+    extra: Partial<Task> = {},
+  ): Task => ({
+    kind,
+    repo,
+    number,
+    title,
+    url: `https://github.com/${repo}/${kind === 'pull' ? 'pull' : 'issues'}/${number}`,
+    author: DEMO_LOGIN,
+    createdAt: daysAgo(quiet + 20),
+    updatedAt: daysAgo(quiet),
+    replies: 0,
+    labels: [],
+    milestone: null,
+    draft: false,
+    ...extra,
+  });
+  const now = new Date();
+  const due = (days: number) =>
+    new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + days)).toISOString();
+  const assigned = [
+    task('issue', 'halftone-labs/tokens', 401, 'Widget stops updating after a theme change', 0.5, {
+      author: 'devonwrites',
+      replies: 6,
+      labels: ['bug', 'widget'],
+      milestone: { title: 'v2.4', dueOn: due(4) },
+    }),
+    task('issue', 'halftone-labs/tokens', 377, 'Document the contrast ratios for every ink', 18, {
+      author: 'marcusleroy',
+      replies: 2,
+      labels: ['docs'],
+      milestone: { title: 'v2.3', dueOn: due(-6) },
+    }),
+    task('pull', `${DEMO_LOGIN}/git-huh`, 142, 'feat: adaptive icon monochrome layer', 1, { replies: 4 }),
+    task('issue', `${DEMO_LOGIN}/git-huh`, 133, 'Share card: long repository names run off the frame', 40, {
+      author: 'annapetrova',
+      replies: 1,
+      labels: ['share'],
+    }),
+  ];
+  const filed = [
+    task('issue', 'annapetrova/plotter-fonts', 14, 'The zero and the capital O are the same glyph', 5, {
+      replies: 3,
+    }),
+    task('issue', 'expo/expo', 38211, 'NativeTabs: indicator colour ignored after a scheme change', 52, {
+      replies: 11,
+      labels: ['Issue accepted', 'Router'],
+    }),
+  ];
+  return { assigned, assignedTotal: assigned.length, filed, filedTotal: filed.length };
+}
+
+/** Five colleagues and a year of reviews between them and the demo account. */
+export function demoPeople(now: Date = new Date()): People {
+  const random = rng(4242);
+  const cast: [string, number, number][] = [
+    ['annapetrova', 23, 18],
+    ['marcusleroy', 14, 21],
+    ['siyakapoor', 9, 6],
+    ['devonwrites', 2, 7],
+    ['tomasz-k', 3, 0],
+    ['lin-hao', 0, 2],
+  ];
+  const when = () => new Date(now.getTime() - Math.floor(random() * random() * 360) * 86_400_000).toISOString();
+  const user = (login: string) => ({ __typename: 'User', login });
+  const mine = cast.flatMap(([login, reviewedYou]) =>
+    Array.from({ length: reviewedYou }, () => {
+      const at = when();
+      return { createdAt: at, reviews: { nodes: [{ author: user(login), submittedAt: at }] } };
+    }),
+  );
+  const theirs = cast.flatMap(([login, , youReviewed]) =>
+    Array.from({ length: youReviewed }, () => {
+      const at = when();
+      return { createdAt: at, author: user(login), reviews: { nodes: [{ submittedAt: at }] } };
+    }),
+  );
+  return {
+    ...tallyPeople(mine, theirs, DEMO_LOGIN, now),
+    sample: { mine: 50, mineTotal: 64, theirs: theirs.length, theirsTotal: theirs.length },
+  };
 }

@@ -6,7 +6,7 @@
 you without reaching for a laptop.** The numbers GitHub already has about
 you — a year of contributions, the languages, the repos, the pull requests
 and the arguments in them — drawn the way the home-screen widget draws them rather than as a
-dashboard: fourteen screens, each laid out after a pin from the "nothing
+dashboard: seventeen screens, each laid out after a pin from the "nothing
 github" Pinterest board and all drawn in the widget's marks (one mono face,
 one ink, dots whose size is the data, a plus for today, a wave for a
 silence), grouped into five sections, plus
@@ -21,8 +21,9 @@ re-run and approvals, repositories with code search, files you can edit into
 a pull request, issues (forms included), discussions, releases, security
 alerts, several accounts, and everything readable offline.
 
-It is personal: you paste a token (or several), and nothing leaves the
-device except requests to GitHub.
+It is personal: you sign in with GitHub (OAuth's device flow, no server, no
+client secret) or paste a token, for one account or several, and nothing
+leaves the device except requests to GitHub.
 
 The repository is public, under the GPL v3.0 or later (`LICENSE`;
 third-party parts in `THIRD-PARTY-NOTICES.md`). The pins
@@ -125,8 +126,8 @@ compiled on a Mac.
 ## Layout
 
 - `src/screens/` — one file per screen: `Hey`, `Now`, `Weather`, `Clock`,
-  `Inbox`, `Index`, `Brief`, `Review`, `Cards`, `Poster`, `Flow`, `Orbit`,
-  `Archive`, `Dots` (the `lab`'s *zoomed out*), plus `Loading` (the widget's
+  `Inbox`, `Queue` (`inbox · review`), `Assigned`, `Index`, `Brief`, `Review`, `Cards`, `Poster`, `Flow`, `Orbit`,
+  `Archive`, `People` (`year · people`), `Dots` (the `lab`'s *zoomed out*), plus `Loading` (the widget's
   card with a light sweeping its dots, shown while the first request is in
   flight), and the pushed pages: `Pull`, `Thread` (issue or discussion),
   `Repo`, `File`, `NewIssue`, `Account` (behind the avatar in every section's
@@ -187,8 +188,8 @@ compiled on a Mac.
   (`SessionProvider`, `useSession`) holds the token, the year, the inbox and
   the pushed pages above the navigator, and reads which section is open from
   the path. `src/shell/sections.ts` `SECTIONS` is the whole map: `today` (you · now · weather · hours),
-  `inbox` (recent), `work` (pulls · brief · cycle · repos), `year` (weeks ·
-  split · languages · years) and `lab` (zoomed out), which is where an
+  `inbox` (recent · review · assigned), `work` (pulls · brief · cycle · repos), `year` (weeks ·
+  split · languages · years · people) and `lab` (zoomed out), which is where an
   unfinished artefact lives until it earns a place in one of the other four.
   The in-section switcher is `src/components/Segments.tsx`. Apple's HIG is the reference: three to five persistent
   labelled destinations, no drawer, no hamburger, segmented control for views
@@ -201,8 +202,10 @@ compiled on a Mac.
   they have horizontal scrollers of their own (the diff, a file, a log), and
   a horizontal scroller nested inside a pager loses every drag to the page
   swipe — which is also why the poster's year chips wrap instead of
-  scrolling. A one-view section (`inbox`, `lab`) turns its pager's scrolling
-  off, or the inbox's swipe actions would lose their drag the same way.
+  scrolling. A one-view section (`lab`) and `inbox` (`swipe: false` in
+  `sections.ts`) turn their pager's scrolling off, or the inbox's swipe
+  actions would lose their drag the same way — the inbox's views change from
+  the segments alone.
 - `src/lib/activity.ts` — the second-tier data layer: sampled commit history
   and pull request detail. `src/lib/social.ts` — the `inbox` section's feed,
   built from search plus each PR's comment and review connections
@@ -221,6 +224,24 @@ compiled on a Mac.
   34-character lines for a week. `src/lib/commitLines.ts` fills it, oldest-heavy,
   from the REST commit-search endpoint — GraphQL has no commit search, and
   `activity.ts` only ever sees the last few days.
+- **Signing in** is OAuth's device flow, `src/lib/oauth.ts` (pure, tested):
+  a code shown on the sign-in page, typed at github.com/login/device, polled
+  for. No client secret exists anywhere — the web flow would need one, and a
+  public app cannot keep it. The client id is `app.json` →
+  `expo.extra.githubClientId` (`src/lib/oauthConfig.ts`); **empty means no
+  OAuth app is behind this build** and the sign-in page is the token form
+  alone. To turn it on: register an OAuth app on GitHub, tick *Enable Device
+  Flow*, paste its client id there, rebuild. A signed-in token is a `gho_`
+  token stored exactly like a pasted one; `tokenKind` reads how an account
+  came in from the prefix, so nothing extra is stored. Disconnecting cannot
+  revoke an OAuth grant (that needs the secret), so the account page links to
+  GitHub's page for it.
+- `src/lib/queue.ts` (review requests, the wait counted from the
+  `ReviewRequestedEvent`, and your reviews with commits since),
+  `src/lib/assigned.ts` (assigned and filed, across repositories) and
+  `src/lib/people.ts` (a year of reviews both ways, a sample that says so) —
+  one GraphQL request each, through `useQueue`, `useTasks` and `usePeople`,
+  gated on the `inbox` and `year` sections.
 - `src/hooks/useTokenScopes.ts` — reads `x-oauth-scopes` off a REST call and
   drives the "no repo scope" strip in `src/shell/SectionScreen.tsx`. See the trap below.
 - `src/lib/pullDetail.ts` — one pull request in full: GraphQL for the object,
@@ -279,7 +300,7 @@ IBM Plex Mono in every role, `src/components/Type.tsx` — one ink in four
 weights on the widget's warm near-black card, and every chart built from the
 widget's marks: `DotField` (a run of days, today the plus, silences folded
 into the wave), `DotRow` (a series), `Marquee` (the travelling commit strip),
-`Card` (the surface). The only colour is `yes` / `no` (sage / clay) for what a
+`Card` (the surface), `WaitDot` (how long something has waited). The only colour is `yes` / `no` (sage / clay) for what a
 machine says — a diff, a check, a review — always beside a word or sign.
 GitHub's language and label colours are not drawn. New screens use these
 pieces; do not bring back per-screen canvases, categorical brights or a

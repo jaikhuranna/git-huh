@@ -182,10 +182,24 @@ async function putFile(
   return written.commit.sha;
 }
 
+const repoSchema = z.object({ default_branch: z.string() });
+
+/**
+ * The branch a file was read from, by name. A file opened from a code search
+ * result was read from the default branch without naming it, and every write
+ * below needs the name.
+ */
+async function baseOf(token: string, proposal: Proposal): Promise<string> {
+  if (proposal.base) return proposal.base;
+  const repo = await rest(token, `/repos/${proposal.repo}`, { schema: repoSchema });
+  return repo.default_branch;
+}
+
 /** Commit straight onto the branch the file came from. */
 export async function commitDirect(token: string, proposal: Proposal): Promise<ProposalResult> {
-  const sha = await putFile(token, proposal.repo, proposal, proposal.base);
-  return { kind: 'committed', sha, branch: proposal.base };
+  const branch = await baseOf(token, proposal);
+  const sha = await putFile(token, proposal.repo, proposal, branch);
+  return { kind: 'committed', sha, branch };
 }
 
 /**
@@ -197,10 +211,11 @@ export async function commitDirect(token: string, proposal: Proposal): Promise<P
  * collaborator: fork, branch, commit, and a pull request back upstream.
  */
 export async function proposeChange(token: string, proposal: Proposal): Promise<ProposalResult> {
+  const baseBranch = await baseOf(token, proposal);
   // The commit the file was read at. Resolved once, upstream: a fork may be
   // behind, or lack the branch entirely, and forks share their parent's
   // objects, so the new branch can start from this commit either way.
-  const base = await rest(token, `/repos/${proposal.repo}/git/ref/heads/${encodePath(proposal.base)}`, {
+  const base = await rest(token, `/repos/${proposal.repo}/git/ref/heads/${encodePath(baseBranch)}`, {
     schema: refSchema,
   });
 
@@ -227,7 +242,7 @@ export async function proposeChange(token: string, proposal: Proposal): Promise<
     body: {
       title,
       head: headOwner ? `${headOwner}:${branch}` : branch,
-      base: proposal.base,
+      base: baseBranch,
       body: description.join('\n').trim(),
     },
     schema: pullMade,

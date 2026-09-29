@@ -18,7 +18,7 @@ under them as dots whose size and weight are the data, a plus for today, and a
 hand-drawn wave where nothing happened, with how long it lasted written on it.
 Every screen is that card with more room. The layouts still come from the
 board's pins — a poster, a filing drawer, a weather page, a spiral — but the
-marks, the type and the surface are the widget's, so fourteen screens read as
+marks, the type and the surface are the widget's, so seventeen screens read as
 one thing.
 
 Three consequences, and they settle most arguments:
@@ -182,8 +182,8 @@ single strongest thing holding thirteen very different layouts together.
 **Card head.** A card that holds one thing names it the same way, smaller:
 `Card`'s `title` and `figure`.
 
-**Chips.** Outlined pill, mono label, filled when on. Used for filters,
-years, tabs. **Chips wrap; they never scroll horizontally** — the app is one
+**Chips.** Outlined pill, mono label, filled when on (`Chips` in
+`screens/shared.tsx`). Used for filters, years, tabs. **Chips wrap; they never scroll horizontally** — the app is one
 big horizontal pager and a nested horizontal scroller loses every drag to the
 page swipe. This is not a preference, it is a bug that has been fixed twice.
 
@@ -193,6 +193,11 @@ you whether the other tab is worth a tap. A bare `open / draft` does not.
 **Empty states are written, not drawn.** One mono line in the screen's own
 voice — `nothing filed here · go ship`, `outside the commit sample`,
 `nobody has said anything yet`. Never an icon, never a grey box.
+
+**Waiting is a dot.** Anything that has been waiting — a pull request on
+review, a request on you, an issue gone quiet — carries a `WaitDot`: the
+widget's dot, bigger and brighter by the day, week, fortnight and month, and
+squared off past a month, the way a peak is.
 
 **Degradation is visible.** Where the app shows a sample rather than the
 whole truth, it says so on the surface (`in 12mo`, `outside the commit

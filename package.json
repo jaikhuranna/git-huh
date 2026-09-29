@@ -1,6 +1,6 @@
 {
   "name": "git-huh",
-  "version": "0.0.3-alpha",
+  "version": "0.0.4-alpha",
   "description": "Your GitHub history as a set of printed artefacts, an inbox you can clear from your phone, and a home-screen widget.",
   "license": "GPL-3.0-or-later",
   "author": "Jai Khurana (https://github.com/jaikhuranna)",
@@ -24,6 +24,7 @@
     "buffer": "^6.0.3",
     "expo": "~57.0.23",
     "expo-background-task": "~57.0.19",
+    "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.18",
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",

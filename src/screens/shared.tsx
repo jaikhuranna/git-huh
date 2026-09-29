@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Label } from '../components/Type';
 import type { GitHubModel } from '../lib/contributions';
-import { colors, space, themed } from '../theme';
+import { GitHubError } from '../lib/github';
+import { colors, radii, space, themed } from '../theme';
 
 /**
  * Every screen opens with the same two-part caption — a name on the left and
@@ -15,6 +16,41 @@ export function ScreenHead({ left, right }: { left: string; right?: string }) {
     <View style={styles.head}>
       <Label style={styles.headLeft}>{left}</Label>
       {right ? <Label>{right}</Label> : null}
+    </View>
+  );
+}
+
+/**
+ * A screen's filter: outlined pills, the one in force filled, each carrying
+ * its count (LANGUAGE §7 — the count belongs on the control). They wrap;
+ * they never scroll sideways inside a pager.
+ */
+export function Chips<T extends string>({
+  items,
+  current,
+  onSelect,
+}: {
+  items: readonly { key: T; label: string }[];
+  current: T;
+  onSelect: (key: T) => void;
+}) {
+  return (
+    <View style={styles.chips}>
+      {items.map(({ key, label }) => {
+        const on = key === current;
+        return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            key={key}
+            onPress={() => onSelect(key)}
+            // Border and fill change together: see the corner-radius trap.
+            style={[styles.chip, on && styles.chipOn]}
+          >
+            <Label style={on ? styles.chipLabelOn : styles.chipLabel}>{label}</Label>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -76,6 +112,24 @@ export function historyLevels(model: Pick<GitHubModel, 'columns'>): number[] {
   return (today >= 0 ? days.slice(0, today + 1) : days).map((day) => day.level);
 }
 
+/**
+ * Why a read failed, in the words that say what would fix it — a failure is
+ * never drawn as an empty list (LANGUAGE §7).
+ */
+export function whyNot(error: unknown): string {
+  if (!(error instanceof GitHubError)) return 'something went wrong reading it';
+  switch (error.kind) {
+    case 'network':
+      return 'no connection, and nothing saved yet';
+    case 'invalid-token':
+      return 'github rejected the token';
+    case 'forbidden':
+      return 'this token is not allowed to read it';
+    default:
+      return 'github answered with something unexpected';
+  }
+}
+
 export function fmt(value: number): string {
   return Math.round(value).toLocaleString('en-US');
 }
@@ -120,6 +174,29 @@ const styles = themed(() =>
     },
     headLeft: {
       color: colors.ink,
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginBottom: 4,
+    },
+    chip: {
+      borderColor: colors.hairStrong,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+    },
+    chipOn: {
+      backgroundColor: colors.black,
+      borderColor: colors.black,
+    },
+    chipLabel: {
+      color: colors.ink,
+    },
+    chipLabelOn: {
+      color: colors.onBlack,
     },
     page: {
       gap: 10,

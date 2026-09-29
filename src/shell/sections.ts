@@ -7,6 +7,8 @@ export type ScreenName =
   | 'weather'
   | 'clock'
   | 'inbox'
+  | 'queue'
+  | 'assigned'
   | 'index'
   | 'brief'
   | 'review'
@@ -15,7 +17,8 @@ export type ScreenName =
   | 'flow'
   | 'orbit'
   | 'archive'
-  | 'dots';
+  | 'dots'
+  | 'people';
 
 export interface SectionView {
   name: ScreenName;
@@ -28,6 +31,12 @@ export interface Section {
   /** The route file under `app/(tabs)/` — `index` is the first tab. */
   route: string;
   views: readonly SectionView[];
+  /**
+   * False when the views are changed only from the segmented control. The
+   * inbox's rows follow a finger sideways to be put away, and a pager that
+   * also claims horizontal drags takes every one of them.
+   */
+  swipe?: boolean;
   /** iOS SF Symbol, outline and filled. */
   sf: { default: SFSymbol; selected: SFSymbol };
   /** Android Material Symbol. */
@@ -65,7 +74,12 @@ export const SECTIONS: readonly Section[] = [
   {
     key: 'inbox',
     route: 'inbox',
-    views: [{ name: 'inbox', label: 'recent' }],
+    views: [
+      { name: 'inbox', label: 'recent' },
+      { name: 'queue', label: 'review' },
+      { name: 'assigned', label: 'assigned' },
+    ],
+    swipe: false,
     sf: { default: 'tray', selected: 'tray.fill' },
     md: 'inbox',
   },
@@ -89,6 +103,7 @@ export const SECTIONS: readonly Section[] = [
       { name: 'flow', label: 'split' },
       { name: 'orbit', label: 'languages' },
       { name: 'archive', label: 'years' },
+      { name: 'people', label: 'people' },
     ],
     sf: { default: 'calendar', selected: 'calendar' },
     md: 'calendar_month',

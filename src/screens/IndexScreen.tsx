@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '../components/Card';
 import { Body, Label, Micro } from '../components/Type';
+import { WaitDot } from '../components/WaitDot';
 import type { PrsState } from '../hooks/useOpenPrs';
 import { prAge, type PullRequest } from '../lib/prs';
 import { colors, radii, themed } from '../theme';
@@ -104,19 +105,6 @@ function byRepo(prs: PullRequest[]): Group[] {
   return [...groups.entries()].map(([repo, list]) => ({ repo, prs: list }));
 }
 
-/** Days waiting → the widget's level: a day, a week, two weeks, a month. */
-function waitLevel(createdAt: string): number {
-  const days = (Date.now() - Date.parse(createdAt)) / 86_400_000;
-  if (days < 1) return 0;
-  if (days < 7) return 1;
-  if (days < 14) return 2;
-  if (days < 30) return 3;
-  return 4;
-}
-
-const WAIT_SIZE = [5, 6.5, 8, 9.5, 11];
-const WAIT_ALPHA = [0.3, 0.46, 0.66, 0.84, 1];
-
 function Row({
   pr,
   first,
@@ -126,8 +114,6 @@ function Row({
   first: boolean;
   onOpen: (pr: PullRequest) => void;
 }) {
-  const level = waitLevel(pr.createdAt);
-  const size = WAIT_SIZE[level];
   return (
     <Pressable
       accessibilityHint="opens the pull request"
@@ -136,15 +122,7 @@ function Row({
       style={[styles.row, !first && styles.rowRule]}
     >
       <View style={styles.markCell}>
-        <View
-          style={{
-            backgroundColor: colors.ink,
-            borderRadius: level === 4 ? size * 0.22 : size / 2,
-            height: size,
-            opacity: WAIT_ALPHA[level],
-            width: size,
-          }}
-        />
+        <WaitDot since={pr.createdAt} />
       </View>
       <View style={styles.rowBody}>
         <Body numberOfLines={2} style={styles.title}>

@@ -15,7 +15,10 @@ import { Linking, Platform } from 'react-native';
 import { useActivity, type ActivityState } from '../hooks/useActivity';
 import { useContributions, type ContributionsState } from '../hooks/useContributions';
 import { useOpenPrs } from '../hooks/useOpenPrs';
+import { usePeople } from '../hooks/usePeople';
+import { useQueue } from '../hooks/useQueue';
 import { useSocial, type SocialState } from '../hooks/useSocial';
+import { useTasks } from '../hooks/useTasks';
 import { useTogether } from '../hooks/useTogether';
 import { useTokenScopes } from '../hooks/useTokenScopes';
 import { useTriage } from '../hooks/useTriage';
@@ -74,6 +77,12 @@ export interface Session {
   scopes: ReturnType<typeof useTokenScopes>;
   prs: ReturnType<typeof useOpenPrs>;
   social: SocialState;
+  /** Pull requests waiting on your review, and the ones you reviewed. */
+  queue: ReturnType<typeof useQueue>;
+  /** Issues and pull requests assigned to you, and issues you filed. */
+  tasks: ReturnType<typeof useTasks>;
+  /** A year of reviews, both ways. */
+  people: ReturnType<typeof usePeople>;
   triage: ReturnType<typeof useTriage>;
   activityState: ActivityState;
   activity: Activity;
@@ -90,6 +99,8 @@ export interface Session {
   stack: Route[];
   nav: Nav;
   openEvent: (event: SocialEvent) => void;
+  /** Open a github.com link in the app if it can be, the browser if not. */
+  openUrl: (item: { url: string }) => void;
   switchTo: (token: string) => Promise<void>;
   disconnect: () => Promise<void>;
   /** The inbox tab's count. */
@@ -150,6 +161,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // know who you are and kept whichever section is open: the count on the
   // bar has to be true before you tap it.
   const social = useSocial(token ?? null, login, true);
+  const queue = useQueue(token ?? null, login, section === 'inbox');
+  const tasks = useTasks(token ?? null, login, section === 'inbox');
+  const people = usePeople(token ?? null, login, section === 'year');
   // The demo keeps its marks under its own name, never under the real login
   // it happens to borrow.
   const triage = useTriage(token === DEMO_TOKEN ? 'demo' : login);
@@ -246,15 +260,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [close, login, open, replace, token],
   );
 
-  /** A row in the inbox opens the thing it is about — here, not in a browser. */
-  const openEvent = useCallback(
-    (event: SocialEvent) => {
-      const route = routeForUrl(event.url);
+  /** A row opens the thing it is about — here, not in a browser. */
+  const openUrl = useCallback(
+    (item: { url: string }) => {
+      const route = routeForUrl(item.url);
       if (route) open(route);
-      else Linking.openURL(event.url).catch(() => {});
+      else Linking.openURL(item.url).catch(() => {});
     },
     [open],
   );
+  const openEvent: (event: SocialEvent) => void = openUrl;
 
   // Every account this phone has been given, kept beside the current token.
   useEffect(() => {
@@ -465,6 +480,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       scopes,
       prs,
       social,
+      queue,
+      tasks,
+      people,
       triage,
       activityState,
       activity,
@@ -477,6 +495,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       stack,
       nav,
       openEvent,
+      openUrl,
       switchTo,
       disconnect,
       wanting,
@@ -494,8 +513,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       model,
       nav,
       openEvent,
+      openUrl,
       pages,
+      people,
       prs,
+      queue,
       scopes,
       words,
       setHome,
@@ -505,6 +527,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       summed.missing,
       switchTo,
       tab,
+      tasks,
       together,
       toggleTogether,
       token,

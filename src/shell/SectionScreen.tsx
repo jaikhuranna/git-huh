@@ -17,6 +17,7 @@ import { Wordmark } from '../components/Wordmark';
 import { shareKindOf } from '../lib/shareData';
 import { savedAge } from '../lib/store';
 import { ArchiveScreen as ArchiveView } from '../screens/ArchiveScreen';
+import { AssignedScreen as AssignedView } from '../screens/AssignedScreen';
 import { BriefScreen as BriefView } from '../screens/BriefScreen';
 import { CardsScreen as CardsView } from '../screens/CardsScreen';
 import { ClockScreen as ClockView } from '../screens/ClockScreen';
@@ -27,7 +28,9 @@ import { InboxScreen as InboxView } from '../screens/InboxScreen';
 import { IndexScreen as IndexView } from '../screens/IndexScreen';
 import { NowScreen as NowView } from '../screens/NowScreen';
 import { OrbitScreen as OrbitView } from '../screens/OrbitScreen';
+import { PeopleScreen as PeopleView } from '../screens/PeopleScreen';
 import { PosterScreen as PosterView } from '../screens/PosterScreen';
+import { QueueScreen as QueueView } from '../screens/QueueScreen';
 import { ReviewScreen as ReviewView } from '../screens/ReviewScreen';
 import { WeatherScreen as WeatherView } from '../screens/WeatherScreen';
 import { colors, radii, space, themed } from '../theme';
@@ -40,6 +43,7 @@ import { useSession } from './session';
  * when its own data does, not whenever any of the fourteen's does.
  */
 const ArchiveScreen = memo(ArchiveView);
+const AssignedScreen = memo(AssignedView);
 const BriefScreen = memo(BriefView);
 const CardsScreen = memo(CardsView);
 const ClockScreen = memo(ClockView);
@@ -50,7 +54,9 @@ const InboxScreen = memo(InboxView);
 const IndexScreen = memo(IndexView);
 const NowScreen = memo(NowView);
 const OrbitScreen = memo(OrbitView);
+const PeopleScreen = memo(PeopleView);
 const PosterScreen = memo(PosterView);
+const QueueScreen = memo(QueueView);
 const ReviewScreen = memo(ReviewView);
 const WeatherScreen = memo(WeatherView);
 
@@ -87,6 +93,7 @@ function ScopeNotice() {
  */
 function SectionPager({
   views,
+  swipe,
   page,
   onPage,
   active,
@@ -94,6 +101,7 @@ function SectionPager({
   render,
 }: {
   views: readonly SectionView[];
+  swipe: boolean;
   page: number;
   onPage: (index: number) => void;
   active: boolean;
@@ -131,9 +139,10 @@ function SectionPager({
         }}
         pagingEnabled
         ref={pager}
-        // A one-view section has nothing to page to, and a pager that still
-        // claims horizontal drags would eat the inbox's swipe actions.
-        scrollEnabled={views.length > 1}
+        // A one-view section has nothing to page to, and a pager that
+        // claims horizontal drags would eat the inbox's swipe actions — so
+        // the inbox changes view from its segments alone.
+        scrollEnabled={swipe && views.length > 1}
         showsHorizontalScrollIndicator={false}
         style={styles.pager}
       >
@@ -201,6 +210,10 @@ export function SectionScreen({ index }: { index: number }) {
         return <ClockScreen activity={activity} loading={loadingActivity} />;
       case 'inbox':
         return <InboxScreen onOpen={session.openEvent} state={social} triage={triage} />;
+      case 'queue':
+        return <QueueScreen onOpen={openPull} state={session.queue} />;
+      case 'assigned':
+        return <AssignedScreen onOpen={session.openUrl} state={session.tasks} />;
       case 'index':
         return (
           <IndexScreen onOpen={openPull} state={prs} />
@@ -221,6 +234,8 @@ export function SectionScreen({ index }: { index: number }) {
         return <OrbitScreen active={live} model={model} />;
       case 'archive':
         return <ArchiveScreen model={model} />;
+      case 'people':
+        return <PeopleScreen state={session.people} />;
       case 'dots':
         return <DotsScreen active={live} lines={session.lines} model={model} />;
     }
@@ -278,6 +293,7 @@ export function SectionScreen({ index }: { index: number }) {
           onPage={onPage}
           page={pages[index]}
           render={render}
+          swipe={section.swipe !== false}
           views={section.views}
           width={width}
         />

@@ -70,6 +70,13 @@ one keeps those endings inside.
 9. **I want to know the difference between "nobody said anything" and "GitHub
    would not tell us".** Two different facts, two different lines.
    → `inbox` empty and error states.
+9a. **I want to know who is waiting on me, and for how long** — counted from
+   when they asked me, not from when they opened it — and how much reading
+   each one is before I open it. → `inbox · review`.
+9b. **I want to know which of the ones I already reviewed have moved since.**
+   → `inbox · review` → `reviewed`, `3 new commits`.
+9c. **I want everything assigned to me in one place**, not one repository at
+   a time, with the one that has gone quiet standing out. → `inbox · assigned`.
 
 ### work — *what I am shipping*
 
@@ -102,6 +109,8 @@ one keeps those endings inside.
     → `languages`.
 20. **I want to compare this year with the ones before it**, drawn from each
     year's own calendar rather than a twelve-bar summary. → `years`.
+20a. **I want to see who I actually worked with** — who reviewed me, whom I
+    reviewed, and whether it was give or take. → `people`.
 
 ### lab — *not finished*
 
@@ -126,6 +135,9 @@ one keeps those endings inside.
 
 ### the account
 
+21a. **I want to sign in the way every other app signs in**, without making a
+    token by hand and without handing a password to anyone but GitHub. →
+    `sign in with github`: a code, typed on github.com.
 22. **I want to paste a token once and never see a login again.** Stored in the
     keystore, restored on launch, never sent anywhere but GitHub. And a
     second one beside it, for the work account — and both **added up**, because
@@ -146,8 +158,11 @@ one keeps those endings inside.
 ### first run
 
     launch → loading wave (stand-in commit subjects)
-           → paste a token   ─┬─ verified → keystore → contributions request
-                              └─ rejected → error line, form stays
+           → sign in with github → a code → copy and open github
+                              → typed on github.com/login/device ─┬─ yes → keystore → contributions request
+                                                                  └─ no / ran out → a line saying which, form stays
+             or paste a token ─┬─ verified → keystore → contributions request
+                               └─ rejected → error line, form stays
            → loading wave (your own commit messages, from the pool)
            → today · you
 
@@ -239,6 +254,9 @@ is mostly *yes*, because this list is the brief the app was built to.
 | 15 | organise the inbox — swipe actions, folders | people ask for Spark-style swipes and custom notification folders by name | **yes** — swipe left `done`, right `snooze`; `snoozed` and `done` folders; anything written on again comes back |
 | 16 | make the small change from the phone — a branch, a file, a pull request | the one-line typo fix at a bus stop is the reason the app is open | **yes** — edit a file, then a new branch and pull request (through a fork if you cannot push), or a commit straight onto the branch |
 | 17 | comment on any line, not only changed ones | context lines are where half of review comments belong | **yes** — tap any line in `files` |
+| 18 | a review queue — what is waiting on me, oldest first | the inbox mixes requests with everything else | **yes** — `inbox · review`, waits counted from the request, with what moved since you reviewed |
+| 19 | everything assigned to me across repositories | GitHub's app files assignments per repository | **yes** — `inbox · assigned` |
+| 20 | sign in without making a token | pasting a PAT is the first thing that stops people | **yes** — the device flow; a token still works |
 
 Still **no**: creating a *new* file or repository, merging, and anything in
 repository settings. None of them was on anyone's list above the fold.
@@ -283,8 +301,10 @@ already are, and nothing tells you what is on the other side.
 What replaced it is in `DESIGN.md` § Navigation — five sections, a bar that
 is always visible, and a segmented control for the views inside a section.
 The stories above are the argument for the grouping: story 6 is why `inbox`
-is a destination and not a paragraph under a greeting; stories 10–16 are why
-`pulls`, `brief`, `cycle` and `repos` are one place; stories 17–20 are why
+is a destination and not a paragraph under a greeting, and 9a–9c are why the
+queue and the assignments are views of it rather than of `work` — they are
+things waiting on you, not things you are shipping; stories 10–16 are why
+`pulls`, `brief`, `cycle` and `repos` are one place; stories 17–20a are why
 the whole retrospective is one tab you can ignore on a Tuesday.
 
 ---

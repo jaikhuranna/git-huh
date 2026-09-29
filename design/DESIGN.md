@@ -368,6 +368,62 @@ the reviewer is somebody else, it says that instead of offering a button. A
 failed Actions job opens to the end of its log: the error annotations in clay,
 then the last forty lines in mono.
 
+### 20. `review` — the queue, filed like pin03 (`inbox`)
+
+The review requests out of the inbox, on a page of their own and read from the
+front. `ScreenHead` `waiting on you` · `{n} to review`, chips `asked {n}` ·
+`reviewed {n} · {m} moved`.
+
+**asked**: a card named `the queue` with `oldest {age}` as its figure, holding one
+of the widget's wait dots per pull request (`WaitDot`, the same dot `pulls` uses:
+bigger and brighter by the day, week, fortnight and month, squared off past a month),
+oldest on the left, and one sentence in the `you` page's voice — `4 pull requests,
+about 978 changed lines across 33 files. the oldest was asked 1mo ago; 1 came through
+a team.` Then a card per pull request, longest wait first: the author's picture and
+handle, the wait dot and `asked 9d ago`, the title, `repo #n · 5 files · draft · via a
+team`, and the change's size as `DiffDots`. **The wait is counted from when you were
+asked**, from the pull request's `ReviewRequestedEvent`s (the newest naming you, else
+the newest to a team), not from when it was opened — a change can sit for a month
+before anyone asks you. Past thirty the foot says `the 30 longest waits of {n}`.
+
+**reviewed**: open pull requests of other people's that you reviewed, in one card.
+Each row is your verdict as a `StateChip` (`you approved` sage, `you asked for
+changes` clay, `you commented` faint) and, on the right, **`{n} new commits`** in
+medium ink when commits were written after your review — the reason to look again —
+or `nothing new`. Moved rows come first. A pull request you were asked to review again
+is in `asked`, not here. Every row opens `pull`.
+
+### 21. `assigned` — what is yours to do (`inbox`)
+
+`ScreenHead` `yours to do` · `{n} assigned`, chips `assigned {n}` · `filed {n}`
+(issues you opened that are still open), then `pulls`' drawer: one card per
+repository, its name and count across the top, the rows inside. A row is the title,
+`issue #401 · quiet 3d · 6 replies` (or `pull #142 · moved today · draft`), and under
+it the milestone with its date in words (`v2.4 · due in 4d`; `3d overdue` in medium
+ink, weight rather than colour) and the labels as outlined pills in ink — GitHub's
+label colours are not drawn. The row's dot is a `WaitDot` on **how long the thread
+has been quiet** (`updatedAt`), so the assignment everyone forgot is the biggest mark
+on the page; the foot says so. Issues open `thread`, pull requests `pull`.
+
+### 22. `people` — who you work with (`year`)
+
+pin08's deck, dealt as people. `ScreenHead` `who you work with` · `last 12 months`.
+Review is the measure because it is the one place GitHub records two people working
+on the same thing on purpose; a shared repository is not that, and followers are a
+vanity figure.
+
+A card with the six busiest faces overlapping and one sentence: `5 people reviewed
+your pull requests and you reviewed 6 people's. most of it was with ~anna, who
+reviewed 23 of yours while you reviewed 18 of theirs.` Then `← reviewed yours` /
+`you reviewed theirs →` over a card per person, busiest first, up to twelve: picture,
+handle, total; a **give-and-take rule** — a stretched dot to the left of a hairline
+for their reviews of yours (`ink70`), one to the right for yours of theirs (ink), each
+with its count, on **one scale across every card**; and the twelve months as a
+`DotRow` on the shared month window, three quiet months the wave, month initials on
+the last card only. A person counts once per pull request however many rounds it
+took. Bots and you are left out. The foot is the sample: `from your last 50 pull
+requests of 64 and all 38 you reviewed · bots left out`.
+
 ### Writing back
 
 Every write is the same object, `Composer`: one box, a row of verbs as
@@ -441,9 +497,9 @@ to. `STORIES.md` is why the grouping is this grouping.
 | section | views (segmented control) | the question it answers |
 |---|---|---|
 | `today` | `you` · `now` · `weather` · `hours` | how am I doing |
-| `inbox` | `recent` | what wants me |
+| `inbox` | `recent` · `review` · `assigned` | what wants me |
 | `work` | `pulls` · `brief` · `cycle` · `repos` | what am I shipping |
-| `year` | `weeks` · `split` · `languages` · `years` | what was the year |
+| `year` | `weeks` · `split` · `languages` · `years` · `people` | what was the year |
 | `lab` | `zoomed out` | the widget, pulled back to the whole year |
 
 - **Bar**: the system's own tab bar, through expo-router's `NativeTabs`
@@ -459,7 +515,10 @@ to. `STORIES.md` is why the grouping is this grouping.
   app's wave under it — the widget's `repo ~~~ message` weights. Hidden when a section
   has one view. The row **wraps, it never scrolls**.
 - **Swiping** moves between views *within* a section and stops at its edges,
-  so a drag never carries you three destinations away.
+  so a drag never carries you three destinations away. **Except in `inbox`**,
+  which changes view from its segments alone (`swipe: false` in `sections.ts`):
+  its rows follow a finger sideways to be put away, and a pager claiming the
+  same drag would take every one of them.
 - **Sections keep their place.** Each remembers which view you left it on,
   and mounts the first time it is opened rather than on launch, so nothing
   is built before it is looked at. A mounted screen is memoised and redraws
@@ -490,7 +549,7 @@ fact with the month along the foot — so a run of them reads as a series.
 | `years` | every year on github | a column per year, the last twelve |
 | `hours` | when I commit | 24 bars from the sampled commits |
 
-Lists (`inbox`, `pulls`, `brief`, `cycle`, `repos`) have no card. Every list on a card is
+Lists (`inbox`, `review`, `assigned`, `pulls`, `brief`, `cycle`, `repos`, `people`) have no card. Every list on a card is
 capped in `lib/shareData.ts` and big figures are shortened (`12.3k`), so no account can
 push anything off the frame; a card with nothing to draw says so in the chart's place.
 The card follows the phone's light or dark.
@@ -512,9 +571,29 @@ rank as the pull request drawer.)*
 
 ## Sign-in (`PatForm`)
 
-`hey,` / `paste a token and i'll read the year.`, a card holding a stand-in field of the
-widget's dots, mono input with a hairline underline, filled pill `connect`, ghost pill
-`try the demo`, the app's version top right. Error text in `no`.
+`hey,` / `sign in and i'll read the year.`, a card holding a stand-in field of the
+widget's dots, the filled pill **`sign in with github`** and the ghost pill `try the
+demo`, then `or paste a token`: a mono input with a hairline underline and an outlined
+`connect` beside it, the scopes line, and `make a token on github →`. The app's
+version top right. Error text in `no`.
+
+**Signing in is OAuth's device flow** (`lib/oauth.ts`), because the web flow needs a
+client secret and a public app cannot keep one. `sign in with github` asks GitHub for
+a code and the card turns into it: `type this on github`, the eight letters in the
+light display cut (`WDJB-MJHT`, selectable), `github.com/login/device · good for 14
+min`, and one filled button, `copy and open github →`, which puts the code on the
+clipboard and opens the page. The page polls at the interval GitHub sets (backing off
+on `slow_down`, riding out a dropped connection) while the token form hides and `stop`
+replaces the button. Each way it can end is its own line: the code ran out, github was
+told no, this build cannot sign in by code. The token that comes back is stored and
+verified exactly as a pasted one is, and asks for the same scopes.
+
+The client id is `app.json` → `expo.extra.githubClientId` (`lib/oauthConfig.ts`).
+Empty, the page is the token form alone and says `paste a token`. The account page
+says how each account came in (`signed in with github`, `token`, `fine-grained
+token`, from the token's own prefix) and, for a signed-in one, links to GitHub's page
+for the grant — revoking it, and asking an organisation that restricts OAuth apps to
+allow git-huh, which a token never needs.
 
 ## The widget
 
@@ -666,5 +745,8 @@ Everything the GraphQL API gives that is worth showing must be surfaced:
 | per-repo commits by month | cards |
 | PR comments, review threads, review state | hey (feed), review, pull |
 | review requests, mentions | hey (feed) |
+| review requests with when you were asked, size, files; your last review + commits since | review |
+| issues and PRs assigned to you, issues you filed: labels, milestone due date, replies, last update | assigned |
+| reviews of your PRs by person, your reviews of theirs, by month | people |
 | PR body, file patches, diff hunks, base/head refs | pull |
 | oldest + newest commit subjects (commit search) | loading |
