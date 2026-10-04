@@ -138,7 +138,7 @@ widget's own corner) · `tile` 14 · `pill` 999.
 Motion is still rare, and now it is the widget's: things **travel**.
 
 - **The strip travels** (`Marquee`) — your commit messages, `repo ~~~ message`,
-  sliding left on the `you` page, the lab and the loading card.
+  sliding left on the `you` page and the loading card.
 - **The light sweeps** through the loading card's dots towards today.
 - **The spiral turns** on `languages`.
 
@@ -206,12 +206,16 @@ without a connection carries its age — `offline · saved 3h ago` — and a
 refusal is never drawn as an empty list: "this token cannot read security
 alerts" is a different sentence from "no open alerts".
 
-**Writing is one object.** Every write goes through `Composer`: one box, a
+**Writing to GitHub is one object.** Every remote write goes through `Composer`: one box, a
 row of verbs, a line under them. The verb names the act (`approve`,
 `request changes`, `comment on this line`, `propose change`), nothing leaves
 until it is pressed, the result is said in words in `yes` or `no`, and a
 failure keeps the text. The words for a failure name the one thing that
 would change it — the scope, the connection, the token.
+
+**Local ideas.** The notebook uses one multiline input and an explicit save
+button. It clears only after the device has saved successfully; failures
+keep the draft. Plain cards, edit and delete actions, no extra filters.
 
 **A gesture always has a second way in.** The inbox's swipe actions are
 also accessibility actions on the row, and the words `done` and `snooze`

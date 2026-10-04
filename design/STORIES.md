@@ -112,13 +112,12 @@ one keeps those endings inside.
 20a. **I want to see who I actually worked with** — who reviewed me, whom I
     reviewed, and whether it was give or take. → `people`.
 
-### lab — *not finished*
+### ideas — *what to build next*
 
-21. **I want somewhere for the ideas that are not load-bearing yet.** A screen
-    in `lab` is allowed to be a toy, to be slow, or to be wrong on an empty
-    account. Nothing in `lab` is linked to from anywhere else, and a screen
-    leaves `lab` by earning a place in one of the four sections above.
-    → `zoomed out` today: the widget, pulled back to the whole year.
+21. **I want to jot down a project before I forget it.** One text box and an
+    `add idea` button, then a newest-first list with `edit` and `delete`.
+    Ideas stay on this device across restarts and account changes. Nothing
+    is sent to GitHub. The demo has its own separate notebook. → `ideas`.
 
 ### writing back
 

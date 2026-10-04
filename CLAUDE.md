@@ -127,7 +127,7 @@ compiled on a Mac.
 
 - `src/screens/` — one file per screen: `Hey`, `Now`, `Weather`, `Clock`,
   `Inbox`, `Queue` (`inbox · review`), `Assigned`, `Index`, `Brief`, `Review`, `Cards`, `Poster`, `Flow`, `Orbit`,
-  `Archive`, `People` (`year · people`), `Dots` (the `lab`'s *zoomed out*), plus `Loading` (the widget's
+  `Archive`, `People` (`year · people`), `Ideas` (local project notes), `Dots` (unlinked legacy view), plus `Loading` (the widget's
   card with a light sweeping its dots, shown while the first request is in
   flight), and the pushed pages: `Pull`, `Thread` (issue or discussion),
   `Repo`, `File`, `NewIssue`, `Account` (behind the avatar in every section's
@@ -144,11 +144,14 @@ compiled on a Mac.
   it, and offline the saved one stays with its age. New data sources should
   use it rather than a hand-rolled hook. Cache keys start with the lowercase
   login and a dash, so `accountStore.remove` can clear an account's answers.
-- **Every write** is in `src/lib/writes.ts` (comments, reviews, line
+- **Every GitHub write** is in `src/lib/writes.ts` (comments, reviews, line
   comments, issues, the edit → branch → pull request flow including the
   fork fallback) and `src/lib/checks.ts` (re-run, approvals), and every
-  write in the UI goes through `src/components/Composer.tsx`. On the demo
+  GitHub write in the UI goes through `src/components/Composer.tsx`. On the demo
   token the composer answers `nothing was sent` and never calls them.
+- `src/lib/ideas.ts` + `ideasStorage.ts` — project notes in a dedicated document
+  file (localStorage on web), outside account caches, with a separate demo
+  notebook. Storage failures reach the editor instead of being swallowed.
 - `src/lib/triage.ts` + `src/hooks/useTriage.ts` — the inbox's own done /
   snooze marks, per account, on the device.
 - `src/lib/notify.ts` — the background inbox check (expo-background-task,
@@ -189,8 +192,7 @@ compiled on a Mac.
   the pushed pages above the navigator, and reads which section is open from
   the path. `src/shell/sections.ts` `SECTIONS` is the whole map: `today` (you · now · weather · hours),
   `inbox` (recent · review · assigned), `work` (pulls · brief · cycle · repos), `year` (weeks ·
-  split · languages · years · people) and `lab` (zoomed out), which is where an
-  unfinished artefact lives until it earns a place in one of the other four.
+  split · languages · years · people) and `ideas` (project ideas saved locally on the device).
   The in-section switcher is `src/components/Segments.tsx`. Apple's HIG is the reference: three to five persistent
   labelled destinations, no drawer, no hamburger, segmented control for views
   of one subject. **Do not add a sixth section**, and do not put an action in
@@ -202,7 +204,7 @@ compiled on a Mac.
   they have horizontal scrollers of their own (the diff, a file, a log), and
   a horizontal scroller nested inside a pager loses every drag to the page
   swipe — which is also why the poster's year chips wrap instead of
-  scrolling. A one-view section (`lab`) and `inbox` (`swipe: false` in
+  scrolling. A one-view section (`ideas`) and `inbox` (`swipe: false` in
   `sections.ts`) turn their pager's scrolling off, or the inbox's swipe
   actions would lose their drag the same way — the inbox's views change from
   the segments alone.

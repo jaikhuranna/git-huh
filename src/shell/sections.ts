@@ -17,7 +17,7 @@ export type ScreenName =
   | 'flow'
   | 'orbit'
   | 'archive'
-  | 'dots'
+  | 'ideas'
   | 'people';
 
 export interface SectionView {
@@ -27,7 +27,7 @@ export interface SectionView {
 }
 
 export interface Section {
-  key: 'today' | 'inbox' | 'work' | 'year' | 'lab';
+  key: 'today' | 'inbox' | 'work' | 'year' | 'ideas';
   /** The route file under `app/(tabs)/` — `index` is the first tab. */
   route: string;
   views: readonly SectionView[];
@@ -50,8 +50,7 @@ export interface Section {
  * the thing I want" "swipe until it turns up". These are the four questions
  * the screens actually answer — what today
  * looks like, what wants me, what I am shipping, what the year was — plus
- * `lab`, which is where an artefact lives until it has earned a place in one
- * of the other four.
+ * `ideas`, a device-local notebook for projects to build next.
  *
  * The grouping, the count and the shape all follow Apple's guidance: a flat
  * bar of persistent, labelled destinations (three to five), content and not
@@ -109,11 +108,12 @@ export const SECTIONS: readonly Section[] = [
     md: 'calendar_month',
   },
   {
-    key: 'lab',
-    route: 'lab',
-    views: [{ name: 'dots', label: 'zoomed out' }],
-    sf: { default: 'flask', selected: 'flask.fill' },
-    md: 'science',
+    key: 'ideas',
+    route: 'ideas',
+    views: [{ name: 'ideas', label: 'project ideas' }],
+    swipe: false,
+    sf: { default: 'lightbulb', selected: 'lightbulb.fill' },
+    md: 'lightbulb',
   },
 ];
 

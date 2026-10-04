@@ -21,7 +21,7 @@ import { AssignedScreen as AssignedView } from '../screens/AssignedScreen';
 import { BriefScreen as BriefView } from '../screens/BriefScreen';
 import { CardsScreen as CardsView } from '../screens/CardsScreen';
 import { ClockScreen as ClockView } from '../screens/ClockScreen';
-import { DotsScreen as DotsView } from '../screens/DotsScreen';
+import { IdeasScreen as IdeasView } from '../screens/IdeasScreen';
 import { FlowScreen as FlowView } from '../screens/FlowScreen';
 import { HeyScreen as HeyView } from '../screens/HeyScreen';
 import { InboxScreen as InboxView } from '../screens/InboxScreen';
@@ -47,7 +47,7 @@ const AssignedScreen = memo(AssignedView);
 const BriefScreen = memo(BriefView);
 const CardsScreen = memo(CardsView);
 const ClockScreen = memo(ClockView);
-const DotsScreen = memo(DotsView);
+const IdeasScreen = memo(IdeasView);
 const FlowScreen = memo(FlowView);
 const HeyScreen = memo(HeyView);
 const InboxScreen = memo(InboxView);
@@ -188,6 +188,7 @@ export function SectionScreen({ index }: { index: number }) {
   const onPage = useCallback((page: number) => goToPage(index, page), [goToPage, index]);
 
   const render = (name: ScreenName, live: boolean) => {
+    if (name === 'ideas') return <IdeasScreen key={nav.demo ? 'demo' : 'local'} demo={nav.demo} />;
     if (!model) return null;
     switch (name) {
       case 'hey':
@@ -236,8 +237,6 @@ export function SectionScreen({ index }: { index: number }) {
         return <ArchiveScreen model={model} />;
       case 'people':
         return <PeopleScreen state={session.people} />;
-      case 'dots':
-        return <DotsScreen active={live} lines={session.lines} model={model} />;
     }
   };
 
@@ -246,7 +245,7 @@ export function SectionScreen({ index }: { index: number }) {
       <View style={styles.chrome}>
         <Wordmark size={17} />
         <View style={styles.corner}>
-          {contributions.status === 'ready' &&
+          {section.key !== 'ideas' && contributions.status === 'ready' &&
             contributions.offline &&
             contributions.savedAt != null && (
               <Label numberOfLines={1} style={styles.handle}>
@@ -285,18 +284,22 @@ export function SectionScreen({ index }: { index: number }) {
         </View>
       </View>
 
-      {session.scopes === 'limited' && <ScopeNotice />}
+      {section.key !== 'ideas' && session.scopes === 'limited' && <ScopeNotice />}
 
       <View style={styles.body}>
-        <SectionPager
-          active={index === tab && stack.length === 0}
-          onPage={onPage}
-          page={pages[index]}
-          render={render}
-          swipe={section.swipe !== false}
-          views={section.views}
-          width={width}
-        />
+        {section.views.length === 1 ? (
+          render(section.views[0].name, index === tab && stack.length === 0)
+        ) : (
+          <SectionPager
+            active={index === tab && stack.length === 0}
+            onPage={onPage}
+            page={pages[index]}
+            render={render}
+            swipe={section.swipe !== false}
+            views={section.views}
+            width={width}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

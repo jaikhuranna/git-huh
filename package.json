@@ -1,6 +1,6 @@
 {
   "name": "git-huh",
-  "version": "0.0.4-alpha",
+  "version": "0.0.5-alpha",
   "description": "Your GitHub history as a set of printed artefacts, an inbox you can clear from your phone, and a home-screen widget.",
   "license": "GPL-3.0-or-later",
   "author": "Jai Khurana (https://github.com/jaikhuranna)",

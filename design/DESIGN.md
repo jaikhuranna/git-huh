@@ -175,13 +175,16 @@ title, `#{n} · waiting {age}`, and a dot for how long it has waited — bigger 
 by the day, week, fortnight and month, squared off past a month — so the one that has
 sat longest stands out the way a peak day does on the widget. Tapping a row opens `pull`.
 
-### 9. `dots` — pin01, now **the widget, zoomed out** (`lab`)
-The home-screen card with room to pull back: the strip on top, the field under it, and
-three zooms — `widget` (seven rows at the widget's own pitch, a few months), `6 mo` and
-`year`. Zooming out makes the dots smaller and the card **taller** — more rows of the
-same run of days — because the widget's rows are not weekdays either; at `year` every
-day since last year's today is on the card. Under it, four figures on a card and a line
-saying what the marks mean. (It replaced the connect-the-dots puzzle.)
+### 9. `ideas` — a local project notebook
+The fifth tab replaces `lab`. A `project ideas` caption with a saved count,
+then `saved on this device`, a card with one multiline text box and an
+`add idea` button. Notes appear newest first on plain cards with `edit` and
+`delete`; editing reuses the box, deletion asks inline before removing a note.
+No segments or charts. Empty, loading and error states are written in words.
+Native notes live in a document file, web notes in localStorage, separate
+from disposable account caches. The demo uses a separate notebook. Saving
+must succeed before the editor clears; unreadable data is never replaced
+with an empty notebook. The old `DotsScreen` remains unlinked source.
 
 ### 10. `archive` — pin10 (rain years)
 On a card: `year` / `today` / `before · after` heads, then one row per contribution year,
@@ -500,7 +503,7 @@ to. `STORIES.md` is why the grouping is this grouping.
 | `inbox` | `recent` · `review` · `assigned` | what wants me |
 | `work` | `pulls` · `brief` · `cycle` · `repos` | what am I shipping |
 | `year` | `weeks` · `split` · `languages` · `years` · `people` | what was the year |
-| `lab` | `zoomed out` | the widget, pulled back to the whole year |
+| `ideas` | `project ideas` | what could I build next |
 
 - **Bar**: the system's own tab bar, through expo-router's `NativeTabs`
   (`app/(tabs)/_layout.tsx`). On iOS it is `UITabBarController` — Liquid Glass
@@ -542,7 +545,7 @@ fact with the month along the foot — so a run of them reads as a series.
 
 | views | card | chart |
 |---|---|---|
-| `you` `now` `weather` `zoomed out` | a year on github | four figures and the widget's field, eleven rows deep so a whole year fits |
+| `you` `now` `weather` | a year on github | four figures and the widget's field, eleven rows deep so a whole year fits |
 | `weeks` | {year}, week by week | the poster for one year (chips on the share page pick it) |
 | `split` | where the year went | one ruled bar and a legend with counts and shares |
 | `languages` | what I write in | six bars and an `other` |

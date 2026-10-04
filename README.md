@@ -29,7 +29,7 @@ sections on the system's own tab bar.
 | **inbox** | recent · review · assigned | review requests, mentions, reviews and replies — swipe to mark done or snooze until morning; the review queue, longest wait first, with what moved since you looked; everything assigned to you across every repository |
 | **work** | pulls · brief · cycle · repos | your open pull requests, one read in full, time to merge, a deck of repositories |
 | **year** | weeks · split · languages · years · people | every year of contributions, where they went, what they were written in, and who you reviewed with |
-| **lab** | zoomed out | the widget pulled back from a few months to the whole year |
+| **ideas** | project ideas | a simple notebook saved on this device, with add, edit and delete |
 
 It also does the things that usually end with "I'll do it on the laptop":
 
