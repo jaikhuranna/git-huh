@@ -8,7 +8,8 @@ import { CARD_HEIGHT, CARD_WIDTH, ShareCard } from '../components/ShareCard';
 import { Label, Micro } from '../components/Type';
 import { useNav } from '../lib/nav';
 import type { ShareKind } from '../lib/shareData';
-import { useSession } from '../shell/session';
+import { GitHubGate } from '../shell/SectionScreen';
+import { useSessionData } from '../shell/session';
 import { colors, radii, space, themed } from '../theme';
 
 /** 4:3 at a size every timeline takes without cropping or softening it. */
@@ -25,7 +26,7 @@ type Phase = 'idle' | 'working' | 'failed' | 'unavailable';
  */
 export function ShareScreen({ kind, year: chosen }: { kind: ShareKind; year?: number }) {
   const nav = useNav();
-  const { model, activity } = useSession();
+  const { model, activity } = useSessionData();
   const { width } = useWindowDimensions();
   const card = useRef<View>(null);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -63,7 +64,13 @@ export function ShareScreen({ kind, year: chosen }: { kind: ShareKind; year?: nu
     }
   }, []);
 
-  if (!model) return null;
+  if (!model) {
+    return (
+      <OverlayFrame onBack={nav.close} where="share · 4:3">
+        <GitHubGate>{null}</GitHubGate>
+      </OverlayFrame>
+    );
+  }
 
   const box = width - space.gutter * 2;
   const scale = box / CARD_WIDTH;

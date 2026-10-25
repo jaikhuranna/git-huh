@@ -3,6 +3,10 @@
 # dependencies
 node_modules/
 
+# `bun` may be used to run scripts, but npm is the package manager of record:
+# `package-lock.json` is committed and `bun.lock` is not.
+bun.lock
+
 # Expo
 .expo/
 dist/

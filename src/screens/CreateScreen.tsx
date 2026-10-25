@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { FormScrollView } from '../components/FormScrollView';
 import { Composer } from '../components/Composer';
 import { OverlayFrame } from '../components/Overlay';
 import { Label, Micro } from '../components/Type';
+import { noteCreated } from '../hooks/usePullDetail';
 import { useRemote } from '../hooks/useRemote';
 import { demoRepoInfo } from '../lib/demo';
 import { eventually } from '../lib/eventually';
@@ -178,7 +179,8 @@ export function NewPullScreen({ repo, head: startHead }: { repo: string; head?: 
             base: into,
             draft,
           });
-          nav.replace(pullRoute({ repo, number }));
+          noteCreated('pull', repo, number);
+ nav.replace(pullRoute({ repo, number }));
           return `opened #${number}`;
         }}
       />
@@ -196,6 +198,10 @@ export function NewReleaseScreen({ repo }: { repo: string }) {
   const [body, setBody] = useState('');
   const [prerelease, setPrerelease] = useState(false);
   const [notes, setNotes] = useState(true);
+  // The wait after a confirmed create is the only read here that retries.
+  // Leaving the form aborts it; an ordinary list of releases stays one attempt.
+  const publish = useRef<AbortController | null>(null);
+  useEffect(() => () => publish.current?.abort(), []);
 
   return (
     <Form where={`${repo} · new release`}>
@@ -232,10 +238,19 @@ export function NewReleaseScreen({ repo }: { repo: string }) {
             prerelease,
             generateNotes: notes,
           });
-          // Wait until the list GitHub hands back has it, or the tab it opens
-          // on would not show the release just made.
-          await eventually(async () =>
-            (await listReleases(token, repo)).some((release) => release.tag === tag.trim()) ? true : null,
+          // The create is confirmed, so GitHub's list can lag it. Retry only
+          // that propagation, and stop if the form is left. A forbidden,
+          // rate-limited, or offline read is not a miss and is not asked again.
+          publish.current?.abort();
+          const signal = new AbortController();
+          publish.current = signal;
+          const made = tag.trim();
+          await eventually(
+            async () =>
+              (await listReleases(token, repo, signal.signal)).some((release) => release.tag === made)
+                ? true
+                : null,
+            { signal: signal.signal, recent: true },
           ).catch(() => null);
           nav.replace({ kind: 'repo', repo, tab: 'releases' });
           return key === 'draft' ? 'saved as a draft' : 'published';
@@ -302,7 +317,8 @@ export function NewDiscussionScreen({ repo }: { repo: string }) {
         doing="that discussion"
         onSubmit={async () => {
           const number = await createDiscussion(nav.token ?? '', repositoryId ?? '', category, title.trim(), body);
-          nav.replace({ kind: 'thread', repo, number, type: 'discussion' });
+          noteCreated('discussion', repo, number);
+ nav.replace({ kind: 'thread', repo, number, type: 'discussion' });
           return 'started';
         }}
       />

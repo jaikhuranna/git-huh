@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import type { ReactElement, ReactNode } from 'react';
+import { FlatList, Pressable, ScrollView, StyleSheet, View, type ListRenderItem } from 'react-native';
 
 import { IconButton, type Glyph } from '../components/Icon';
 import { FormScrollView } from '../components/FormScrollView';
@@ -140,6 +140,70 @@ export function Chips<T extends string>({
   );
 }
 
+/** Shared scroll styling for a page, whether a ScrollView or a FlatList owns it. */
+function pageContentStyle(gutter: boolean, fill: boolean, blocks: boolean) {
+  return [
+    styles.page,
+    blocks && styles.blocks,
+    fill && styles.fill,
+    gutter && { paddingHorizontal: space.gutter },
+  ];
+}
+
+/**
+ * A screen whose rows are virtualized. The list owns the one vertical scroll;
+ * `header` is the blocks that used to sit above the rows in `Page`.
+ */
+export function VirtualPage<T>({
+  header,
+  data,
+  keyExtractor,
+  renderItem,
+  footer,
+  background,
+  gutter = true,
+  onEnd,
+  onDeep,
+  blocks = false,
+}: {
+  header: ReactElement;
+  data: readonly T[];
+  keyExtractor: (item: T) => string;
+  renderItem: ListRenderItem<T>;
+  footer?: ReactElement | null;
+  background?: string;
+  gutter?: boolean;
+  onEnd?: () => void;
+  onDeep?: () => void;
+  blocks?: boolean;
+}) {
+  return (
+    <FlatList
+      data={data}
+      initialNumToRender={8}
+      keyExtractor={keyExtractor}
+      ListFooterComponent={footer}
+      ListHeaderComponent={header}
+      maxToRenderPerBatch={8}
+      onEndReached={onEnd}
+      onEndReachedThreshold={0.6}
+      onScroll={
+        onDeep
+          ? ({ nativeEvent: { contentOffset, layoutMeasurement } }) => {
+              if (contentOffset.y > layoutMeasurement.height / 2) onDeep();
+            }
+          : undefined
+      }
+      renderItem={renderItem}
+      scrollEventThrottle={onDeep ? 250 : undefined}
+      showsVerticalScrollIndicator={false}
+      style={background ? { backgroundColor: background } : undefined}
+      contentContainerStyle={pageContentStyle(gutter, false, blocks)}
+      windowSize={7}
+    />
+  );
+}
+
 /** Scrolling page body with the app's standard gutters. */
 export function Page({
   children,
@@ -191,12 +255,7 @@ export function Page({
           : undefined
       }
       scrollEventThrottle={watch ? 250 : undefined}
-      contentContainerStyle={[
-        styles.page,
-        blocks && styles.blocks,
-        fill && styles.fill,
-        gutter && { paddingHorizontal: space.gutter },
-      ]}
+      contentContainerStyle={pageContentStyle(gutter, fill, blocks)}
       showsVerticalScrollIndicator={false}
       style={background ? { backgroundColor: background } : undefined}
     >

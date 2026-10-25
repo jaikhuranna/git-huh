@@ -1,7 +1,8 @@
 import { pullRoute } from '../lib/nav';
 import { memo, useCallback } from 'react';
 
-import { useSession } from '../shell/session';
+import { GitHubGate } from '../shell/SectionScreen';
+import { useSessionActions, useSessionData } from '../shell/session';
 import { BriefTile } from './BriefScreen';
 import { InboxBlocks } from './InboxScreen';
 import { CardsScreen } from './CardsScreen';
@@ -28,7 +29,8 @@ const Repos = memo(CardsScreen);
  *    their code.
  */
 export function WorkScreen() {
-  const { activity, activityState, model, nav, prs } = useSession();
+  const { nav } = useSessionActions();
+  const { activity, activityState, model, prs } = useSessionData();
   const loading = activityState.status !== 'ready';
   const openPull = useCallback(
     (pr: { repo: string; number: number }) =>
@@ -36,7 +38,15 @@ export function WorkScreen() {
     [nav],
   );
 
-  if (!model) return null;
+  // The rolling year can arrive before the archive. Work still needs a model
+  // of its own; until then the page says so instead of disappearing.
+  if (!model) {
+    return (
+      <Page>
+        <GitHubGate>{null}</GitHubGate>
+      </Page>
+    );
+  }
 
   return (
     <Page blocks>

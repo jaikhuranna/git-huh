@@ -54,7 +54,13 @@ export function IndexScreen({
       />
 
       {state.status === 'loading' && <Label style={styles.note}>reading the drawer…</Label>}
-      {state.status === 'error' && <Body style={styles.error}>could not load pull requests</Body>}
+      {state.status === 'unavailable' && (
+        <Body style={styles.error}>
+          {state.failure === 'invalid-token'
+            ? 'this token cannot read your pull requests'
+            : 'could not load pull requests'}
+        </Body>
+      )}
       {state.status === 'ready' && folders.length === 0 && (
         <Label style={styles.note}>nothing filed under {filter} · go ship</Label>
       )}

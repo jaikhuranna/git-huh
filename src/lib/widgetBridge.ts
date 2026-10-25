@@ -59,19 +59,40 @@ interface Payload {
  * lands before the pool is read back, and a card with no line is a card
  * with no masthead.
  */
-function withKeptLines(payload: Payload): string {
+function withKeptLines(payload: Payload): Payload {
   if (payload.lines.length === 0 && storage) {
     try {
       const previous = JSON.parse(storage.get(PAYLOAD_KEY) ?? 'null') as Partial<Payload> | null;
       if (previous?.login === payload.login && previous.lines?.length) {
-        return JSON.stringify({ ...payload, lines: previous.lines });
+        return { ...payload, lines: previous.lines };
       }
     } catch {
       // A payload that does not parse is the same as none.
     }
   }
-  return JSON.stringify(payload);
+  return payload;
 }
+
+/**
+ * One canonical string for a payload. Key order is fixed so two syncs of the
+ * same days and the same lines compare equal even if the objects were built
+ * apart. The date is not part of this string: the card picks today's line
+ * when it draws, and dropping a later day from `days` still changes it.
+ */
+function canonical(payload: Payload): string {
+  return JSON.stringify({
+    login: payload.login,
+    todayCount: payload.todayCount,
+    days: payload.days,
+    lines: payload.lines,
+  });
+}
+
+/** The payload last handed to the widget, and which account generation wrote it. */
+let applied: string | null = null;
+let generation = 0;
+/** Syncs still running, oldest first. A newer generation makes an older one a no-op. */
+let chain: Promise<void> = Promise.resolve();
 
 /**
  * Push the latest snapshot to any placed home-screen widgets. The widgets
@@ -81,12 +102,18 @@ function withKeptLines(payload: Payload): string {
  * written in. The widget runs one of them across the card, picked by the date
  * and held for the day, so it says something you wrote rather than repeating
  * your handle back at you.
+ *
+ * An identical payload does not write and does not ask for a redraw: the
+ * model is synced often, and the card only changes when the days, the count
+ * or the line pool do. Calls are serialized, and a clear or a later account
+ * that started after this one wins — a slow sync must not paint the account
+ * that was just left.
  */
-export async function syncWidget(
+export function syncWidget(
   model: GitHubModel,
   lines: readonly CommitLine[] = [],
 ): Promise<void> {
-  if (!bridge && !storage) return;
+  if (!bridge && !storage) return Promise.resolve();
 
   // The days as they happened, ending on today, with no weekday padding: the
   // card draws a run of days whose last mark is always the bottom-right one,
@@ -100,27 +127,50 @@ export async function syncWidget(
     t: day.isToday,
   }));
 
-  const payload: Payload = {
+  const payload = withKeptLines({
     login: model.login,
     todayCount: model.todayCount,
     days,
     lines: lines.slice(0, WIDGET_LINES).map((line) => ({ m: line.message, r: line.repo })),
-  };
+  });
+  const text = canonical(payload);
+  const mine = ++generation;
+  if (text === applied) return Promise.resolve();
 
-  if (storage) {
-    storage.set(PAYLOAD_KEY, withKeptLines(payload));
-    ExtensionStorage.reloadWidget();
-    return;
-  }
-  await bridge?.sync(JSON.stringify(payload));
+  const run = chain.then(async () => {
+    if (mine !== generation || text === applied) return;
+    if (storage) {
+      storage.set(PAYLOAD_KEY, text);
+      ExtensionStorage.reloadWidget();
+    } else {
+      await bridge?.sync(text);
+    }
+    if (mine === generation) applied = text;
+  });
+  chain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }
 
 /** Reset every placed widget to its empty state (called on disconnect). */
-export async function clearWidget(): Promise<void> {
-  if (storage) {
-    storage.remove(PAYLOAD_KEY);
-    ExtensionStorage.reloadWidget();
-    return;
-  }
-  await bridge?.clear();
+export function clearWidget(): Promise<void> {
+  const mine = ++generation;
+  applied = null;
+  if (!bridge && !storage) return Promise.resolve();
+  const run = chain.then(async () => {
+    if (mine !== generation) return;
+    if (storage) {
+      storage.remove(PAYLOAD_KEY);
+      ExtensionStorage.reloadWidget();
+    } else {
+      await bridge?.clear();
+    }
+  });
+  chain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }

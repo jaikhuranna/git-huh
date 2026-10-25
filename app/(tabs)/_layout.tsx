@@ -1,40 +1,68 @@
 import { StatusBar } from 'expo-status-bar';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { memo, useEffect } from 'react';
+import { lazy, memo, Suspense, useCallback, useEffect, type ComponentType } from 'react';
 import { BackHandler, Platform, StyleSheet, View } from 'react-native';
 
-import { IconPill } from '../../src/components/Icon';
 import { PatForm } from '../../src/components/PatForm';
-import { Body } from '../../src/components/Type';
 import { NavContext, type Route } from '../../src/lib/nav';
 import { tokenStore } from '../../src/lib/token';
-import { AccountScreen } from '../../src/screens/AccountScreen';
-import { AssignedPage } from '../../src/screens/AssignedScreen';
-import {
-  NewDiscussionScreen,
-  NewFileScreen,
-  NewGistScreen,
-  NewPullScreen,
-  NewReleaseScreen,
-  NewRepoScreen,
-} from '../../src/screens/CreateScreen';
-import { FileScreen } from '../../src/screens/FileScreen';
-import { GistScreen, GistsScreen } from '../../src/screens/GistsScreen';
-import { InboxPage } from '../../src/screens/InboxScreen';
 import { LoadingScreen } from '../../src/screens/LoadingScreen';
-import { NewIssueScreen } from '../../src/screens/NewIssueScreen';
-import { PeoplePage } from '../../src/screens/PeopleScreen';
-import { PullScreen } from '../../src/screens/PullScreen';
-import { QueuePage } from '../../src/screens/QueueScreen';
-import { RepoScreen } from '../../src/screens/RepoScreen';
-import { SearchScreen } from '../../src/screens/SearchScreen';
-import { ServiceScreen } from '../../src/screens/ServiceScreen';
-import { ShareScreen } from '../../src/screens/ShareScreen';
-import { ThreadScreen } from '../../src/screens/ThreadScreen';
-import { UserScreen } from '../../src/screens/UserScreen';
 import { SECTIONS } from '../../src/shell/sections';
 import { useSession } from '../../src/shell/session';
-import { colors, fonts, space, themed } from '../../src/theme';
+import { colors, fonts, themed } from '../../src/theme';
+
+/**
+ * Pushed screens are not part of first paint. Metro's `lazy` evaluates the
+ * module the first time that route is actually opened, then keeps it. The
+ * shell, the token form and the loading screen stay eager: they are what
+ * the first frame is.
+ */
+const AccountScreen = lazyScreen(() => import('../../src/screens/AccountScreen'), 'AccountScreen');
+const AssignedPage = lazyScreen(() => import('../../src/screens/AssignedScreen'), 'AssignedPage');
+const NewDiscussionScreen = lazyScreen(
+  () => import('../../src/screens/CreateScreen'),
+  'NewDiscussionScreen',
+);
+const NewFileScreen = lazyScreen(() => import('../../src/screens/CreateScreen'), 'NewFileScreen');
+const NewGistScreen = lazyScreen(() => import('../../src/screens/CreateScreen'), 'NewGistScreen');
+const NewPullScreen = lazyScreen(() => import('../../src/screens/CreateScreen'), 'NewPullScreen');
+const NewReleaseScreen = lazyScreen(
+  () => import('../../src/screens/CreateScreen'),
+  'NewReleaseScreen',
+);
+const NewRepoScreen = lazyScreen(() => import('../../src/screens/CreateScreen'), 'NewRepoScreen');
+const FileScreen = lazyScreen(() => import('../../src/screens/FileScreen'), 'FileScreen');
+const GistScreen = lazyScreen(() => import('../../src/screens/GistsScreen'), 'GistScreen');
+const GistsScreen = lazyScreen(() => import('../../src/screens/GistsScreen'), 'GistsScreen');
+const InboxPage = lazyScreen(() => import('../../src/screens/InboxScreen'), 'InboxPage');
+const NewIssueScreen = lazyScreen(() => import('../../src/screens/NewIssueScreen'), 'NewIssueScreen');
+const PeoplePage = lazyScreen(() => import('../../src/screens/PeopleScreen'), 'PeoplePage');
+const PullScreen = lazyScreen(() => import('../../src/screens/PullScreen'), 'PullScreen');
+const QueuePage = lazyScreen(() => import('../../src/screens/QueueScreen'), 'QueuePage');
+const RepoScreen = lazyScreen(() => import('../../src/screens/RepoScreen'), 'RepoScreen');
+const SearchScreen = lazyScreen(() => import('../../src/screens/SearchScreen'), 'SearchScreen');
+const ServiceScreen = lazyScreen(() => import('../../src/screens/ServiceScreen'), 'ServiceScreen');
+const ShareScreen = lazyScreen(() => import('../../src/screens/ShareScreen'), 'ShareScreen');
+const ThreadScreen = lazyScreen(() => import('../../src/screens/ThreadScreen'), 'ThreadScreen');
+const UserScreen = lazyScreen(() => import('../../src/screens/UserScreen'), 'UserScreen');
+
+/**
+ * The conditional type keeps this export's props from being unified with
+ * its siblings. Several of these modules export more than one screen.
+ */
+function lazyScreen<M, K extends keyof M>(
+  load: () => Promise<M>,
+  name: K,
+): M[K] extends ComponentType<infer P> ? ComponentType<P> : never {
+  return lazy(async () => {
+    const module = await load();
+    const screen = module[name];
+    if (typeof screen !== 'function') {
+      throw new Error(`pushed screen ${String(name)} did not load`);
+    }
+    return { default: screen as unknown as ComponentType<any> };
+  }) as unknown as M[K] extends ComponentType<infer P> ? ComponentType<P> : never;
+}
 
 /**
  * One thing pushed over the sections. Memoised: a page lower in the stack
@@ -91,6 +119,13 @@ const RouteView = memo(function RouteView({ route, active }: { route: Route; act
   }
 });
 
+/**
+ * How many pushed screens stay mounted under the one on top. Deeper ones
+ * remain in the session stack and are built again on the way back; drafts
+ * and the read cache are what make that return feel like the same page.
+ */
+const KEEP_OVERLAYS = 3;
+
 function routeKey(route: Route): string {
   switch (route.kind) {
     case 'pull':
@@ -131,15 +166,8 @@ function routeKey(route: Route): string {
   }
 }
 
-/** The token form as a pushed screen, with the system back button wired to cancel. */
+/** The token form as a pushed screen. Back is handled once, for the whole stack. */
 function AddAccount({ onCancel, onVerified }: { onCancel: () => void; onVerified: (token: string) => void }) {
-  useEffect(() => {
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      onCancel();
-      return true;
-    });
-    return () => subscription.remove();
-  }, [onCancel]);
   return <PatForm onCancel={onCancel} onTokenVerified={onVerified} />;
 }
 
@@ -149,12 +177,26 @@ function AddAccount({ onCancel, onVerified }: { onCancel: () => void; onVerified
  * Android. A bar drawn in JavaScript can never look like either system's,
  * and would be the one part of the app that felt like a web page.
  *
- * Nothing is here until there is a year to show: the loading wave, the token
- * form and the error all take the whole screen, with no bar under them.
+ * The bar needs an account, not a year. Ideas and the host are on the device;
+ * an unreachable GitHub must not hide them. Today, work and year say so
+ * themselves while their data is still coming.
  */
 export default function TabsLayout() {
   const session = useSession();
-  const { contributions, model, nav, stack, token } = session;
+  const { nav, stack, token } = session;
+  const close = nav.close;
+
+  const onBack = useCallback(() => {
+    if (stack.length === 0) return false;
+    close();
+    return true;
+  }, [close, stack.length]);
+
+  useEffect(() => {
+    if (stack.length === 0) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => subscription.remove();
+  }, [onBack, stack.length]);
 
   if (token === undefined) {
     return (
@@ -176,35 +218,8 @@ export default function TabsLayout() {
     );
   }
 
-  if (contributions.status === 'loading' || contributions.status === 'idle') {
-    return (
-      <>
-        <StatusBar style="auto" />
-        <LoadingScreen caption="reading your year" lines={session.lines} />
-      </>
-    );
-  }
-
-  if (!model) {
-    const expired = contributions.status === 'error' && contributions.error.kind === 'invalid-token';
-    return (
-      <View style={styles.errorStack}>
-        <StatusBar style="auto" />
-        <Body style={styles.errorText}>
-          {expired ? 'that token expired or was revoked' : 'could not reach github'}
-        </Body>
-        {expired ? (
-          <IconPill icon="restart" label="start over" onPress={session.disconnect} />
-        ) : (
-          // No signal and nothing saved yet is not a reason to forget the
-          // token; it is a reason to try again.
-          <IconPill icon="refresh" label="try again" onPress={contributions.reload} />
-        )}
-      </View>
-    );
-  }
-
   const android = Platform.OS === 'android';
+  const mountedFrom = Math.max(0, stack.length - KEEP_OVERLAYS);
 
   return (
     <NavContext.Provider value={nav}>
@@ -249,25 +264,30 @@ export default function TabsLayout() {
 
       {/* Over the tabs rather than inside one, like a pushed screen on any
           phone: the bar belongs to the sections, and a detail page has its
-          own back. Lower pages stay mounted, hidden, so back returns to them
-          as they were. */}
-      {stack.map((route, index) => (
-        <View
-          key={`${index}-${routeKey(route)}`}
-          style={[styles.overlay, index < stack.length - 1 && styles.hidden]}
-        >
-          {route.kind === 'add-account' ? (
-            <AddAccount
-              onCancel={nav.close}
-              onVerified={(verified) => {
-                session.switchTo(verified).catch(() => {});
-              }}
-            />
-          ) : (
-            <RouteView route={route} active={index === stack.length - 1} />
-          )}
-        </View>
-      ))}
+          own back. Only the top few stay mounted; the rest of the stack is
+          remembered and built again on the way back. */}
+      {stack.slice(mountedFrom).map((route, offset) => {
+        const index = mountedFrom + offset;
+        return (
+          <View
+            key={`${index}-${routeKey(route)}`}
+            style={[styles.overlay, index < stack.length - 1 && styles.hidden]}
+          >
+            {route.kind === 'add-account' ? (
+              <AddAccount
+                onCancel={close}
+                onVerified={(verified) => {
+                  session.switchTo(verified).catch(() => {});
+                }}
+              />
+            ) : (
+              <Suspense fallback={<LoadingScreen caption="opening" lines={session.lines} />}>
+                <RouteView route={route} active={index === stack.length - 1} />
+              </Suspense>
+            )}
+          </View>
+        );
+      })}
     </NavContext.Provider>
   );
 }
@@ -282,22 +302,10 @@ const styles = themed(() =>
       right: 0,
       top: 0,
     },
-    // Kept mounted and off screen: React Native honours `display: none`, so a
-    // page that is under another keeps its state without drawing.
-    hidden: {
+    // Under the top page, still mounted, but not drawn. Deeper than
+  // KEEP_OVERLAYS is not in the tree at all.
+  hidden: {
       display: 'none',
-    },
-    errorStack: {
-      alignItems: 'center',
-      backgroundColor: colors.canvas,
-      flex: 1,
-      gap: 16,
-      justifyContent: 'center',
-      paddingHorizontal: space.gutter,
-    },
-    errorText: {
-      color: colors.no,
-      textAlign: 'center',
     },
   }),
 );

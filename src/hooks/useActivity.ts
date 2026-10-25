@@ -2,42 +2,78 @@ import { useMemo } from 'react';
 
 import { EMPTY_ACTIVITY, fetchActivity, type Activity } from '../lib/activity';
 import { demoActivity } from '../lib/demo';
+import { GitHubError } from '../lib/github';
 import { DEMO_TOKEN } from '../lib/token';
 import { useRemote } from './useRemote';
+
+const ACTIVITY_STALE_AFTER_MS = 5 * 60_000;
 
 export type ActivityState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; activity: Activity };
+  | {
+      status: 'ready';
+      activity: Activity;
+      /** True when this sample is the last good one after a failed refresh. */
+      stale: boolean;
+      savedAt: number | null;
+      offline: boolean;
+    }
+  | { status: 'unavailable'; failure: 'invalid-token' | 'aborted' | 'failed' };
 
 /**
- * Commit timestamps and pull request detail. Only fetched once a screen that
- * needs them is reachable, and a failure resolves to the empty activity
- * rather than an error state — these screens are additive, so the rest of
- * the app must not care when GitHub declines. The last sample is kept on the
- * device, which also keeps `hours` and `repos` drawn when offline.
+ * Commit timestamps and pull request summaries. Only fetched once a screen
+ * that needs them is reachable. A failure is unavailable, not an empty
+ * sample: an empty sample is a real answer that nothing matched. The last
+ * sample stays on screen, marked stale, so hours and repos survive a blip.
  */
 export function useActivity(
   token: string | null,
   login: string | null,
   active: boolean,
+  viewerId?: string | null,
 ): ActivityState {
   const demo = useMemo(
-    () => (token === DEMO_TOKEN ? demoActivity() : undefined),
+    () => (token === DEMO_TOKEN ? withReady(demoActivity()) : undefined),
     [token],
   );
   const remote = useRemote(
-    active && token && login ? `${token}|${login}` : null,
-    (signal) => fetchActivity(token ?? '', login ?? '', signal),
+    active && token && login ? `${token}|${login}|${viewerId ?? ''}` : null,
+    (signal) => fetchActivity(token ?? '', login ?? '', signal, viewerId, 'background'),
     {
-      cacheKey: login && token !== DEMO_TOKEN ? `${login.toLowerCase()}-activity` : null,
+      cacheKey: login && token !== DEMO_TOKEN ? `${login.toLowerCase()}-activity-v2` : null,
       demo,
+      staleAfterMs: ACTIVITY_STALE_AFTER_MS,
     },
   );
 
   return useMemo(() => {
-    if (remote.status === 'ready') return { status: 'ready', activity: remote.data };
-    if (remote.status === 'error') return { status: 'ready', activity: EMPTY_ACTIVITY };
+    if (remote.status === 'ready') {
+      const activity = remote.data.availability ? remote.data : withReady(remote.data);
+      const stale = remote.failure != null || activity.availability === 'stale' || remote.stale === true;
+      return {
+        status: 'ready',
+        activity: stale ? { ...activity, availability: 'stale' } : activity,
+        stale,
+        savedAt: remote.savedAt,
+        offline: remote.offline,
+      };
+    }
+    if (remote.status === 'error') {
+      const failure =
+        remote.error instanceof GitHubError && remote.error.kind === 'invalid-token'
+          ? 'invalid-token'
+          : remote.error instanceof Error && remote.error.name === 'AbortError'
+            ? 'aborted'
+            : 'failed';
+      return { status: 'unavailable', failure };
+    }
     return { status: remote.status };
   }, [remote]);
 }
+
+function withReady(activity: Activity): Activity {
+  return { ...activity, availability: activity.availability ?? 'ready', at: activity.at ?? null };
+}
+
+export { EMPTY_ACTIVITY };

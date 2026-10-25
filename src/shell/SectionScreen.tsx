@@ -1,11 +1,12 @@
-import { useCallback } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
 import { TOKEN_SETTINGS_URL } from '../components/PatForm';
-import { Label } from '../components/Type';
+import { Body, Label } from '../components/Type';
 import { Wordmark } from '../components/Wordmark';
+import { whyNot } from '../screens/shared';
 import { savedAge } from '../lib/store';
 import { IdeasScreen } from '../screens/IdeasScreen';
 import { HostScreen } from '../screens/HostScreen';
@@ -14,7 +15,7 @@ import { WorkScreen } from '../screens/WorkScreen';
 import { YearScreen } from '../screens/YearScreen';
 import { colors, radii, space, themed } from '../theme';
 import { SECTIONS } from './sections';
-import { useSession } from './session';
+import { useSessionActions, useSessionData } from './session';
 
 /**
  * The one thing the app cannot fix for you.
@@ -40,6 +41,25 @@ function ScopeNotice() {
 }
 
 /**
+ * The tabs mount as soon as there is a token, so a GitHub year that has not
+ * arrived yet is this section's own state — not a reason to hide Ideas or
+ * Host, and not a blank page where the year should be.
+ */
+export function GitHubGate({ children }: { children: ReactNode }) {
+  const { contributions } = useSessionData();
+  if (contributions.status === 'ready') return children;
+  const waiting = contributions.status === 'idle' || contributions.status === 'loading';
+  return (
+    <View style={styles.gate}>
+      <Label style={styles.gateText}>
+        {waiting ? 'reading your year…' : 'could not read your year'}
+      </Label>
+      {!waiting && <Body style={styles.gateWhy}>{whyNot(contributions.error)}</Body>}
+    </View>
+  );
+}
+
+/**
  * A tab: the wordmark and the account, the scope strip if it applies, and the
  * section's page.
  *
@@ -50,8 +70,8 @@ function ScopeNotice() {
  * rest (`More`, `Tile`).
  */
 export function SectionScreen({ index }: { index: number }) {
-  const session = useSession();
-  const { contributions, model, nav, stack, tab } = session;
+  const { nav, stack, tab } = useSessionActions();
+  const { contributions, model, scopes } = useSessionData();
   const section = SECTIONS[index];
   // On screen: this section, and nothing pushed over it. Animations park and
   // the feed stops paging in when it is not.
@@ -106,7 +126,7 @@ export function SectionScreen({ index }: { index: number }) {
         </View>
       </View>
 
-      {section.key !== 'ideas' && section.key !== 'host' && session.scopes === 'limited' && <ScopeNotice />}
+      {section.key !== 'ideas' && section.key !== 'host' && scopes === 'limited' && <ScopeNotice />}
 
       <View style={styles.body}>{page}</View>
     </SafeAreaView>
@@ -166,6 +186,17 @@ const styles = themed(() =>
     },
     body: {
       flex: 1,
+    },
+    gate: {
+      gap: 8,
+      paddingHorizontal: space.gutter,
+      paddingTop: space.row,
+    },
+    gateText: {
+      color: colors.ink70,
+    },
+    gateWhy: {
+      color: colors.ink40,
     },
   }),
 );

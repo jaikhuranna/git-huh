@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { executeQuery } from './github';
+import { executeQuery, type RequestPriority } from './github';
 
 /**
  * The social half of GitHub: who replied to you, who reviewed you, who
@@ -19,6 +19,24 @@ import { executeQuery } from './github';
 
 const MINE = 15;
 const OTHERS = 10;
+
+/**
+ * How much of each pull request the history page reads. The rest of a long
+ * thread is not fetched; the feed says so rather than calling the sample complete.
+ */
+export const HISTORY_COMMENT_LIMIT = 20;
+export const HISTORY_REVIEW_LIMIT = 10;
+
+/** How many events the inbox feed is willing to draw on its expanded page. */
+export const INBOX_ROW_CAP = 40;
+
+export interface ListSample<T> {
+  items: T[];
+  /** How many matched before the cap, when the caller counted them. */
+  total: number;
+  /** True when `items` is shorter than everything that matched. */
+  truncated: boolean;
+}
 
 const actorSchema = z.object({ login: z.string() }).nullable();
 
@@ -276,8 +294,9 @@ export async function fetchSocial(
   token: string,
   login: string,
   signal?: AbortSignal,
+  priority: RequestPriority = 'interactive',
 ): Promise<SocialEvent[]> {
-  const data = await executeQuery(token, query(login), socialSchema, signal);
+  const data = await executeQuery(token, query(login), socialSchema, { signal, priority });
   const me = login.toLowerCase();
   const events = new Map<string, SocialEvent>();
 
@@ -377,6 +396,10 @@ export interface SocialPage {
   events: SocialEvent[];
   /** Where the next page starts; null when there is nothing older. */
   cursor: string | null;
+  /** This page read the newest comments and reviews, not the whole thread. */
+  sampled: true;
+  commentLimit: number;
+  reviewLimit: number;
 }
 
 /**
@@ -403,6 +426,9 @@ export async function fetchSocialPage(
   return {
     events: eventsFromPrs(nodes, login, false),
     cursor: pageInfo.hasNextPage ? pageInfo.endCursor : null,
+    sampled: true,
+    commentLimit: HISTORY_COMMENT_LIMIT,
+    reviewLimit: HISTORY_REVIEW_LIMIT,
   };
 }
 
@@ -430,4 +456,17 @@ export function filterEvents(
 ): SocialEvent[] {
   const kinds = IN_FILTER[filter];
   return events.filter((event) => kinds.includes(event.kind));
+}
+
+/**
+ * The first `limit` rows of a filtered feed, plus whether more matched.
+ * Drawing a cap is not the same as there being nothing past it.
+ */
+export function sampleEvents(events: readonly SocialEvent[], limit: number): ListSample<SocialEvent> {
+  const cap = Math.max(0, limit);
+  return {
+    items: events.slice(0, cap),
+    total: events.length,
+    truncated: events.length > cap,
+  };
 }

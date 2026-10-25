@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { executeQuery } from './github';
+import { executeQuery, type RequestPriority } from './github';
 
 /**
  * The review queue: pull requests waiting on *you*, and the ones you have
@@ -237,11 +237,16 @@ export async function fetchQueue(
   token: string,
   login: string,
   signal?: AbortSignal,
+  priority: RequestPriority = 'interactive',
 ): Promise<Queue> {
-  const data = await executeQuery(token, QUERY, responseSchema, signal, {
-    asked: `is:pr is:open archived:false review-requested:${login} sort:created-asc`,
-    reviewed: `is:pr is:open archived:false reviewed-by:${login} -author:${login} sort:updated-desc`,
-    login,
+  const data = await executeQuery(token, QUERY, responseSchema, {
+    signal,
+    priority,
+    variables: {
+      asked: `is:pr is:open archived:false review-requested:${login} sort:created-asc`,
+      reviewed: `is:pr is:open archived:false reviewed-by:${login} -author:${login} sort:updated-desc`,
+      login,
+    },
   });
   return readQueue(data, login);
 }

@@ -13,6 +13,8 @@ import type { SocialState } from '../hooks/useSocial';
 import type { Triage } from '../hooks/useTriage';
 import {
   filterEvents,
+  INBOX_ROW_CAP,
+  sampleEvents,
   SOCIAL_FILTERS,
   type SocialEvent,
   type SocialFilter,
@@ -23,7 +25,7 @@ import { colors, radii, themed } from '../theme';
 
 // The feed has a section to itself, so it lists what it has rather than the
 // dozen rows that fitted under the greeting.
-const MAX_ROWS = 40;
+const MAX_ROWS = INBOX_ROW_CAP;
 /** How far a row has to travel before letting go of it counts. */
 const COMMIT_AT = 88;
 
@@ -70,7 +72,8 @@ export function SocialFeed({
 
   const folder = view === 'snoozed' || view === 'done';
   const all = folder ? byState(view) : filterEvents(open, view);
-  const rows = all.slice(0, Math.min(limit, MAX_ROWS));
+  const sample = sampleEvents(all, Math.min(limit, MAX_ROWS));
+  const rows = sample.items;
 
   const count = (value: View_) =>
     value === 'snoozed' || value === 'done'
@@ -145,8 +148,16 @@ export function SocialFeed({
         </SwipeRow>
       ))}
 
-      {onMore && all.length > rows.length && (
-        <More label={`all ${Math.min(all.length, MAX_ROWS)} ${view === 'all' ? 'events' : view}`} onPress={onMore} />
+      {onMore && sample.truncated && (
+        <More
+          label={`all ${Math.min(sample.total, MAX_ROWS)} of ${sample.total} ${view === 'all' ? 'events' : view}`}
+          onPress={onMore}
+        />
+      )}
+      {!onMore && sample.truncated && (
+        <Label style={styles.note}>
+          showing {rows.length} of {sample.total} · the rest of this sample is not on this page
+        </Label>
       )}
     </View>
   );

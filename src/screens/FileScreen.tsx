@@ -16,8 +16,12 @@ import { Composer } from '../components/Composer';
 import { OverlayFrame, SavedNote } from '../components/Overlay';
 import { Body, Label, Micro } from '../components/Type';
 import { useRemote } from '../hooks/useRemote';
+import { composeKey } from '../lib/cacheKey';
 import { demoFile, demoRepoInfo } from '../lib/demo';
+import { clearDraft, loadDraft, saveDraft } from '../lib/drafts';
+import { captureFileSnapshot, fileMovedOn, type FileSnapshot } from '../lib/fileSnapshot';
 import { pullRoute, useNav } from '../lib/nav';
+import { loadProposal, proposalKey, proposalLeft, type ProposalProgress } from '../lib/proposals';
 import { explain } from '../lib/rest';
 import { fetchFile, fetchRepoInfo, type RepoFile } from '../lib/repo';
 import {
@@ -25,6 +29,7 @@ import {
   deleteFile,
   encodePath,
   proposeChange,
+  resumeProposal,
   type ProposalResult,
 } from '../lib/writes';
 import { colors, fonts, radii, space, themed, tint } from '../theme';
@@ -36,6 +41,10 @@ const GUTTER = 44;
 const MAX_COLUMNS = 220;
 /** Past this a phone keyboard is the wrong tool, and the screen says so. */
 const EDIT_LIMIT = 200_000;
+/** A search that reports more than this is no longer something to step through. */
+const MATCH_CAP = 200;
+/** How long a keystroke waits before the whole file is scanned again. */
+const SEARCH_WAIT = 120;
 
 /**
  * One file, readable: line numbers, no wrapping, and a find bar — the
@@ -77,8 +86,12 @@ export function FileScreen({
   const canWrite =
     info.status === 'ready' && ['ADMIN', 'MAINTAIN', 'WRITE'].includes(info.data?.permission ?? '');
   const [editing, setEditing] = useState(false);
+  // Taken when editing starts, and kept: a refresh must not change the sha
+  // a draft will be saved against.
+  const [base, setBase] = useState<FileSnapshot | null>(null);
   const file = state.status === 'ready' ? state.data : null;
   const name = path.split('/').pop() ?? path;
+  const draftId = composeKey(nav.login, 'file-edit', repo, refName ?? '', path);
 
   const editable = file?.text != null && file.size <= EDIT_LIMIT;
 
@@ -88,7 +101,16 @@ export function FileScreen({
         file && !editing ? (
           <View style={styles.footer}>
             {editable && (
-              <Pressable accessibilityRole="button" onPress={() => setEditing(true)} style={styles.solid}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  const snapshot = captureFileSnapshot(file, repo);
+                  if (!snapshot) return;
+                  setBase(snapshot);
+                  setEditing(true);
+                }}
+                style={styles.solid}
+              >
                 <Label style={styles.solidLabel}>edit</Label>
               </Pressable>
             )}
@@ -139,17 +161,27 @@ export function FileScreen({
       )}
 
       {file && file.text == null && (
-        <Label style={styles.note}>binary, or too big for github to send inline</Label>
+        <Label style={styles.note}>
+          {file.reason === 'too-large' ? 'too big to open on a phone' : 'binary, or not text github could send'}
+        </Label>
       )}
 
       {file && file.text != null && !editing && <Reader find={find} text={file.text} />}
 
-      {file && file.text != null && editing && (
+      {base && editing && (
         <Editor
+          account={nav.login}
+          draftId={draftId}
           file={file}
           name={name}
-          onCancel={() => setEditing(false)}
+          onCancel={() => {
+            clearDraft(nav.login, 'file', draftId);
+            setEditing(false);
+            setBase(null);
+          }}
           onDone={(result) => {
+            clearDraft(nav.login, 'file', draftId);
+            setBase(null);
             if (result.kind === 'pull') {
               nav.replace(pullRoute(result));
             } else {
@@ -157,7 +189,15 @@ export function FileScreen({
               state.reload();
             }
           }}
+          onRebase={() => {
+            if (!file || file.text == null) return;
+            const snapshot = captureFileSnapshot(file, repo);
+            if (!snapshot) return;
+            clearDraft(nav.login, 'file', draftId);
+            setBase(snapshot);
+          }}
           repo={repo}
+          snapshot={base}
         />
       )}
     </OverlayFrame>
@@ -167,7 +207,7 @@ export function FileScreen({
 // --- reading -----------------------------------------------------------------
 
 function Reader({ text, find }: { text: string; find?: string }) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const list = useRef<FlatList<string>>(null);
   const [query, setQuery] = useState(find ?? '');
   const [cursor, setCursor] = useState(0);
@@ -178,20 +218,40 @@ function Reader({ text, find }: { text: string; find?: string }) {
     return split;
   }, [text]);
 
-  const needle = query.trim().toLowerCase();
-  const matches = useMemo(
-    () =>
-      needle
-        ? lines.flatMap((line, index) => (line.toLowerCase().includes(needle) ? [index] : []))
-        : [],
-    [lines, needle],
-  );
+  // The scan waits out a burst of keystrokes, and stops once it has enough
+  // matches to step through. The lowercase copy lives only for that scan.
+  const [needle, setNeedle] = useState(() => (find ?? '').trim().toLowerCase());
+  useEffect(() => {
+    const next = query.trim().toLowerCase();
+    const timer = setTimeout(() => setNeedle(next), SEARCH_WAIT);
+    return () => clearTimeout(timer);
+  }, [query]);
+  const matches = useMemo(() => {
+    if (!needle) return [];
+    const found: number[] = [];
+    for (let index = 0; index < lines.length; index++) {
+      if (!lines[index].toLowerCase().includes(needle)) continue;
+      found.push(index);
+      if (found.length >= MATCH_CAP) break;
+    }
+    return found;
+  }, [lines, needle]);
+  const capped = matches.length >= MATCH_CAP;
   const current = matches.length > 0 ? matches[Math.min(cursor, matches.length - 1)] : -1;
 
   const contentWidth = useMemo(() => {
-    const longest = lines.reduce((max, line) => Math.max(max, Math.min(line.length, MAX_COLUMNS)), 0);
+    let longest = 0;
+    const sample = Math.min(lines.length, 400);
+    for (let index = 0; index < sample; index++) {
+      longest = Math.max(longest, Math.min(lines[index].length, MAX_COLUMNS));
+    }
     return Math.max(width, GUTTER + longest * CHAR + space.gutter * 2);
   }, [lines, width]);
+
+  // A phone shows about a screen of rows at once; the window stays a little
+  // wider than that so a fling does not run into empty space.
+  const windowRows = Math.max(1, Math.ceil(height / ROW));
+  const initialRows = Math.min(40, windowRows + 8);
 
   useEffect(() => {
     if (current < 0) return;
@@ -221,7 +281,11 @@ function Reader({ text, find }: { text: string; find?: string }) {
           value={query}
         />
         <Micro style={styles.count}>
-          {needle ? (matches.length === 0 ? 'none' : `${Math.min(cursor, matches.length - 1) + 1} / ${matches.length}`) : ''}
+          {needle
+            ? matches.length === 0
+              ? 'none'
+              : `${Math.min(cursor, matches.length - 1) + 1} / ${matches.length}${capped ? '+' : ''}`
+            : ''}
         </Micro>
         <Pressable accessibilityLabel="previous match" accessibilityRole="button" onPress={() => step(-1)} style={styles.step}>
           <Label style={styles.stepLabel}>↑</Label>
@@ -235,14 +299,14 @@ function Reader({ text, find }: { text: string; find?: string }) {
         <FlatList
           data={lines}
           getItemLayout={(_, index) => ({ index, length: ROW, offset: ROW * index })}
-          initialNumToRender={60}
+          initialNumToRender={initialRows}
           keyExtractor={(_, index) => String(index)}
           ref={list}
           renderItem={({ item, index }) => (
             <Line current={index === current} needle={needle} number={index + 1} text={item} />
           )}
           style={{ width: contentWidth }}
-          windowSize={9}
+          windowSize={7}
         />
       </ScrollView>
     </View>
@@ -260,12 +324,18 @@ function Line({
   needle: string;
   current: boolean;
 }) {
-  const shown = text.length > MAX_COLUMNS ? `${text.slice(0, MAX_COLUMNS)}…` : text;
+  // A match past the row's width is still a match. The row starts at that
+  // column, so what was found is the thing on screen, and the number says
+  // how far along the line it sits.
+  const at = needle ? text.toLowerCase().indexOf(needle) : -1;
+  const start = at > MAX_COLUMNS - needle.length ? Math.max(0, at - 24) : 0;
+  const shown = text.slice(start, start + MAX_COLUMNS);
   const parts = useMemo(() => split(shown, needle), [needle, shown]);
   return (
     <View style={[styles.line, current && styles.lineOn]}>
       <Micro style={styles.lineNo}>{number}</Micro>
       <Text numberOfLines={1} style={styles.code}>
+        {start > 0 && <Text style={styles.skip}>{`col ${start + 1} · `}</Text>}
         {parts.map((part, index) =>
           part.hit ? (
             <Text key={index} style={styles.hitText}>
@@ -275,6 +345,7 @@ function Line({
             part.text
           ),
         )}
+        {text.length > start + MAX_COLUMNS ? '…' : ''}
       </Text>
     </View>
   );
@@ -300,52 +371,110 @@ function split(text: string, needle: string): { text: string; hit: boolean }[] {
 // --- editing -----------------------------------------------------------------
 
 function Editor({
+  snapshot,
   file,
   name,
   repo,
+  account,
+  draftId,
   onCancel,
   onDone,
+  onRebase,
 }: {
-  file: RepoFile;
+  snapshot: FileSnapshot;
+  file: RepoFile | null;
   name: string;
   repo: string;
+  account: string | null;
+  draftId: string;
   onCancel: () => void;
   onDone: (result: ProposalResult) => void;
+  onRebase: () => void;
 }) {
   const nav = useNav();
-  const [text, setText] = useState(file.text ?? '');
+  // Restored from the draft when one survived the remount; otherwise the
+  // snapshot. Derived rather than written from an effect, so a newer file
+  // arriving underneath does not reset the words.
+  const [restored, setRestored] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  useEffect(() => {
+    let live = true;
+    loadDraft(account, 'file', draftId).then((draft) => {
+      if (!live) return;
+      setRestored(draft?.text ?? null);
+      setDraftReady(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [account, draftId]);
+  const [typed, setTyped] = useState<string | null>(null);
+  const text = typed ?? restored ?? snapshot.text;
   const [message, setMessage] = useState(`Update ${name}`);
   const [mode, setMode] = useState<'pull' | 'direct'>('pull');
   const [phase, setPhase] = useState<{ kind: 'idle' | 'sending' | 'failed' | 'sent'; note?: string }>({
     kind: 'idle',
   });
-  const changed = text !== file.text;
-  const branch = file.ref || 'the default branch';
+  const [pending, setPending] = useState<ProposalProgress | null>(null);
+  useEffect(() => {
+    const key = proposalKey(account, snapshot.repo, snapshot.ref, snapshot.path, snapshot.sha);
+    let live = true;
+    loadProposal(key).then((progress) => {
+      if (live) setPending(progress);
+    });
+    return () => {
+      live = false;
+    };
+  }, [account, snapshot]);
+  const changed = text !== snapshot.text;
+  const newer = fileMovedOn(snapshot, file);
+  const branch = snapshot.ref || 'the default branch';
+
+  const change = (value: string) => {
+    setTyped(value);
+    if (draftReady) saveDraft(account, 'file', draftId, value === snapshot.text ? '' : value);
+  };
+
+  const proposalOf = () => ({
+    repo,
+    path: snapshot.path,
+    sha: snapshot.sha,
+    base: snapshot.ref,
+    text,
+    message: message.trim(),
+    login: nav.login ?? 'git-huh',
+  });
 
   const save = async () => {
-    if (!changed || !message.trim() || phase.kind === 'sending') return;
+    if (!changed || !message.trim() || phase.kind === 'sending' || newer) return;
     if (nav.demo) {
       setPhase({ kind: 'sent', note: 'demo account · nothing was committed' });
       return;
     }
     setPhase({ kind: 'sending' });
-    const proposal = {
-      repo,
-      path: file.path,
-      sha: file.sha,
-      base: file.ref,
-      text,
-      message: message.trim(),
-      login: nav.login ?? 'git-huh',
-    };
+    const proposal = proposalOf();
     try {
       const result =
         mode === 'pull'
-          ? await proposeChange(nav.token ?? '', proposal)
+          ? await proposeChange(nav.token ?? '', proposal, { account })
           : await commitDirect(nav.token ?? '', proposal);
       onDone(result);
     } catch (error) {
+      const key = proposalKey(account, snapshot.repo, snapshot.ref, snapshot.path, snapshot.sha);
+      const progress = await loadProposal(key);
+      setPending(progress);
       setPhase({ kind: 'failed', note: explain(error, mode === 'pull' ? 'that change' : 'that commit') });
+    }
+  };
+
+  const resume = async () => {
+    if (phase.kind === 'sending' || !pending) return;
+    setPhase({ kind: 'sending' });
+    try {
+      const result = await resumeProposal(nav.token ?? '', proposalOf(), { account });
+      onDone(result);
+    } catch (error) {
+      setPhase({ kind: 'failed', note: explain(error, 'that pull request') });
     }
   };
 
@@ -359,7 +488,7 @@ function Editor({
         autoCapitalize="none"
         autoCorrect={false}
         multiline
-        onChangeText={setText}
+        onChangeText={change}
         scrollEnabled={false}
         spellCheck={false}
         style={styles.editor}
@@ -368,6 +497,24 @@ function Editor({
       />
 
       <View style={styles.commit}>
+        {newer && (
+          <View style={styles.modes}>
+            <Micro style={styles.failed}>
+              a newer version of this file arrived · saving would write over it, so the edit stays on the version it started from
+            </Micro>
+            <Pressable accessibilityRole="button" onPress={onRebase} style={styles.ghost}>
+              <Label style={styles.ghostLabel}>load the newer version</Label>
+            </Pressable>
+          </View>
+        )}
+        {pending && pending.step === 'committed' && (
+          <View style={styles.modes}>
+            <Micro style={styles.explain}>{proposalLeft(pending)}</Micro>
+            <Pressable accessibilityRole="button" onPress={resume} style={styles.solid}>
+              <Label style={styles.solidLabel}>{phase.kind === 'sending' ? 'sending…' : 'open the pull request'}</Label>
+            </Pressable>
+          </View>
+        )}
         <Label style={styles.commitHead}>{changed ? 'the change' : 'nothing changed yet'}</Label>
         <TextInput
           onChangeText={setMessage}
@@ -402,10 +549,10 @@ function Editor({
         <View style={styles.modes}>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: !changed || phase.kind === 'sending' }}
-            disabled={!changed || phase.kind === 'sending'}
+            accessibilityState={{ disabled: !changed || phase.kind === 'sending' || newer }}
+            disabled={!changed || phase.kind === 'sending' || newer}
             onPress={save}
-            style={[styles.solid, (!changed || phase.kind === 'sending') && styles.disabled]}
+            style={[styles.solid, (!changed || phase.kind === 'sending' || newer) && styles.disabled]}
           >
             <Label style={styles.solidLabel}>
               {phase.kind === 'sending' ? 'sending…' : mode === 'pull' ? 'propose change' : 'commit'}
@@ -490,6 +637,9 @@ const styles = themed(() =>
     hitText: {
       backgroundColor: tint(colors.ink, 0.3),
       color: colors.ink,
+    },
+    skip: {
+      color: colors.ink40,
     },
     editPage: {
       paddingBottom: 30,

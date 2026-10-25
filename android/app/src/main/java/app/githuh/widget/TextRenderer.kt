@@ -12,6 +12,7 @@ import android.util.TypedValue
 import androidx.core.content.res.ResourcesCompat
 import androidx.glance.ImageProvider
 import app.githuh.R
+import java.util.TimeZone
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.sin
@@ -62,6 +63,12 @@ object TextRenderer {
         face ?: (ResourcesCompat.getFont(context, R.font.ibmplexmono) ?: Typeface.MONOSPACE)
             .also { face = it }
 
+    /** The same local-day count [WidgetState.lineOfTheDay] rotates the pool by. */
+    private fun localDay(): Long {
+        val now = System.currentTimeMillis()
+        return (now + TimeZone.getDefault().getOffset(now)) / 86_400_000L
+    }
+
     private fun paint(context: Context, sizeSp: Float, color: Int): TextPaint =
         TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = plexMono(context)
@@ -96,6 +103,34 @@ object TextRenderer {
         faint: Int,
         sizeSp: Float,
     ): List<Bitmap> {
+        val display = context.resources.displayMetrics
+        val key = buildString {
+            append("strip|")
+            append(unitPx)
+            append('|')
+            append(ink)
+            append('|')
+            append(faint)
+            append('|')
+            append(sizeSp)
+            append('|')
+            append(display.density)
+            append('|')
+            append(display.scaledDensity)
+            append('|')
+            // The pool is rotated by the local day before it is painted.
+            // Without the day in the key, a card recomposed after midnight
+            // would keep yesterday's frames until the payload itself changed.
+            append(localDay())
+            for (line in lines) {
+                append('|')
+                append(line.message)
+                append('|')
+                append(line.repo)
+            }
+        }
+        val cachedFrames = (0 until CYCLE_UNITS).map { WidgetBitmapCache.get("$key#$it") }
+        if (cachedFrames.all { it != null }) return cachedFrames.filterNotNull()
         val inkPaint = paint(context, sizeSp, ink)
         val faintPaint = paint(context, sizeSp, faint)
         val metrics = inkPaint.fontMetrics
@@ -140,6 +175,8 @@ object TextRenderer {
         val middle = height / 2f
 
         return List(CYCLE_UNITS) { frame ->
+            val cached = WidgetBitmapCache.get("$key#$frame")
+            if (cached != null) return@List cached
             val bitmap = Bitmap.createBitmap(unit * 2, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             canvas.translate(-(frame * unit).toFloat(), 0f)
@@ -166,7 +203,7 @@ object TextRenderer {
                     x += gap
                 }
             }
-            bitmap
+            WidgetBitmapCache.put("$key#$frame", bitmap)
         }
     }
 

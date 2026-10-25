@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
-import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Animated,
+  AppState,
+  Easing,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { LanguageChip } from '../components/LanguageChip';
@@ -43,8 +51,11 @@ export function OrbitScreen({
   const { width } = useWindowDimensions();
   const size = Math.min(width - 72, 320);
   const languages = useMemo(() => model.languages.slice(0, ON_SPIRAL), [model.languages]);
-  // Parked while the section is out of sight.
-  const turn = useTurn(active && languages.length > 0);
+  // Parked while the section is out of sight, the app is backgrounded, or
+  // the platform asks for reduced motion. The animated value itself is not
+  // rebuilt when those flags change.
+  const motion = useMotionAllowed();
+  const turn = useTurn(active && motion && languages.length > 0);
 
   return (
     <Block>
@@ -77,11 +88,45 @@ export function OrbitScreen({
 }
 
 /**
+ * Decorative motion is allowed only while the app is foregrounded and the
+ * platform has not asked for reduced motion. The turn value is owned by
+ * `useTurn`; this only reports whether a lap should be in flight.
+ */
+
+/**
  * One turn, 0 → 1, over and over, on the native driver: the spiral is drawn
  * once and the views holding it are rotated, so a frame costs nothing on the
  * JavaScript thread — which matters on a page you are scrolling. Each lap
  * resumes from where the last one was parked.
  */
+function useMotionAllowed(): boolean {
+  const [foreground, setForeground] = useState(() => AppState.currentState === 'active');
+  const [reduce, setReduce] = useState(false);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      setForeground(next === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (!cancelled) setReduce(enabled);
+      })
+      .catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduce);
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, []);
+
+  return foreground && !reduce;
+}
+
 function useTurn(active: boolean): Animated.Value {
   const [turn] = useState(() => new Animated.Value(0));
 

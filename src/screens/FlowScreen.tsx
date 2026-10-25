@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 
@@ -85,87 +86,25 @@ export function FlowScreen({ model, onShare }: { model: GitHubModel; onShare: ()
   const { width } = useWindowDimensions();
   const chartWidth = width - 36 - 36;
 
-  const categories = (
-    [
-      { label: 'commits', value: model.breakdown.commits },
-      { label: 'pull requests', value: model.breakdown.pullRequests },
-      { label: 'issues', value: model.breakdown.issues },
-      { label: 'reviews', value: model.breakdown.reviews },
-      { label: 'private', value: model.breakdown.private },
-    ] as const
-  )
-    .filter((entry) => entry.value > 0)
-    .map((entry) => ({ ...entry }));
-
-  const total = categories.reduce((sum, entry) => sum + entry.value, 0) || 1;
-  const repos = model.topRepos.slice(0, 5);
-
-  /** Repos step down in weight by rank; `others` is the ghost. */
-  const repoWeight = (nameWithOwner: string, rank: number) =>
-    nameWithOwner === 'others' ? 0.16 : Math.max(0.3, 1 - rank * 0.18);
+  /**
+   * Band heights are a function of the breakdown and the top five
+   * repositories. Horizontal placement uses the chart width directly, below.
+   * Year re-renders for reasons that change neither (a share handler, a
+   * sibling block), and rebuilding the bands would hand SVG a new object
+   * graph for a diagram that has not moved. The Sankey is small; this only
+   * keeps that identity stable.
+   */
+  const flow = useMemo(
+    () => sankey(model.breakdown, model.topRepos),
+    [model.breakdown, model.topRepos],
+  );
+  const { total, catBands, trunkOffsets, repoBands, repoSources, commitsBand } = flow;
 
   const trunkX = 0;
   const trunkW = 8;
   const midX = chartWidth * 0.46;
   const midW = 8;
   const rightX = chartWidth - 8;
-
-  const catBands = stack(
-    categories,
-    (entry) => entry.value,
-    (entry) => CATEGORY_WEIGHT[entry.label],
-    CHART_HEIGHT,
-  );
-
-  /**
-   * The second stage belongs to the commits band alone: `topRepos` is built
-   * from commit contributions, and hanging every repository off the whole
-   * trunk would draw repos absorbing pull requests and reviews they never
-   * saw. They are sized against the
-   * commits band, which means a year that was mostly private shows a thin
-   * fan. That is the shape of the year, and the legend carries the numbers.
-   */
-  const commitsBand = catBands.find((band) => band.entry.label === 'commits');
-  const commitsHeight = commitsBand?.height ?? 0;
-  const repoTotal = repos.reduce((sum, repo) => sum + repo.count, 0) || 1;
-
-  // Where each repo leaves the commits band: contiguous slices of it, since
-  // the band itself has no gaps in it.
-  const repoSources = repos.reduce<{ y: number; height: number }[]>(
-    (slices, repo) => {
-      const previous = slices[slices.length - 1];
-      const y = previous
-        ? previous.y + previous.height
-        : commitsBand?.y ?? 0;
-      return [...slices, { y, height: (repo.count / repoTotal) * commitsHeight }];
-    },
-    [],
-  );
-
-  // Where it arrives: the same quantities, spaced apart and centred on the
-  // chart, so the links fan the way the pin's do instead of running flat.
-  const repoHeights = repos.map((repo) =>
-    Math.max((repo.count / repoTotal) * commitsHeight, MIN_BAND),
-  );
-  const repoStack =
-    repoHeights.reduce((sum, height) => sum + height, 0) +
-    GAP * Math.max(repos.length - 1, 0);
-  const repoTop = (CHART_HEIGHT - repoStack) / 2;
-  const repoBands = repos.map((repo, index) => ({
-    entry: repo,
-    y:
-      repoTop +
-      repoHeights.slice(0, index).reduce((sum, height) => sum + height, 0) +
-      GAP * index,
-    height: repoHeights[index],
-    weight: repoWeight(repo.nameWithOwner, index),
-  }));
-
-  /** Where each category band leaves the trunk — the trunk has no gaps. */
-  const trunkOffsets = catBands.reduce<number[]>((offsets, band, index) => {
-    const previous = index === 0 ? 0 : offsets[index - 1] + catBands[index - 1].height;
-    return [...offsets, previous];
-  }, []);
 
   return (
     <Block>
@@ -278,6 +217,101 @@ export function FlowScreen({ model, onShare }: { model: GitHubModel; onShare: ()
       </Card>
     </Block>
   );
+}
+
+interface Category {
+  label: string;
+  value: number;
+}
+
+interface RepoSlice {
+  nameWithOwner: string;
+  count: number;
+}
+
+/**
+ * Repos step down in weight by rank; `others` is the ghost.
+ */
+function repoWeight(nameWithOwner: string, rank: number): number {
+  return nameWithOwner === 'others' ? 0.16 : Math.max(0.3, 1 - rank * 0.18);
+}
+
+/**
+ * The Sankey: category bands off the trunk, then the commit band fanning
+ * into the repositories that actually absorbed those commits.
+ */
+function sankey(breakdown: GitHubModel['breakdown'], topRepos: GitHubModel['topRepos']) {
+  const categories: Category[] = (
+    [
+      { label: 'commits', value: breakdown.commits },
+      { label: 'pull requests', value: breakdown.pullRequests },
+      { label: 'issues', value: breakdown.issues },
+      { label: 'reviews', value: breakdown.reviews },
+      { label: 'private', value: breakdown.private },
+    ] as const
+  )
+    .filter((entry) => entry.value > 0)
+    .map((entry) => ({ ...entry }));
+
+  const total = categories.reduce((sum, entry) => sum + entry.value, 0) || 1;
+  const repos: RepoSlice[] = topRepos.slice(0, 5);
+
+  const catBands = stack(
+    categories,
+    (entry) => entry.value,
+    (entry) => CATEGORY_WEIGHT[entry.label],
+    CHART_HEIGHT,
+  );
+
+  /**
+   * The second stage belongs to the commits band alone: `topRepos` is built
+   * from commit contributions, and hanging every repository off the whole
+   * trunk would draw repos absorbing pull requests and reviews they never
+   * saw. They are sized against the commits band, which means a year that
+   * was mostly private shows a thin fan. That is the shape of the year, and
+   * the legend carries the numbers.
+   */
+  const commitsBand = catBands.find((band) => band.entry.label === 'commits');
+  const commitsHeight = commitsBand?.height ?? 0;
+  const repoTotal = repos.reduce((sum, repo) => sum + repo.count, 0) || 1;
+
+  // Where each repo leaves the commits band: contiguous slices of it, since
+  // the band itself has no gaps in it.
+  const repoSources = repos.reduce<{ y: number; height: number }[]>(
+    (slices, repo) => {
+      const previous = slices[slices.length - 1];
+      const y = previous ? previous.y + previous.height : commitsBand?.y ?? 0;
+      return [...slices, { y, height: (repo.count / repoTotal) * commitsHeight }];
+    },
+    [],
+  );
+
+  // Where it arrives: the same quantities, spaced apart and centred on the
+  // chart, so the links fan the way the pin's do instead of running flat.
+  const repoHeights = repos.map((repo) =>
+    Math.max((repo.count / repoTotal) * commitsHeight, MIN_BAND),
+  );
+  const repoStack =
+    repoHeights.reduce((sum, height) => sum + height, 0) +
+    GAP * Math.max(repos.length - 1, 0);
+  const repoTop = (CHART_HEIGHT - repoStack) / 2;
+  const repoBands = repos.map((repo, index) => ({
+    entry: repo,
+    y:
+      repoTop +
+      repoHeights.slice(0, index).reduce((sum, height) => sum + height, 0) +
+      GAP * index,
+    height: repoHeights[index],
+    weight: repoWeight(repo.nameWithOwner, index),
+  }));
+
+  /** Where each category band leaves the trunk — the trunk has no gaps. */
+  const trunkOffsets = catBands.reduce<number[]>((offsets, _band, index) => {
+    const previous = index === 0 ? 0 : offsets[index - 1] + catBands[index - 1].height;
+    return [...offsets, previous];
+  }, []);
+
+  return { total, catBands, trunkOffsets, repoBands, repoSources, commitsBand };
 }
 
 /**

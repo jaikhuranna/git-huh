@@ -5,6 +5,8 @@ import { demoTasks } from '../lib/demo';
 import { DEMO_TOKEN } from '../lib/token';
 import { useRemote, type Remote } from './useRemote';
 
+const TASKS_STALE_AFTER_MS = 2 * 60_000;
+
 /** Assigned work and filed issues, fetched while the inbox is open. */
 export function useTasks(
   token: string | null,
@@ -14,7 +16,11 @@ export function useTasks(
   const demo = useMemo(() => (token === DEMO_TOKEN ? demoTasks() : undefined), [token]);
   return useRemote(
     active && token && login ? `${token}|${login}` : null,
-    (signal) => fetchTasks(token ?? '', login ?? '', signal),
-    { cacheKey: login && token !== DEMO_TOKEN ? `${login.toLowerCase()}-tasks` : null, demo },
+    (signal) => fetchTasks(token ?? '', login ?? '', signal, 'background'),
+    {
+      cacheKey: login && token !== DEMO_TOKEN ? `${login.toLowerCase()}-tasks` : null,
+      demo,
+      staleAfterMs: TASKS_STALE_AFTER_MS,
+    },
   );
 }

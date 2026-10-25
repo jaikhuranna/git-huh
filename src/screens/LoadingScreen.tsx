@@ -24,20 +24,20 @@ const PHASES = Array.from({ length: SAMPLES + 1 }, (_, i) => i / SAMPLES);
 const CREST = 0.09;
 
 /**
- * The first thing on screen, and the only moment with nothing to show — so
- * it shows the widget, waiting. The card is the home-screen card: your own
- * commit messages travel across the top, taken from across your history, and
- * under them a field of dots with a light passing through it from the oldest
- * column to today's plus, over and over, until the year arrives.
+ * The first thing on screen while the token is read from the keystore, and
+ * the fallback while a pushed screen's module loads. It shows the widget,
+ * waiting: your own commit messages travel across the top, taken from across
+ * your history, and under them a field of dots with a light passing through
+ * it from the oldest column to today's plus, over and over. The caption says
+ * which wait this is.
  *
  * **Nothing about this animation runs in JavaScript.** Every dot's whole
  * track — its size and weight at twenty-four phases of the sweep — is
  * computed once at mount and handed to the native driver as an
  * interpolation of one looping value, so the light keeps moving at the
- * display's rate while the JS thread is parsing the first GitHub response,
- * which is the entire point of this screen. The strip is the same
- * (`Marquee`). A timer or `requestAnimationFrame` was tried on the old
- * version of this page and stuttered exactly then.
+ * display's rate while the JS thread does whatever it is doing. The strip is
+ * the same (`Marquee`). A timer or `requestAnimationFrame` was tried on the
+ * old version of this page and stuttered exactly then.
  */
 export function LoadingScreen({
   lines,

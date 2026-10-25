@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  AccessibilityInfo,
+  Animated,
+  AppState,
+  Easing,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
 import { colors, fonts, themed } from '../theme';
 import { Squiggle } from './Squiggle';
@@ -45,6 +55,10 @@ export function Marquee({
   style?: StyleProp<ViewStyle>;
 }) {
   const [x] = useState(() => new Animated.Value(0));
+  // Section `active` already parks a hidden tab. Foreground and reduced
+  // motion are the other two reasons a strip should sit still.
+  const motion = useMotionAllowed();
+  const running = active && motion;
 
   const { pieces, width } = useMemo(() => {
     const char = size * ADVANCE;
@@ -60,7 +74,7 @@ export function Marquee({
   }, [items, size]);
 
   useEffect(() => {
-    if (!active || width <= 0) return;
+    if (!running || width <= 0) return;
     x.setValue(0);
     const loop = Animated.loop(
       Animated.timing(x, {
@@ -72,7 +86,7 @@ export function Marquee({
     );
     loop.start();
     return () => loop.stop();
-  }, [active, speed, width, x]);
+  }, [running, speed, width, x]);
 
   const height = Math.ceil(size * 1.5);
   const line = { fontSize: size, lineHeight: height };
@@ -111,6 +125,39 @@ export function Marquee({
       </Animated.View>
     </View>
   );
+}
+
+/**
+ * Decorative motion is allowed only while the app is foregrounded and the
+ * platform has not asked for reduced motion. The animated value stays where
+ * the caller put it; this only reports whether the loop should be running.
+ */
+function useMotionAllowed(): boolean {
+  const [foreground, setForeground] = useState(() => AppState.currentState === 'active');
+  const [reduce, setReduce] = useState(false);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      setForeground(next === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (!cancelled) setReduce(enabled);
+      })
+      .catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduce);
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, []);
+
+  return foreground && !reduce;
 }
 
 function clip(value: string): string {

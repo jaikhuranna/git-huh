@@ -10,7 +10,7 @@ import type { Remote } from '../hooks/useRemote';
 import type { People, Person } from '../lib/people';
 import { useNav } from '../lib/nav';
 import { savedAge } from '../lib/store';
-import { useSession } from '../shell/session';
+import { useSessionData } from '../shell/session';
 import { colors, fonts, space, themed } from '../theme';
 import { Block, More, Page, ScreenHead, whyNot } from './shared';
 
@@ -109,7 +109,7 @@ export function PeopleScreen({
 /** Everyone, pushed from the `year` page. */
 export function PeoplePage() {
   const nav = useNav();
-  const { people } = useSession();
+  const { people } = useSessionData();
   return (
     <OverlayFrame onBack={nav.close} where="year · people">
       <Page>

@@ -3,8 +3,12 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Composer } from './Composer';
 import { Data, Label, Micro } from './Type';
+import { DIFF_PAGE_ROWS, pageWindow } from '../lib/boundedPatch';
 import type { DiffFile, DiffLine } from '../lib/pullDetail';
 import { colors, fonts, radii, themed, tint } from '../theme';
+
+/** Open files whose rows are mounted together. Further hits stay one tap away. */
+const OPEN_FILES = 4;
 
 /** Where a line comment lands: GitHub numbers new lines on the right, old on the left. */
 export interface LineTarget {
@@ -48,15 +52,41 @@ export function Diff({
   demo?: boolean;
 }) {
   const needle = find.trim().toLowerCase();
+  // Count only the rows a file will actually mount. Scanning every retained
+  // line of every file on each keystroke is the search, not a preview of it.
   const hits = useMemo(
     () =>
       needle
-        ? files.map(
-            (file) => file.lines.filter((line) => line.kind !== 'meta' && line.text.toLowerCase().includes(needle)).length,
-          )
+        ? files.map((file) => {
+            const window = pageWindow(file.lines.length, DIFF_PAGE_ROWS, DIFF_PAGE_ROWS);
+            let count = 0;
+            for (let index = 0; index < window.visible; index += 1) {
+              const line = file.lines[index];
+              if (line.kind !== 'meta' && line.text.toLowerCase().includes(needle)) count += 1;
+            }
+            return count;
+          })
         : files.map(() => 0),
     [files, needle],
   );
+
+  const total = hits.reduce((sum, count) => sum + count, 0);
+  const [opened, setOpened] = useState(OPEN_FILES);
+  // A search used to unfold every hit at once, which mounts a row per
+  // matching line across the pull. The first few open; the rest wait.
+  const revealThrough = useMemo(() => {
+    if (!needle) return files.length;
+    let budget = opened;
+    let last = -1;
+    for (let index = 0; index < hits.length; index += 1) {
+      if (hits[index] === 0) continue;
+      if (budget === 0) break;
+      budget -= 1;
+      last = index;
+    }
+    return last;
+  }, [files.length, hits, needle, opened]);
+  const deferred = needle ? hits.reduce((count, hit, index) => count + (hit > 0 && index > revealThrough ? 1 : 0), 0) : 0;
 
   if (files.length === 0) {
     return (
@@ -65,8 +95,6 @@ export function Diff({
       </Label>
     );
   }
-
-  const total = hits.reduce((sum, count) => sum + count, 0);
 
   return (
     <View style={styles.stack}>
@@ -79,17 +107,27 @@ export function Diff({
               }`}
         </Micro>
       )}
-      {files.map((file, index) => (
-        <FileBlock
-          demo={demo}
-          file={file}
-          hits={hits[index]}
-          key={file.path}
-          needle={needle}
-          onComment={onComment}
-          width={width}
-        />
-      ))}
+      {files.map((file, index) => {
+        const reveal = !needle || hits[index] === 0 || index <= revealThrough;
+        return (
+          <FileBlock
+            demo={demo}
+            file={file}
+            hits={hits[index]}
+            key={file.path}
+            needle={reveal ? needle : ''}
+            onComment={onComment}
+            width={width}
+          />
+        );
+      })}
+      {deferred > 0 && (
+        <Pressable accessibilityRole="button" onPress={() => setOpened((current) => current + OPEN_FILES)}>
+          <Label style={styles.more}>
+            {deferred} more {deferred === 1 ? 'file' : 'files'} with “{find.trim()}”
+          </Label>
+        </Pressable>
+      )}
       {moreFiles > 0 && (
         <Label style={styles.more}>
           {moreFiles} more {moreFiles === 1 ? 'file' : 'files'} in this pull
@@ -119,16 +157,21 @@ function FileBlock({
   // the file list is not a list any more. A find opens the ones it hit.
   const [folded, setOpen] = useState(file.lines.length > 0 && file.lines.length <= 40);
   const open = needle ? hits > 0 || folded : folded;
+  const [shown, setShown] = useState(DIFF_PAGE_ROWS);
   const [picked, setPicked] = useState<number | null>(null);
-  const pickedLine = picked != null ? file.lines[picked] : null;
+  // One page at a time, including a find. Showing every retained row for a
+  // match is what made search mount the whole file.
+  const window = pageWindow(file.lines.length, DIFF_PAGE_ROWS, shown);
+  const visible = file.lines.slice(0, window.visible);
+  const pickedLine = picked != null && picked < window.visible ? file.lines[picked] : null;
 
   const contentWidth = useMemo(() => {
-    const longest = file.lines.reduce(
+    const longest = visible.reduce(
       (max, line) => Math.max(max, Math.min(line.text.length, MAX_COLUMNS)),
       0,
     );
     return Math.max(width, GUTTER + longest * CHAR + 16);
-  }, [file.lines, width]);
+  }, [visible, width]);
 
   return (
     <View style={styles.file}>
@@ -156,7 +199,7 @@ function FileBlock({
           // patch with nothing to scroll it; the page scroll handles depth.
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ width: contentWidth }}>
-              {file.lines.map((line, index) => (
+              {visible.map((line, index) => (
                 <Row
                   found={needle.length > 0 && line.kind !== 'meta' && line.text.toLowerCase().includes(needle)}
                   key={index}
@@ -169,7 +212,19 @@ function FileBlock({
                   picked={picked === index}
                 />
               ))}
-              {file.truncated && (
+              {window.remaining > 0 && (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setShown((current) => current + DIFF_PAGE_ROWS)}
+                  style={styles.moreRows}
+                >
+                  <Micro style={styles.truncated}>
+                    {window.remaining} more {window.remaining === 1 ? 'line' : 'lines'} in this file
+                    {needle ? ' — the find covers this page' : ''}
+                  </Micro>
+                </Pressable>
+              )}
+              {window.remaining === 0 && file.truncated && (
                 <Micro style={styles.truncated}>
                   … the rest of this patch is on github
                 </Micro>
@@ -380,6 +435,9 @@ const styles = themed(() =>
       fontFamily: fonts.mono,
       fontSize: CODE_SIZE,
       lineHeight: 15,
+    },
+    moreRows: {
+      alignSelf: 'flex-start',
     },
     truncated: {
       color: colors.ink40,

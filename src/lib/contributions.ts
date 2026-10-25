@@ -1,9 +1,14 @@
 import { brightCycle } from '../theme/palette';
 import type {
+  ArchiveSlice,
   Contributions,
   ContributionStats,
   ContributionWeek,
   RepoNode,
+  ReposSlice,
+  Slice,
+  TodaySlice,
+  WorkSlice,
   YearStats,
 } from './github';
 
@@ -77,6 +82,11 @@ export interface YearSummary {
 }
 
 export interface GitHubModel {
+  /**
+   * The viewer's node id, when the profile that produced this model had one.
+   * Older saved models omit it; commit sampling then falls back to login.
+   */
+  viewerId?: string;
   login: string;
   /**
    * Every login summed into this model, when it is several accounts shown
@@ -107,10 +117,22 @@ export interface GitHubModel {
   repos: RepoSummary[];
   /** Aggregated across all repos, sorted by bytes desc. */
   languages: LanguageShare[];
-  /** Per contribution year, oldest first. */
+  /** Per contribution year, oldest first. Empty until the archive slice lands. */
   years: YearSummary[];
   /** Weekly totals across the visible year, oldest first. */
   weeks: number[];
+  /**
+   * The year archive. Absent on a model saved before slices existed, which
+   * is treated as already reduced into `years`. `loading` means older years
+   * have not been asked for yet; that is not a zero year.
+   */
+  archive?: Slice<ArchiveSlice>;
+  /** Today's commit and open-PR counts. Independent of the year archive. */
+  today?: Slice<TodaySlice>;
+  /** Followers and the repository count. */
+  work?: Slice<WorkSlice>;
+  /** Repositories and languages. Independent of the year archive. */
+  reposSlice?: Slice<ReposSlice>;
 }
 
 /** `~jai`, or `~jai + ~work` for several accounts shown as one. */
@@ -296,21 +318,27 @@ export function toGitHubModel(
     if (lastPast) lastPast.isToday = true;
   }
 
+  const todaySlice = sliceValue(stats.today);
+  const work = sliceValue(stats.work);
+  const repos = sliceValue(stats.repos);
+  const archive = sliceValue(stats.archive);
+  const repoNodes = repos?.repos ?? [];
   return {
+    viewerId: contributions.id,
     login: contributions.login,
     name: contributions.name ?? contributions.login,
     avatarUrl: contributions.avatarUrl,
     bio: contributions.bio ?? '',
-    following: stats.following,
+    following: work?.following ?? 0,
     total: contributions.totalContributions,
     todayCount: allDays.find((day) => day.isToday)?.count ?? 0,
-    todayCommits: stats.todayCommits,
-    totalCommits: stats.totalCommits,
-    totalPrivate: stats.totalPrivate,
-    openPrs: stats.openPrs,
-    followers: stats.followers,
-    stars: stats.stars,
-    repoCount: stats.repoCount,
+    todayCommits: todaySlice?.todayCommits ?? 0,
+    totalCommits: archive?.totalCommits ?? 0,
+    totalPrivate: archive?.totalPrivate ?? 0,
+    openPrs: todaySlice?.openPrs ?? 0,
+    followers: work?.followers ?? 0,
+    stars: repos?.stars ?? 0,
+    repoCount: work?.repoCount ?? 0,
     since: sinceYear(contributions, now),
     columns,
     breakdown: {
@@ -321,11 +349,22 @@ export function toGitHubModel(
       private: contributions.restrictedContributions,
     },
     topRepos: toTopRepos(contributions.commitContributionsByRepository),
-    repos: stats.repos.map(toRepoSummary),
-    languages: toLanguages(stats.repos),
-    years: stats.years.map((year) => toYearSummary(year, now)),
+    repos: repoNodes.map(toRepoSummary),
+    languages: toLanguages(repoNodes),
+    years: (archive?.years ?? []).map((year) => toYearSummary(year, now)),
     weeks: weeklyTotals(contributions.weeks),
+    archive: stats.archive,
+    today: stats.today,
+    work: stats.work,
+    reposSlice: stats.repos,
   };
+}
+
+/** A loading or failed slice has no number to print. Only a real answer does. */
+function sliceValue<T>(slice: Slice<T> | undefined): T | null {
+  if (!slice) return null;
+  if (slice.status === 'ready' || slice.status === 'stale') return slice.value;
+  return null;
 }
 
 export interface Insights {

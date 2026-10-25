@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 import { toISODate } from './contributions';
-import { executeQuery } from './github';
-import { PULL_SUMMARY_FIELDS, pullSummarySchema, toPullSummary, type PullSummary } from './pullRequest';
+import { executeQuery, type RequestPriority } from './github';
+import { PULL_SUMMARY_FIELDS, pullSummarySchema, rememberPull, toPullSummary, type PullSummary } from './pullRequest';
 import type { CommitLine } from './messageCache';
 
 /**
@@ -32,7 +32,8 @@ const commitSchema = z.object({
   messageHeadline: z.string(),
   author: z
     .object({ user: z.object({ login: z.string() }).nullable() })
-    .nullable(),
+    .nullable()
+    .optional(),
 });
 
 const historySchema = z.object({
@@ -89,13 +90,42 @@ export interface PullActivity extends PullSummary {
 export interface Activity {
   commits: CommitSample[];
   pulls: PullActivity[];
+  /**
+   * `ready` is a real sample, including a genuine empty one. `unavailable`
+   * means the read failed and the arrays are not a claim that nothing
+   * happened. `stale` is the last ready sample after a later failure.
+   */
+  /**
+   * `ready` is a real sample, including a genuine empty one. `unavailable`
+   * means the read failed. `stale` is the last ready sample after a later
+   * failure. Optional so a merger that only concatenates samples still
+   * typechecks; a missing value is treated as ready.
+   */
+  availability?: 'ready' | 'unavailable' | 'stale';
+  /** When a ready or stale sample was known to be true. */
+  at?: number | null;
 }
 
-export const EMPTY_ACTIVITY: Activity = { commits: [], pulls: [] };
+export const EMPTY_ACTIVITY: Activity = {
+  commits: [],
+  pulls: [],
+  availability: 'unavailable',
+  at: null,
+};
 
-function query(login: string): string {
-  // `author:` on history needs a node id we do not have yet, so the author
-  // filter happens client-side against the login instead.
+/** A successful sample with nothing in it. Distinct from a failed read. */
+export function emptyActivity(at = Date.now()): Activity {
+  return { commits: [], pulls: [], availability: 'ready', at };
+}
+
+function query(login: string, viewerId: string | null): string {
+  // With the viewer's node id, GitHub returns only that author's commits.
+  // Without it the sample still filters by login after the fact, and is
+  // still a sample of recent history, not a complete contribution log.
+  const historyArgs = viewerId
+    ? `first: ${COMMITS_PER_REPO}, author: { id: "${viewerId}" }`
+    : `first: ${COMMITS_PER_REPO}`;
+  const authorFields = viewerId ? '' : '${authorFields}';
   return /* GraphQL */ `
     query Activity {
       prs: search(
@@ -125,13 +155,13 @@ function query(login: string): string {
             defaultBranchRef {
               target {
                 ... on Commit {
-                  history(first: ${COMMITS_PER_REPO}) {
+                  history(${historyArgs}) {
                     nodes {
                       committedDate
                       additions
                       deletions
                       messageHeadline
-                      author { user { login } }
+                      ${authorFields}
                     }
                   }
                 }
@@ -145,27 +175,27 @@ function query(login: string): string {
 }
 
 /**
- * Fetch commit timestamps and pull request detail. The caller treats a
- * failure as an empty sample; nothing else depends on it.
+ * Fetch a sample of commit timestamps and pull-request summaries.
+ * Descriptions are not included. A failure rejects; it is not an empty sample.
  */
 export async function fetchActivity(
   token: string,
   login: string,
   signal?: AbortSignal,
+  viewerId?: string | null,
+  priority: RequestPriority = 'interactive',
 ): Promise<Activity> {
-  const data = await executeQuery(
-    token,
-    query(login),
-    activitySchema,
+  const data = await executeQuery(token, query(login, viewerId ?? null), activitySchema, {
     signal,
-  );
+    priority,
+  });
 
   const commits: CommitSample[] = [];
   for (const repo of data.repos.repositories.nodes) {
     const nodes = repo.defaultBranchRef?.target?.history.nodes ?? [];
     for (const node of nodes) {
       // Other people's commits land in the same history; keep only ours.
-      if (node.author?.user?.login?.toLowerCase() !== login.toLowerCase()) {
+      if (!viewerId && node.author?.user?.login?.toLowerCase() !== login.toLowerCase()) {
         continue;
       }
       const when = new Date(node.committedDate);
@@ -187,15 +217,25 @@ export async function fetchActivity(
     // The search union can return issues too; skip anything that is not a PR.
     if (!node.success) continue;
     const pr = node.data;
+    const summary = toPullSummary(pr, pr.repository.nameWithOwner);
+    rememberPull({
+      repo: summary.repo,
+      number: summary.number,
+      title: summary.title,
+      htmlUrl: summary.url,
+      createdAt: summary.createdAt,
+      draft: summary.isDraft,
+      membership: pr.state === 'OPEN' ? 'authored-open' : 'authored-history',
+    });
     pulls.push({
-      ...toPullSummary(pr, pr.repository.nameWithOwner),
+      ...summary,
       closedAt: pr.closedAt,
       comments: pr.comments.totalCount,
       firstReviewAt: pr.reviews?.nodes[0]?.submittedAt ?? null,
     });
   }
 
-  return { commits, pulls };
+  return { commits, pulls, availability: 'ready', at: Date.now() };
 }
 
 /** Commits per local hour, 0–23. */

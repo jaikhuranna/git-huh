@@ -122,6 +122,8 @@ export interface Entry {
   path: string;
   type: 'file' | 'dir' | 'symlink' | 'submodule';
   size: number;
+  /** Blob sha, when the listing has one — a file can be named without re-reading it. */
+  sha?: string;
 }
 
 const entriesSchema = z.array(
@@ -130,6 +132,7 @@ const entriesSchema = z.array(
     path: z.string(),
     type: z.enum(['file', 'dir', 'symlink', 'submodule']),
     size: z.number(),
+    sha: z.string().optional(),
   }),
 );
 
@@ -156,9 +159,21 @@ export interface RepoFile {
   sha: string;
   size: number;
   ref: string;
-  /** null for a binary file, or one too big for GitHub to hand over inline. */
+  /**
+   * Decoded text. `''` is a real empty file. `null` is a file that was not
+   * decoded: binary, not UTF-8, or larger than a phone should hold.
+   */
   text: string | null;
+  /** Why `text` is null, so the screen can say "too big" rather than "binary". */
+  reason?: 'binary' | 'too-large';
 }
+
+/**
+ * Past this the decoded string, plus the lines the reader keeps, is more
+ * than a phone should hold for one file. GitHub will send far more; we do
+ * not ask it to.
+ */
+export const VIEW_LIMIT = 1_000_000;
 
 const fileSchema = z.object({
   path: z.string(),
@@ -174,18 +189,37 @@ export async function fetchFile(
   path: string,
   ref: string,
   signal?: AbortSignal,
+  /** Size already known from the directory listing, so a huge file is refused first. */
+  known?: { size?: number; sha?: string },
 ): Promise<RepoFile> {
+  if (known?.size != null && known.size > VIEW_LIMIT) {
+    return {
+      path,
+      sha: known.sha ?? '',
+      size: known.size,
+      ref,
+      text: null,
+      reason: 'too-large',
+    };
+  }
   const file = await rest(token, `/repos/${repo}/contents/${encodePath(path)}${refQuery(ref)}`, {
     schema: fileSchema,
     signal,
   });
-  let text: string | null = null;
-  if (file.encoding === 'base64' && file.content) {
+  if (file.size > VIEW_LIMIT) {
+    return { path: file.path, sha: file.sha, size: file.size, ref, text: null, reason: 'too-large' };
+  }
+  // `content` may be `''`: a zero-byte file is base64 of nothing, which is
+  // still a file. Only a missing field means GitHub declined to inline it.
+  if (file.encoding === 'base64' && typeof file.content === 'string') {
     const bytes = Buffer.from(file.content, 'base64');
     // A NUL in the first few KB is how git itself decides a file is binary.
-    text = bytes.subarray(0, 8000).includes(0) ? null : bytes.toString('utf8');
+    if (bytes.subarray(0, 8000).includes(0)) {
+      return { path: file.path, sha: file.sha, size: file.size, ref, text: null, reason: 'binary' };
+    }
+    return { path: file.path, sha: file.sha, size: file.size, ref, text: bytes.toString('utf8') };
   }
-  return { path: file.path, sha: file.sha, size: file.size, ref, text };
+  return { path: file.path, sha: file.sha, size: file.size, ref, text: null, reason: 'binary' };
 }
 
 // --- code search ------------------------------------------------------------

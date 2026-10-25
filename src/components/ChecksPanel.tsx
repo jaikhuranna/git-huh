@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useRemote } from '../hooks/useRemote';
@@ -52,6 +52,10 @@ export function ChecksPanel({ repo, sha }: { repo: string; sha: string }) {
     { demo },
   );
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [flight, setFlight] = useState<{ key: string; phase: 'armed' | 'sending' } | null>(null);
+  // A second tap can arrive before the sending render, so the ref is what
+  // actually refuses the duplicate write.
+  const inflight = useRef<string | null>(null);
 
   if (checks.status === 'loading') return <Label style={styles.note}>reading the checks…</Label>;
   if (checks.status === 'error') {
@@ -65,18 +69,31 @@ export function ChecksPanel({ repo, sha }: { repo: string; sha: string }) {
     .map((tone) => [tone, runs.filter((run) => toneOf(run) === tone).length] as const)
     .filter(([, count]) => count > 0);
 
-  const act = async (label: string, run: () => Promise<void>) => {
-    if (nav.demo) {
-      setNote({ ok: true, text: 'demo account · nothing was sent' });
+  const act = async (key: string, label: string, run: () => Promise<void>, after?: () => void) => {
+    if (inflight.current != null) return;
+    if (flight?.key === key && flight.phase === 'armed') {
+      if (nav.demo) {
+        setFlight(null);
+        setNote({ ok: true, text: 'demo account · nothing was sent' });
+        return;
+      }
+      inflight.current = key;
+      setFlight({ key, phase: 'sending' });
+      try {
+        await run();
+        setNote({ ok: true, text: label });
+        checks.reload();
+        after?.();
+      } catch (error) {
+        setNote({ ok: false, text: explain(error, 'that') });
+      } finally {
+        inflight.current = null;
+        setFlight(null);
+      }
       return;
     }
-    try {
-      await run();
-      setNote({ ok: true, text: label });
-      checks.reload();
-    } catch (error) {
-      setNote({ ok: false, text: explain(error, 'that') });
-    }
+    setFlight({ key, phase: 'armed' });
+    setNote(null);
   };
 
   return (
@@ -93,6 +110,7 @@ export function ChecksPanel({ repo, sha }: { repo: string; sha: string }) {
       </View>
 
       <Workflows
+        flight={flight}
         onAct={act}
         repo={repo}
         workflows={workflows}
@@ -110,11 +128,13 @@ export function ChecksPanel({ repo, sha }: { repo: string; sha: string }) {
 function Workflows({
   repo,
   workflows,
+  flight,
   onAct,
 }: {
   repo: string;
   workflows: WorkflowRun[];
-  onAct: (label: string, run: () => Promise<void>) => void;
+  flight: { key: string; phase: 'armed' | 'sending' } | null;
+  onAct: (key: string, label: string, run: () => Promise<void>, after?: () => void) => void;
 }) {
   const nav = useNav();
   const failed = workflows.filter((run) => run.conclusion === 'failure');
@@ -125,33 +145,35 @@ function Workflows({
   return (
     <View style={styles.actions}>
       {failed.map((run) => (
-        <Pressable
-          accessibilityRole="button"
+        <ActionButton
+          confirm="re-run the failed jobs?"
+          flight={flight}
           key={`rerun-${run.id}`}
+          label={`re-run failed · ${run.name}`}
           onPress={() =>
-            onAct(`re-running the failed jobs in ${run.name}`, () =>
+            onAct(`rerun-${run.id}`, `re-running the failed jobs in ${run.name}`, () =>
               rerunFailed(nav.token ?? '', repo, run.id),
             )
           }
-          style={styles.solid}
-        >
-          <Label style={styles.solidLabel}>re-run failed · {run.name}</Label>
-        </Pressable>
+          operation={`rerun-${run.id}`}
+        />
       ))}
       {held.map((run) => (
-        <Pressable
-          accessibilityRole="button"
+        <ActionButton
+          confirm="approve this run?"
+          flight={flight}
           key={`approve-${run.id}`}
+          label={`approve and run · ${run.name}`}
           onPress={() =>
-            onAct(`${run.name} is allowed to run`, () => approveRun(nav.token ?? '', repo, run.id))
+            onAct(`approve-${run.id}`, `${run.name} is allowed to run`, () =>
+              approveRun(nav.token ?? '', repo, run.id),
+            )
           }
-          style={styles.solid}
-        >
-          <Label style={styles.solidLabel}>approve and run · {run.name}</Label>
-        </Pressable>
+          operation={`approve-${run.id}`}
+        />
       ))}
       {waiting.map((run) => (
-        <Deployment key={`deploy-${run.id}`} onAct={onAct} repo={repo} run={run} />
+        <Deployment flight={flight} key={`deploy-${run.id}`} onAct={onAct} repo={repo} run={run} />
       ))}
     </View>
   );
@@ -160,11 +182,13 @@ function Workflows({
 function Deployment({
   repo,
   run,
+  flight,
   onAct,
 }: {
   repo: string;
   run: WorkflowRun;
-  onAct: (label: string, action: () => Promise<void>) => void;
+  flight: { key: string; phase: 'armed' | 'sending' } | null;
+  onAct: (key: string, label: string, action: () => Promise<void>, after?: () => void) => void;
 }) {
   const nav = useNav();
   const demo = useMemo(() => (nav.demo ? demoPending() : undefined), [nav.demo]);
@@ -173,6 +197,16 @@ function Deployment({
     (signal) => fetchPendingDeployments(nav.token ?? '', repo, run.id, signal),
     { demo },
   );
+  if (pending.status === 'loading' || pending.status === 'idle') {
+    return <Micro style={styles.waitingNote}>checking who can approve {run.name}…</Micro>;
+  }
+  if (pending.status === 'error' || pending.failure) {
+    return (
+      <Micro style={styles.failed}>
+        {explain(pending.status === 'error' ? pending.error : pending.failure, 'reading the pending deployment')}
+      </Micro>
+    );
+  }
   if (pending.status !== 'ready' || pending.data.length === 0) return null;
   const mine = pending.data.filter((item) => item.canApprove);
   if (mine.length === 0) {
@@ -186,29 +220,69 @@ function Deployment({
   const ids = mine.map((item) => item.environmentId);
   return (
     <View style={styles.deploy}>
-      <Pressable
-        accessibilityRole="button"
+      <ActionButton
+        confirm={`approve deploy to ${names}?`}
+        flight={flight}
+        label={`approve deploy · ${names}`}
         onPress={() =>
-          onAct(`deploying to ${names}`, () =>
-            reviewDeployments(nav.token ?? '', repo, run.id, ids, 'approved', 'approved from git-huh'),
+          onAct(
+            `deploy-approve-${run.id}`,
+            `deploying to ${names}`,
+            () => reviewDeployments(nav.token ?? '', repo, run.id, ids, 'approved', 'approved from git-huh'),
+            () => pending.reload(),
           )
         }
-        style={styles.solid}
-      >
-        <Label style={styles.solidLabel}>approve deploy · {names}</Label>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
+        operation={`deploy-approve-${run.id}`}
+      />
+      <ActionButton
+        confirm="reject this deploy?"
+        flight={flight}
+        ghost
+        label="reject"
         onPress={() =>
-          onAct(`the deploy to ${names} was stopped`, () =>
-            reviewDeployments(nav.token ?? '', repo, run.id, ids, 'rejected', 'rejected from git-huh'),
+          onAct(
+            `deploy-reject-${run.id}`,
+            `the deploy to ${names} was stopped`,
+            () => reviewDeployments(nav.token ?? '', repo, run.id, ids, 'rejected', 'rejected from git-huh'),
+            () => pending.reload(),
           )
         }
-        style={styles.ghost}
-      >
-        <Label style={styles.ghostLabel}>reject</Label>
-      </Pressable>
+        operation={`deploy-reject-${run.id}`}
+      />
     </View>
+  );
+}
+
+function ActionButton({
+  operation,
+  label,
+  confirm,
+  flight,
+  onPress,
+  ghost,
+}: {
+  operation: string;
+  label: string;
+  confirm: string;
+  flight: { key: string; phase: 'armed' | 'sending' } | null;
+  onPress: () => void;
+  ghost?: boolean;
+}) {
+  const mine = flight?.key === operation;
+  const sending = mine && flight.phase === 'sending';
+  const locked = flight?.phase === 'sending';
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ busy: sending, disabled: locked && !sending }}
+      disabled={locked}
+      onPress={onPress}
+      style={ghost ? styles.ghost : styles.solid}
+    >
+      <Label style={ghost ? styles.ghostLabel : styles.solidLabel}>
+        {sending ? 'sending…' : mine ? confirm : label}
+      </Label>
+    </Pressable>
   );
 }
 
@@ -270,6 +344,13 @@ function Log({ repo, jobId, url }: { repo: string; jobId: number; url: string })
     );
   }
   if (log.status !== 'ready') return null;
+  if (log.data.tooLarge) {
+    return (
+      <Pressable accessibilityRole="link" onPress={() => Linking.openURL(url).catch(() => {})}>
+        <Micro style={styles.logNote}>log too large · open it on github</Micro>
+      </Pressable>
+    );
+  }
 
   return (
     <View style={styles.log}>

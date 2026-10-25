@@ -23,6 +23,7 @@ function contributions(weeks: ContributionWeek[], extra: Partial<Contributions> 
     .flatMap((week) => week.contributionDays)
     .reduce((sum, day) => sum + day.contributionCount, 0);
   return {
+    id: 'octo',
     login: 'octo',
     name: null,
     avatarUrl: '',
@@ -42,16 +43,10 @@ function contributions(weeks: ContributionWeek[], extra: Partial<Contributions> 
 }
 
 const STATS: ContributionStats = {
-  todayCommits: 0,
-  totalCommits: 0,
-  totalPrivate: 0,
-  openPrs: 0,
-  followers: 0,
-  following: 0,
-  stars: 0,
-  repoCount: 0,
-  repos: [],
-  years: [],
+  today: { status: 'ready', at: NOW.getTime(), value: { todayCommits: 0, openPrs: 0 } },
+  work: { status: 'ready', at: NOW.getTime(), value: { followers: 0, following: 0, repoCount: 0 } },
+  repos: { status: 'ready', at: NOW.getTime(), value: { stars: 0, repos: [] } },
+  archive: { status: 'ready', at: NOW.getTime(), value: { totalCommits: 0, totalPrivate: 0, years: [] } },
 };
 
 function model(counts: number[], end: Date = NOW) {

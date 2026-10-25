@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { executeQuery } from './github';
+import { executeQuery, type RequestPriority } from './github';
 
 /**
  * What is yours to do: open issues and pull requests assigned to you, and the
@@ -134,10 +134,15 @@ export async function fetchTasks(
   token: string,
   login: string,
   signal?: AbortSignal,
+  priority: RequestPriority = 'interactive',
 ): Promise<Tasks> {
-  const data = await executeQuery(token, QUERY, responseSchema, signal, {
-    assigned: `is:open archived:false assignee:${login} sort:updated-desc`,
-    filed: `is:open is:issue archived:false author:${login} sort:updated-desc`,
+  const data = await executeQuery(token, QUERY, responseSchema, {
+    signal,
+    priority,
+    variables: {
+      assigned: `is:open archived:false assignee:${login} sort:updated-desc`,
+      filed: `is:open is:issue archived:false author:${login} sort:updated-desc`,
+    },
   });
   return {
     assigned: readTasks(data.assigned.nodes),

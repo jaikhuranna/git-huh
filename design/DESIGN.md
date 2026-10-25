@@ -275,13 +275,18 @@ travelling across the top** (`Marquee`, from the pool below) and a field of dots
 them with **a light passing through it** from the oldest column to today's plus, over and
 over — each dot rests at a stand-in level and swells to the peak as the crest passes its
 column, the crest leaning a little down the rows. Under the card, the wordmark and what
-it is doing (`reading your year`). The card fades in over half a second.
+it is doing — `opening the drawer` while the token is read from the keystore, `opening`
+while a pushed screen's module loads. The card fades in over half a second.
+
+This is the token read and a lazy row, not the year: once there is a token the five
+tabs are up and each section says what it is doing, so an unreachable GitHub never
+hides the device-local `ideas` and `host`.
 
 **Nothing about the animation runs in JavaScript.** Every dot's whole track — its scale
 and opacity at twenty-four phases of the sweep — is computed once at mount and handed to
 the native driver as an interpolation of one looping value; the strip is one native
-`translateX`. So the light keeps moving at the display's rate while the first GitHub
-response is parsed on the JS thread.
+`translateX`. So the light keeps moving at the display's rate while the JS thread starts
+the screen it is waiting for.
 
 *(Superseded: pin11's ultramarine page of warped uppercase type. It was the one screen in
 another app's colours.)*
@@ -747,8 +752,9 @@ pushes the rest.
   push over the sections and over each other, each with `←
   back` and the system back button wired to pop the top. A pushed page about one
   thing may have views of it (`Segments` on `pull`): it covers the bar, so that row
-  is the only one on screen. Lower pages stay
-  mounted, hidden, so back returns to them as they were. A github.com link
+  is the only one on screen. The top few pages stay mounted, hidden, so back returns
+  to them as they were; deeper ones are built again on the way back, showing the saved
+  reads and the drafts left on the device. A github.com link
   anywhere in rendered Markdown opens the matching page on the stack instead
   of the browser. (`lib/nav.tsx`.)
 

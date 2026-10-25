@@ -1,6 +1,7 @@
 import { memo, useCallback } from 'react';
 
-import { useSession } from '../shell/session';
+import { GitHubGate } from '../shell/SectionScreen';
+import { useSessionActions, useSessionData } from '../shell/session';
 import { ArchiveScreen } from './ArchiveScreen';
 import { FlowScreen } from './FlowScreen';
 import { OrbitScreen } from './OrbitScreen';
@@ -21,7 +22,8 @@ const People = memo(PeopleScreen);
  * carries its own `share`.
  */
 export function YearScreen({ active }: { active: boolean }) {
-  const { model, nav, people } = useSession();
+  const { nav } = useSessionActions();
+  const { model, people } = useSessionData();
   const shareWeeks = useCallback(
     (year: number) => nav.open({ kind: 'share', card: 'weeks', year }),
     [nav],
@@ -31,7 +33,15 @@ export function YearScreen({ active }: { active: boolean }) {
   const shareYears = useCallback(() => nav.open({ kind: 'share', card: 'years' }), [nav]);
   const everyone = useCallback(() => nav.open({ kind: 'people' }), [nav]);
 
-  if (!model) return null;
+  // Archive slices can still be on their way after the rolling year is ready.
+  // A missing model is a failed or unfinished read, not an empty year.
+  if (!model) {
+    return (
+      <Page>
+        <GitHubGate>{null}</GitHubGate>
+      </Page>
+    );
+  }
 
   return (
     <Page blocks>

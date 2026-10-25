@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 
+import { MARKDOWN_PAGE_BLOCKS, pageWindow } from '../lib/boundedPatch';
 import { routeForUrl, useNav } from '../lib/nav';
 import { Body, Data, Serif } from './Type';
 import { Squiggle } from './Squiggle';
@@ -31,14 +32,20 @@ export function Markdown({
   source,
   width,
   limit,
+  href,
 }: {
   source: string;
   /** Used to size the wavy rules, which are SVG and cannot be `100%`. */
   width: number;
   /** Characters to show before the text is cut off; omit for all of it. */
   limit?: number;
+  /** Where the uncut body lives, when this view is only a page of it. */
+  href?: string;
 }) {
   const blocks = useMemo(() => parse(source, limit), [limit, source]);
+  const [shown, setShown] = useState(MARKDOWN_PAGE_BLOCKS);
+  const window = pageWindow(blocks.length, MARKDOWN_PAGE_BLOCKS, shown);
+  const visible = blocks.slice(0, window.visible);
 
   if (blocks.length === 0) {
     return <Body style={styles.empty}>Nothing was written here.</Body>;
@@ -46,9 +53,19 @@ export function Markdown({
 
   return (
     <View>
-      {blocks.map((block, index) => (
+      {visible.map((block, index) => (
         <Fragment key={index}>{render(block, width)}</Fragment>
       ))}
+      {window.remaining > 0 && (
+        <Text
+          accessibilityRole="button"
+          onPress={() => setShown((current) => current + MARKDOWN_PAGE_BLOCKS)}
+          style={styles.more}
+        >
+          {window.remaining} more {window.remaining === 1 ? 'block' : 'blocks'}
+          {href ? ' · the full text is on github' : ''}
+        </Text>
+      )}
     </View>
   );
 }
@@ -251,8 +268,10 @@ function parse(source: string, limit?: number): Block[] {
     .replace(/<\/?(details|summary|br|p|div|img|picture|source)[^>]*>/gi, '')
     .trim();
 
+  let cut = false;
   if (limit && text.length > limit) {
     text = `${text.slice(0, limit).trimEnd()}…`;
+    cut = true;
   }
 
   const blocks: Block[] = [];
@@ -358,6 +377,12 @@ function parse(source: string, limit?: number): Block[] {
   }
 
   flush();
+  if (cut) {
+    blocks.push({
+      kind: 'paragraph',
+      text: 'The rest of this was cut off. The full text is on GitHub.',
+    });
+  }
   return blocks;
 }
 
@@ -366,6 +391,12 @@ const styles = themed(() =>
     empty: {
       color: colors.ink40,
       fontStyle: 'italic',
+    },
+    more: {
+      color: colors.ink40,
+      fontFamily: fonts.mono,
+      fontSize: 11,
+      marginTop: 12,
     },
     headingBlock: {
       gap: 2,

@@ -30,7 +30,7 @@ export function useTokenScopes(token: string | null): ScopeState {
     if (!token || token === DEMO_TOKEN) return;
 
     const controller = new AbortController();
-    fetchTokenScopes(token, controller.signal)
+    fetchTokenScopes(token, controller.signal, 'background')
       .then((scopes) => {
         const sees = seesPrivateWork(scopes);
         if (sees === null) return;

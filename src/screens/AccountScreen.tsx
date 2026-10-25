@@ -21,7 +21,7 @@ import {
   type NotifyStatus,
 } from '../lib/notify';
 import { DEMO_TOKEN } from '../lib/token';
-import { useSession } from '../shell/session';
+import { useSessionActions, useSessionData } from '../shell/session';
 import { colors, radii, space, themed } from '../theme';
 
 /** How an account came in, in the words the account rows use. */
@@ -48,15 +48,15 @@ function how(token: string | null | undefined): string {
  * every phone; the page is for your year.
  */
 export function AccountScreen() {
-  const session = useSession();
+  const { disconnect, forget, setHome, switchTo, toggleTogether } = useSessionActions();
+  const { accounts, contributions, home, missing, model, token, together } = useSessionData();
   const nav = useNav();
-  const { accounts, contributions, model, together, toggleTogether, home, setHome } = session;
   const own = contributions.status === 'ready' ? contributions.model : null;
   const current = (own?.login ?? '').toLowerCase();
-  const demo = session.token === DEMO_TOKEN;
+  const demo = token === DEMO_TOKEN;
   const others = accounts.filter((account) => account.login.toLowerCase() !== current);
   const summed = model?.accounts && model.accounts.length > 1;
-  const oauth = tokenKind(session.token ?? '') === 'oauth';
+  const oauth = tokenKind(token ?? '') === 'oauth';
   const clientId = GITHUB_CLIENT_ID;
 
   return (
@@ -73,7 +73,7 @@ export function AccountScreen() {
             <Data numberOfLines={1}>~{current}{demo ? ' · demo' : ''}</Data>
             <Micro style={styles.dim}>
               in use · inbox, pull requests and replies
-              {how(session.token) ? ` · ${how(session.token)}` : ''}
+              {how(token) ? ` · ${how(token)}` : ''}
             </Micro>
           </View>
           <View style={[styles.tag, styles.tagOn]}>
@@ -84,20 +84,20 @@ export function AccountScreen() {
         {others.map((account) => {
           const lower = account.login.toLowerCase();
           const ticked = together.includes(lower);
-          const missing = session.missing.includes(account.login);
+          const unread = missing.includes(account.login);
           return (
             <View key={account.login} style={styles.row}>
               <Pressable
                 accessibilityLabel={`switch to ${account.login}`}
                 accessibilityRole="button"
-                onPress={() => session.switchTo(account.token).catch(() => {})}
+                onPress={() => switchTo(account.token).catch(() => {})}
                 style={styles.rowMain}
               >
                 <Avatar login={account.login} size={34} />
                 <View style={styles.rowText}>
                   <Data numberOfLines={1}>~{lower}</Data>
-                  <Micro style={missing ? styles.bad : styles.dim}>
-                    {missing
+                  <Micro style={unread ? styles.bad : styles.dim}>
+                    {unread
                       ? 'could not be read · left out of the charts'
                       : ticked
                         ? `added into ~${current}'s charts`
@@ -135,7 +135,7 @@ export function AccountScreen() {
                 <Pressable
                   accessibilityRole="button"
                   key={`forget-${account.login}`}
-                  onPress={() => session.forget(account.login).catch(() => {})}
+                  onPress={() => forget(account.login).catch(() => {})}
                   style={styles.chip}
                 >
                   <Label style={styles.dim}>forget ~{account.login.toLowerCase()}</Label>
@@ -231,7 +231,7 @@ export function AccountScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            onPress={session.disconnect}
+            onPress={disconnect}
             style={styles.pill}
           >
             <Label style={styles.ink}>{demo ? 'exit demo' : `disconnect ~${current}`}</Label>

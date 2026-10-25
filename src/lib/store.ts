@@ -1,26 +1,20 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { credentialGeneration, escapeName } from './cacheKey';
+import { createSavedStore, type Saved, type SavedBackend } from './savedStore';
+
+export type { Saved } from './savedStore';
+
 /**
- * A small JSON box on disk, for everything the app wants to still have when
- * the network is gone.
- *
- * SecureStore is where secrets live and it warns past 2 KB a value; a year of
- * contributions is forty times that. This is the app's documents directory,
- * one file per key, each carrying the time it was written — because a saved
- * answer shown without its age is a lie about the present.
- *
- * Nothing in here is secret. Tokens stay in the keystore (`accounts.ts`).
+ * The device adapter for the ordered, bounded saved store. Tokens stay in the
+ * keystore; read caches, authored drafts, and settings use this JSON box.
+ * The core indexes physical names so pre-index files are included without
+ * decoding or renaming filenames from an older app release.
  */
-
-export interface Saved<T> {
-  value: T;
-  /** Epoch ms the value was written. */
-  at: number;
-}
-
 const web = Platform.OS === 'web';
 const memory = new Map<string, string>();
+const INDEX_KEY = '~index';
 
 function folder(): Directory {
   const dir = new Directory(Paths.document, 'githuh-store');
@@ -28,89 +22,102 @@ function folder(): Directory {
   return dir;
 }
 
-/** Keys become file names, so anything that is not a plain word is escaped. */
-function fileFor(key: string): File {
-  const safe = key.replace(/[^a-zA-Z0-9._-]/g, (char) => `_${char.charCodeAt(0)}_`);
-  return new File(folder(), `${safe}.json`);
+function fileForId(id: string): File {
+  return new File(folder(), `${id}.json`);
 }
 
-export async function readSaved<T>(key: string): Promise<Saved<T> | null> {
-  try {
-    const raw = web ? memory.get(key) : await readFile(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<Saved<T>>;
-    if (parsed == null || typeof parsed.at !== 'number' || !('value' in parsed)) {
-      return null;
+const backend: SavedBackend = {
+  async read(id) {
+    if (web) return memory.get(id) ?? null;
+    const file = fileForId(id);
+    return file.exists ? file.text() : null;
+  },
+  async write(id, raw) {
+    if (web) {
+      memory.set(id, raw);
+      return;
     }
-    return parsed as Saved<T>;
-  } catch {
-    // A torn write or a shape from an older version is the same as nothing.
-    return null;
-  }
-}
-
-async function readFile(key: string): Promise<string | null> {
-  const file = fileFor(key);
-  return file.exists ? file.text() : null;
-}
-
-export async function writeSaved<T>(key: string, value: T): Promise<void> {
-  const raw = JSON.stringify({ value, at: Date.now() } satisfies Saved<T>);
-  if (web) {
-    memory.set(key, raw);
-    return;
-  }
-  try {
-    const file = fileFor(key);
+    const file = fileForId(id);
     if (!file.exists) file.create({ intermediates: true, overwrite: true });
     file.write(raw);
-  } catch {
-    // Saving is a convenience. Failing to save must never fail the screen.
-  }
-}
-
-export async function removeSaved(key: string): Promise<void> {
-  if (web) {
-    memory.delete(key);
-    return;
-  }
-  try {
-    const file = fileFor(key);
+  },
+  async remove(id) {
+    if (web) {
+      memory.delete(id);
+      return;
+    }
+    const file = fileForId(id);
     if (file.exists) file.delete();
-  } catch {
-    // Nothing to remove is the same as removed.
-  }
+  },
+  async list() {
+    if (web) {
+      return [...memory].map(([id, raw]) => ({
+        id,
+        bytes: new TextEncoder().encode(raw).byteLength,
+        at: 0,
+      }));
+    }
+    return folder().list()
+      .filter((entry): entry is File => entry instanceof File && entry.name.endsWith('.json'))
+      .map((file) => ({
+        id: file.name.slice(0, -5),
+        bytes: file.size,
+        at: file.lastModified ?? file.creationTime ?? 0,
+      }));
+  },
+};
+
+const savedStore = createSavedStore(backend, {
+  indexId: escapeName(INDEX_KEY),
+  legacyId: escapeName,
+  onIndexError(error) {
+    console.warn('The saved-cache index could not be updated.', error);
+  },
+});
+
+export function readSaved<T>(
+  key: string,
+  validate?: (value: unknown) => T | null,
+): Promise<Saved<T> | null> {
+  return savedStore.read(escapeName(key), validate);
 }
 
-/** Everything under a prefix — used when an account is removed. */
-export async function removeSavedPrefix(prefix: string): Promise<void> {
-  if (web) {
-    for (const key of [...memory.keys()]) {
-      if (key.startsWith(prefix)) memory.delete(key);
-    }
-    return;
-  }
-  try {
-    const safePrefix = prefix.replace(/[^a-zA-Z0-9._-]/g, (char) => `_${char.charCodeAt(0)}_`);
-    for (const entry of folder().list()) {
-      if (entry instanceof File && entry.name.startsWith(safePrefix)) entry.delete();
-    }
-  } catch {
-    // Best effort, like every other write here.
-  }
+/** Failed persistence rejects, including authored drafts and settings. */
+export function writeSaved<T>(key: string, value: T): Promise<void> {
+  return savedStore.write(escapeName(key), value);
+}
+
+export function removeSaved(key: string): Promise<void> {
+  return savedStore.remove(escapeName(key));
+}
+
+/** Prefixes are already escaped by accountCachePrefixes. */
+export function removeSavedPrefixes(prefixes: string[]): Promise<void> {
+  return savedStore.removePrefixes(prefixes);
+}
+
+export function removeSavedPrefix(prefix: string): Promise<void> {
+  return removeSavedPrefixes([escapeName(prefix)]);
+}
+
+export function pinSaved(key: string): void {
+  savedStore.pin(escapeName(key), true);
+}
+
+export function unpinSaved(key: string): void {
+  savedStore.pin(escapeName(key), false);
+}
+
+export function pruneSavedCache(budgetBytes?: number): Promise<void> {
+  return savedStore.prune(budgetBytes);
 }
 
 /**
- * A stable, short name for something that must not be written down as-is —
- * a token, which identifies the account whose answers these are.
+ * The persisted name of a credential. See `credentialGeneration`: this is no
+ * longer a 32-bit hash, and it never returns the credential itself.
  */
 export function keyOf(text: string): string {
-  let value = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    value ^= text.charCodeAt(i);
-    value = Math.imul(value, 0x01000193) >>> 0;
-  }
-  return value.toString(36);
+  return credentialGeneration(text);
 }
 
 /** Short age for a saved answer, in the app's own voice: `4m`, `3h`, `2d`. */

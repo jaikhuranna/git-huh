@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { monthWindow } from './activity';
-import { executeQuery } from './github';
+import { executeQuery, type RequestPriority } from './github';
 
 /**
  * Who you work with, as review: the people who reviewed your pull requests
@@ -158,12 +158,17 @@ export async function fetchPeople(
   login: string,
   signal?: AbortSignal,
   now: Date = new Date(),
+  priority: RequestPriority = 'interactive',
 ): Promise<People> {
   const since = yearAgo(now);
-  const data = await executeQuery(token, QUERY, responseSchema, signal, {
-    mine: `is:pr author:${login} created:>=${since} sort:created-desc`,
-    theirs: `is:pr reviewed-by:${login} -author:${login} created:>=${since} sort:created-desc`,
-    login,
+  const data = await executeQuery(token, QUERY, responseSchema, {
+    signal,
+    priority,
+    variables: {
+      mine: `is:pr author:${login} created:>=${since} sort:created-desc`,
+      theirs: `is:pr reviewed-by:${login} -author:${login} created:>=${since} sort:created-desc`,
+      login,
+    },
   });
   const mine = data.mine.nodes.flatMap((node) => {
     const parsed = mineSchema.safeParse(node);

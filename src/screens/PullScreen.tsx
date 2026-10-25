@@ -27,7 +27,7 @@ import { Reactions } from '../components/Reactions';
 import { Segments } from '../components/Segments';
 import { Squiggle } from '../components/Squiggle';
 import { Body, Data, Label, Micro } from '../components/Type';
-import { usePullDetail } from '../hooks/usePullDetail';
+import { usePullDetail, type PullMutation } from '../hooks/usePullDetail';
 import { useNav, type PullTab } from '../lib/nav';
 import type { PullRef } from '../lib/pullRequest';
 import { parsePatch, type PullComment, type PullDetailFull } from '../lib/pullDetail';
@@ -68,8 +68,12 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
   const nav = useNav();
   const onClose = nav.close;
   const { width } = useWindowDimensions();
-  const state = usePullDetail(nav.token, nav.login, repo, number);
   const [tab, setTab] = useState<PullTab>(initialTab);
+  const state = usePullDetail(nav.token, nav.login, repo, number, {
+    details: tab === 'brief' || tab === 'talk',
+    conversation: tab === 'talk',
+    files: tab === 'diff',
+  });
   const [find, setFind] = useState('');
   const body = width - space.gutter * 2;
 
@@ -86,8 +90,9 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
     return () => subscription.remove();
   }, [onClose]);
 
-  const pull = state.status === 'ready' ? state.pull : null;
+  const pull = state.pull;
   const token = nav.token ?? '';
+  const changed = (effect: PullMutation) => state.afterMutation(effect);
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.screen}>
@@ -137,7 +142,11 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
             current={TABS.findIndex(([value]) => value === tab)}
             items={TABS.map(([value, label]) =>
               value === 'talk'
-                ? pull.unavailable.conversation ? `${label} · unavailable` : `${label} ${pull.comments.length}`
+                ? state.conversation.failure
+                  ? `${label} · unavailable`
+                  : state.conversation.status === 'ready'
+                    ? `${label} ${pull.comments.length}`
+                    : label
                 : value === 'diff'
                   ? `${label} ${pull.changedFiles}`
                   : label,
@@ -152,13 +161,15 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
           >
             {tab === 'brief' && (
               <>
-                <Markdown source={pull.body} width={body} />
+                <Markdown href={pull.url} source={pull.body} width={body} />
                 <View style={styles.bodyReactions}>
-                  <Reactions onChanged={state.reload} reactions={pull.reactions} subjectId={pull.id} />
+                  <Reactions onChanged={() => changed('reaction')} reactions={pull.reactions} subjectId={pull.id} />
                 </View>
-                {pull.unavailable.details ? (
-                  <ReadNotice failure={pull.unavailable.details} subject="pull request details and merge controls" onRetry={state.reload} />
-                ) : <Details
+                {state.details.status === 'loading' || state.details.status === 'idle' ? (
+            <Label style={styles.note}>reading the details…</Label>
+          ) : state.details.failure ? (
+            <ReadNotice failure={state.details.failure} subject="pull request details and merge controls" onRetry={state.details.reload} />
+          ) : <Details
                   assignees={pull.assignees}
                   body={pull.body}
                   canUpdate={pull.canUpdate}
@@ -168,7 +179,7 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
                   milestone={pull.milestone}
                   nodeId={pull.id}
                   number={number}
-                  onChanged={state.reload}
+                  onChanged={() => changed('details')}
                   repo={repo}
                   reviewers={pull.reviewers}
                   title={pull.title}
@@ -177,13 +188,17 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
             )}
             {tab === 'talk' && (
               <>
-                {pull.unavailable.conversation ? (
-                  <ReadNotice failure={pull.unavailable.conversation} subject="the conversation" onRetry={state.reload} />
-                ) : <Conversation onChanged={state.reload} pull={pull} width={body} />}
-                {pull.unavailable.details ? (
-                  <ReadNotice failure={pull.unavailable.details} subject="merge controls" onRetry={state.reload} />
-                ) : <MergeBox onChanged={state.reload} pull={pull} />}
-                <Composer
+                {state.conversation.status === 'loading' || state.conversation.status === 'idle' ? (
+              <Label style={styles.note}>reading the conversation…</Label>
+            ) : state.conversation.failure ? (
+              <ReadNotice failure={state.conversation.failure} subject="the conversation" onRetry={state.conversation.reload} />
+            ) : <Conversation onChanged={() => changed('comment')} pull={pull} width={body} />}
+            {state.details.status === 'loading' || state.details.status === 'idle' ? (
+              <Label style={styles.note}>reading the merge controls…</Label>
+            ) : state.details.failure ? (
+              <ReadNotice failure={state.details.failure} subject="merge controls" onRetry={state.details.reload} />
+            ) : <MergeBox onChanged={() => changed('merge')} pull={pull} />}
+            <Composer
                   actions={[
                     { key: 'comment', label: 'comment', primary: true, icon: 'send' as const },
                     ...(!pull.viewerIsAuthor && pull.state === 'OPEN'
@@ -195,13 +210,22 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
                   ]}
                   demo={nav.demo}
                   doing={'that review'}
-                  onSubmit={async (action, text) => {
+                  draftKey={{ account: nav.login, kind: 'pull-comment', id: `${repo}#${number}` }}
+              onCheck={async (action) => {
+                // The write may already have landed. Refresh and keep the
+                // draft; sending again would post a second comment.
+                state.conversation.reload();
+                return action === 'approve'
+                  ? 'could not confirm the approval · look before sending again'
+                  : 'could not confirm it was sent · the draft is still here';
+              }}
+              onSubmit={async (action, text) => {
                     if (action === 'comment') await addComment(token, pull.id, text);
                     if (action === 'approve') await submitReview(token, pull.id, 'APPROVE', text);
                     if (action === 'changes') {
                       await submitReview(token, pull.id, 'REQUEST_CHANGES', text);
                     }
-                    state.reload();
+                    changed(action === 'comment' ? 'comment' : 'review');
                     return action === 'approve'
                       ? 'approved'
                       : action === 'changes'
@@ -214,10 +238,12 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
                 />
               </>
             )}
-            {tab === 'diff' && (pull.unavailable.files ? (
-              <ReadNotice failure={pull.unavailable.files} subject="the files" onRetry={state.reload} />
-            ) : <>
-                <TextInput
+            {tab === 'diff' && (state.files.status === 'loading' || state.files.status === 'idle' ? (
+          <Label style={styles.note}>reading the files…</Label>
+        ) : state.files.failure ? (
+          <ReadNotice failure={state.files.failure} subject="the files" onRetry={state.files.reload} />
+        ) : <>
+          <TextInput
                   autoCapitalize="none"
                   autoCorrect={false}
                   onChangeText={setFind}
@@ -239,7 +265,7 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
                       { commitId: pull.headSha, ...target },
                       text,
                     );
-                    state.reload();
+                    changed('comment');
                     return `commented on ${target.side === 'LEFT' ? 'old ' : ''}line ${target.line}`;
                   }}
                   width={body}
@@ -275,6 +301,11 @@ export function PullScreen({ repo, number, initialTab = 'brief', sequence }: Pul
   );
 }
 
+/** How many comments are drawn before the rest is a deliberate next page. */
+const TALK_PAGE = 25;
+/** A single comment longer than this is cut, with the rest one tap away. */
+const COMMENT_CAP = 4000;
+
 function Conversation({
   pull,
   width,
@@ -284,13 +315,23 @@ function Conversation({
   width: number;
   onChanged: () => void;
 }) {
+  const [shown, setShown] = useState(TALK_PAGE);
   if (pull.comments.length === 0) {
     return <Label style={styles.note}>nobody has said anything yet</Label>;
   }
+  const visible = pull.comments.slice(0, shown);
+  const rest = pull.comments.length - visible.length;
 
   return (
     <View>
-      {pull.comments.map((comment, index) => (
+      {rest > 0 && (
+        <Pressable accessibilityRole="button" onPress={() => setShown((n) => n + TALK_PAGE)}>
+          <Label style={styles.note}>
+            {rest} earlier {rest === 1 ? 'comment is' : 'comments are'} not shown · show more
+          </Label>
+        </Pressable>
+      )}
+      {visible.map((comment, index) => (
         <View key={comment.id}>
           {index > 0 && (
             <Squiggle
@@ -384,7 +425,7 @@ function Comment({
 
         {comment.diffHunk && <Hunk hunk={comment.diffHunk} />}
 
-        <Markdown source={comment.body} width={width - 34} />
+        <Bounded href={comment.url} source={comment.body} width={width - 34} />
 
         <CommentTools
           body={comment.body}
@@ -457,6 +498,24 @@ function kindOf(comment: PullComment): string {
     return comment.resolved ? 'resolved thread' : 'on the diff';
   }
   return 'commented';
+}
+
+
+function Bounded({ source, width, href }: { source: string; width: number; href?: string }) {
+  const [open, setOpen] = useState(false);
+  const cut = !open && source.length > COMMENT_CAP;
+  return (
+    <View>
+      <Markdown href={href} source={cut ? source.slice(0, COMMENT_CAP) : source} width={width} />
+      {source.length > COMMENT_CAP && (
+        <Pressable accessibilityRole="button" onPress={() => setOpen((value) => !value)}>
+          <Label style={styles.note}>
+            {cut ? `cut at ${COMMENT_CAP} characters · show the rest` : 'show less'}
+          </Label>
+        </Pressable>
+      )}
+    </View>
+  );
 }
 
 /** The few lines a review thread is arguing about, in the diff's own voice. */

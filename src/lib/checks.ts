@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { rest, restText } from './rest';
+import { GitHubError } from './github';
+import { rest } from './rest';
+import { tailLines } from './textTail';
 
 /**
  * CI, from the phone: what ran on a pull request's head commit, why the red
@@ -130,11 +132,33 @@ export interface LogTail {
   errors: string[];
   /** The last lines of the job, which is where a failure usually ends. */
   tail: string[];
+  /**
+   * True when the download was refused because the log is larger than this
+   * phone should hold. The caller should send the person to GitHub.
+   */
+  tooLarge?: boolean;
 }
+
+/** Forty lines is what the panel draws; eight of those may be called out as errors. */
+const LOG_TAIL_LINES = 40;
+const LOG_ERROR_LINES = 8;
+
+/**
+ * Stop before a log can occupy tens of megabytes of JS string.
+ *
+ * The jobs logs API answers with a redirect to a short-lived blob URL.
+ * That host does not advertise `Accept-Ranges`, so a `Range` request cannot
+ * be relied on to fetch only the end. The bound is therefore the download
+ * itself: refuse when `Content-Length` already says the file is over this
+ * cap, and stop reading once the body passes it.
+ */
+const LOG_BYTE_CAP = 2 * 1024 * 1024;
 
 /**
  * The end of a job's log, trimmed to what a phone can show: the timestamps
  * off, the error annotations pulled out, and the last forty lines.
+ *
+ * A log past the byte cap is not downloaded into a line array at all.
  */
 export async function fetchLogTail(
   token: string,
@@ -142,20 +166,85 @@ export async function fetchLogTail(
   jobId: number,
   signal?: AbortSignal,
 ): Promise<LogTail> {
-  const text = await restText(token, `/repos/${repo}/actions/jobs/${jobId}/logs`, signal);
-  return tailOf(text);
+  const text = await downloadLog(token, `/repos/${repo}/actions/jobs/${jobId}/logs`, signal);
+  if (text == null) return { errors: [], tail: [], tooLarge: true };
+  return tailLines(text, { lines: LOG_TAIL_LINES, errors: LOG_ERROR_LINES });
 }
 
-function tailOf(text: string): LogTail {
-  const lines = text
-    .split('\n')
-    .map((line) => line.replace(/^\d{4}-\d\d-\d\dT[\d:.]+Z\s?/, '').replace(/\r$/, ''))
-    .filter((line) => line.trim().length > 0 && !line.startsWith('##[group]') && line !== '##[endgroup]');
-  const errors = lines
-    .filter((line) => /##\[error\]|^error[:\s]|\bERR!|\bFAIL(ED)?\b|Error:/.test(line))
-    .map((line) => line.replace('##[error]', ''))
-    .slice(-8);
-  return { errors, tail: lines.slice(-40) };
+const API = 'https://api.github.com';
+
+/**
+ * Download a job log only while it stays under the byte cap.
+ *
+ * `Content-Length`, when the redirected blob sends one, refuses the body
+ * before it is read. The running total is the backstop for a missing or
+ * lying length. Either way the returned string is at most the cap, and a
+ * log that would exceed it is reported as too large instead.
+ */
+async function downloadLog(token: string, path: string, signal?: AbortSignal): Promise<string | null> {
+  let response: Response;
+  try {
+    response = await fetch(`${API}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    throw new GitHubError('network', 'Could not reach GitHub.');
+  }
+  if (!response.ok) throw await logFailure(response);
+
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > LOG_BYTE_CAP) {
+    await response.body?.cancel().catch(() => {});
+    return null;
+  }
+  if (!response.body) {
+    const text = await response.text();
+    return text.length > LOG_BYTE_CAP ? null : text;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      received += value.byteLength;
+      if (received > LOG_BYTE_CAP) {
+        await reader.cancel().catch(() => {});
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    throw new GitHubError('network', 'Could not reach GitHub.');
+  }
+
+  const body = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(body);
+}
+
+async function logFailure(response: Response): Promise<GitHubError> {
+  let message = `GitHub responded with ${response.status}.`;
+  try {
+    const body = (await response.json()) as { message?: string };
+    if (body.message) message = body.message;
+  } catch {
+    // A failed log redirect is often not JSON; the status is enough.
+  }
+  if (response.status === 401) return new GitHubError('invalid-token', message);
+  if (response.status === 403) return new GitHubError('forbidden', message);
+  if (response.status === 404) return new GitHubError('missing', message);
+  return new GitHubError('api', message);
 }
 
 export async function rerunFailed(token: string, repo: string, runId: number) {

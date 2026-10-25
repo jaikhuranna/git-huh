@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Card } from '../components/Card';
@@ -10,6 +11,7 @@ import type { useFeedHistory } from '../hooks/useFeedHistory';
 import type { SocialState } from '../hooks/useSocial';
 import { handleOf, insights, type GitHubModel } from '../lib/contributions';
 import { HOME_BLOCKS, homeEvents, type HomeSettings } from '../lib/home';
+import { HISTORY_COMMENT_LIMIT, HISTORY_REVIEW_LIMIT } from '../lib/social';
 import type { CommitLine } from '../lib/messageCache';
 import type { SocialEvent } from '../lib/social';
 import { colors, fonts, space, themed } from '../theme';
@@ -110,15 +112,16 @@ export function HomeFeed({
   onOpen: (event: SocialEvent) => void;
   onSettings: () => void;
 }) {
-  const inbox = social.status === 'ready' ? social.events : [];
-  const rows = homeEvents([...inbox, ...history.events], home);
+  const rows = useMemo(
+    () => homeEvents(social.status === 'ready' ? social.events : [], history.events, home),
+    [history.events, home, social],
+  );
   const title =
     home.blocks.length === 0
       ? 'nothing chosen'
       : HOME_BLOCKS.filter((block) => home.blocks.includes(block.key))
           .map((block) => block.label)
           .join(' · ');
-  const oldest = rows[rows.length - 1];
 
   return (
     <Block>
@@ -137,30 +140,68 @@ export function HomeFeed({
       )}
 
       {rows.map((event) => (
-        <FeedRow event={event} key={event.id} onOpen={() => onOpen(event)} />
+        <HomeFeedRow event={event} key={event.id} onOpen={onOpen} />
       ))}
 
       {home.blocks.length > 0 && (
-        <View style={styles.end}>
-          {history.loading || social.status === 'loading' ? (
-            <Micro style={styles.blockNote}>reading older pull requests…</Micro>
-          ) : history.failed ? (
-            <View style={styles.endRow}>
-              <Micro style={styles.blockNote}>github stopped answering</Micro>
-              <IconPill icon="refresh" label="try again" onPress={history.more} />
-            </View>
-          ) : history.done ? (
-            <Micro style={styles.blockNote}>
-              {rows.length === 0
-                ? 'nothing on your pull requests yet'
-                : `that is everything${oldest ? `, back to ${monthOf(oldest.at)}` : ''}`}
-            </Micro>
-          ) : (
-            <IconPill icon="expand" label="older" onPress={history.more} />
-          )}
-        </View>
+        <FeedEnd
+          history={history}
+          oldest={rows[rows.length - 1]}
+          rows={rows.length}
+          social={social}
+        />
       )}
     </Block>
+  );
+}
+
+const FeedRowMemo = memo(FeedRow);
+
+/** One virtualized row. Opening is bound here so the list item stays stable. */
+export function HomeFeedRow({
+  event,
+  onOpen,
+}: {
+  event: SocialEvent;
+  onOpen: (event: SocialEvent) => void;
+}) {
+  return <FeedRowMemo event={event} onOpen={() => onOpen(event)} />;
+}
+
+/**
+ * The line under the feed. History reads the last comments and reviews on
+ * each pull request, not the whole thread, so a finished walk is not "everything".
+ */
+export function FeedEnd({
+  history,
+  social,
+  rows,
+  oldest,
+}: {
+  history: ReturnType<typeof useFeedHistory>;
+  social: SocialState;
+  rows: number;
+  oldest: SocialEvent | undefined;
+}) {
+  return (
+    <View style={styles.end}>
+      {history.loading || social.status === 'loading' ? (
+        <Micro style={styles.blockNote}>reading older pull requests…</Micro>
+      ) : history.failed ? (
+        <View style={styles.endRow}>
+          <Micro style={styles.blockNote}>github stopped answering</Micro>
+          <IconPill icon="refresh" label="try again" onPress={() => history.more(true)} />
+        </View>
+      ) : history.done ? (
+        <Micro style={styles.blockNote}>
+          {rows === 0
+            ? 'nothing on your pull requests yet'
+            : `end of the pull requests${oldest ? `, back to ${monthOf(oldest.at)}` : ''} · last ${HISTORY_COMMENT_LIMIT} comments and ${HISTORY_REVIEW_LIMIT} reviews on each`}
+        </Micro>
+      ) : (
+        <IconPill icon="expand" label="older" onPress={() => history.more(true)} />
+      )}
+    </View>
   );
 }
 

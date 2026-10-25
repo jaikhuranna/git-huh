@@ -1,7 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-import { keyOf, removeSaved, removeSavedPrefix } from './store';
+import { accountCachePrefixes } from './cacheKey';
+import { keyOf, removeSaved, removeSavedPrefixes } from './store';
 
 /**
  * Every account this phone has been given a token for.
@@ -57,11 +58,18 @@ export const accountStore = {
     const list = await read();
     const lower = login.toLowerCase();
     const index = list.findIndex((item) => item.login.toLowerCase() === lower);
+    const previous = index >= 0 ? list[index] : null;
     const next =
       index >= 0
         ? list.map((item, position) => (position === index ? { login, token } : item))
         : [...list, { login, token }];
     await write(next);
+    // A replaced token must not keep answering under the old one. The new
+    // token's model is a different key, so the old file would otherwise sit
+    // until the budget noticed it.
+    if (previous && previous.token !== token) {
+      await removeSaved(`model-${keyOf(previous.token)}`);
+    }
     return next;
   },
 
@@ -72,7 +80,7 @@ export const accountStore = {
     const gone = list.find((item) => item.login.toLowerCase() === lower);
     const next = list.filter((item) => item.login.toLowerCase() !== lower);
     await write(next);
-    await removeSavedPrefix(`${lower}-`);
+    await removeSavedPrefixes(accountCachePrefixes(login));
     if (gone) await removeSaved(`model-${keyOf(gone.token)}`);
     return next;
   },

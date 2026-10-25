@@ -25,7 +25,15 @@ export function useTriage(login: string | null): Triage {
     if (!login) return;
     let cancelled = false;
     loadMarks(login).then((marks) => {
-      if (!cancelled) setLoaded({ login, marks });
+      if (cancelled) return;
+      // A swipe can land before this read returns. Those marks were made
+      // against the live feed and must win; disk fills only the rest.
+      setLoaded((current) => {
+        if (current && current.login === login) {
+          return { login, marks: { ...marks, ...current.marks } };
+        }
+        return { login, marks };
+      });
     });
     return () => {
       cancelled = true;
@@ -37,12 +45,15 @@ export function useTriage(login: string | null): Triage {
   const update = useCallback(
     (change: (current: Marks) => Marks) => {
       if (!login) return;
+      let next: Marks | null = null;
       setLoaded((current) => {
         const base = current && current.login === login ? current.marks : {};
-        const next = change(base);
-        saveMarks(login, next).catch(() => {});
+        next = change(base);
         return { login, marks: next };
       });
+      // Outside the updater: React may call it twice, and a write is not a
+      // state transition.
+      if (next) saveMarks(login, next).catch(() => {});
     },
     [login],
   );

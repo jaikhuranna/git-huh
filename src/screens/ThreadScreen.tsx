@@ -20,6 +20,7 @@ import { Spoken } from '../components/Spoken';
 import { Squiggle } from '../components/Squiggle';
 import { StateChip } from '../components/StateChip';
 import { Body, Data, Heading, Label, Micro } from '../components/Type';
+import { wasJustCreated } from '../hooks/usePullDetail';
 import { useRemote } from '../hooks/useRemote';
 import { demoThread } from '../lib/demo';
 import { eventually } from '../lib/eventually';
@@ -71,7 +72,7 @@ export function ThreadScreen({
       // One started a second ago can still read as missing.
       const thread = await eventually(
         () => fetchThread(nav.token ?? '', repo, number, type, signal),
-        { signal },
+        { signal, recent: wasJustCreated(type, repo, number) },
       );
       if (!thread) throw new GitHubError('missing', 'Not found.');
       return thread;
@@ -156,7 +157,7 @@ export function ThreadScreen({
 
           <Squiggle amplitude={2.6} length={body} opacity={0.4} style={styles.rule} wavelength={14} />
 
-          <Markdown source={thread.body} width={body} />
+          <Bounded href={thread.url} source={thread.body} width={body} />
 
           <View style={styles.bodyTools}>
             {type === 'discussion' && (
@@ -234,7 +235,7 @@ export function ThreadScreen({
               <Spoken
                 at={comment.createdAt}
                 author={comment.author}
-                body={comment.body}
+                body={comment.body.length > 4000 ? comment.body.slice(0, 4000) + '\n\n... cut, the rest is on github' : comment.body}
                 kind={comment.isAnswer ? 'the answer' : 'replied'}
                 seed={comment.id}
                 tone={comment.isAnswer ? colors.yes : colors.ink70}
@@ -312,7 +313,13 @@ export function ThreadScreen({
             }
             demo={nav.demo}
             doing={type === 'issue' ? 'that comment' : 'that reply'}
-            onSubmit={async (action, text) => {
+            
+ draftKey={{ account: nav.login, kind: `${type}-comment`, id: `${repo}#${number}` }}
+ onCheck={async () => {
+ state.reload();
+ return 'could not confirm it was sent - the draft is still here';
+ }}
+ onSubmit={async (action, text) => {
               const token = nav.token ?? '';
               if (text) {
                 if (type === 'issue') await addComment(token, thread.id, text);
@@ -338,6 +345,23 @@ export function ThreadScreen({
       )}
     </OverlayFrame>
   );
+}
+
+const POST_CAP = 4000;
+
+function Bounded({ source, width, href }: { source: string; width: number; href?: string }) {
+ const [open, setOpen] = useState(false);
+ const cut = !open && source.length > POST_CAP;
+ return (
+ <View>
+ <Markdown href={href} source={cut ? source.slice(0, POST_CAP) : source} width={width} />
+ {source.length > POST_CAP && (
+ <Pressable accessibilityRole="button" onPress={() => setOpen((value) => !value)}>
+ <Label style={styles.note}>{cut ? 'cut short - show the rest' : 'show less'}</Label>
+ </Pressable>
+ )}
+ </View>
+ );
 }
 
 /** Vote up, and mark or unmark the answer: what a discussion reply can have done to it. */

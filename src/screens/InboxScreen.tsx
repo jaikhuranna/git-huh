@@ -5,13 +5,13 @@ import { SocialFeed } from '../components/SocialFeed';
 import { Micro } from '../components/Type';
 import { useNav } from '../lib/nav';
 import { savedAge } from '../lib/store';
-import { useSession } from '../shell/session';
+import { useSessionActions, useSessionData } from '../shell/session';
 import { colors, space, themed } from '../theme';
 import { AssignedTile } from './AssignedScreen';
 import { QueueTile } from './QueueScreen';
 import { Block, Page, ScreenHead } from './shared';
 
-/** How much of the feed the `work` page shows before `all 40 events →`. */
+/** How much of the feed the `work` page shows before offering the rest of the cap. */
 const HEAD_ROWS = 6;
 
 /**
@@ -30,7 +30,8 @@ const HEAD_ROWS = 6;
  * scope is asked for, so GitHub's inbox is never touched.
  */
 export function InboxBlocks() {
-  const { nav, openEvent, queue, social, tasks, triage } = useSession();
+  const { nav, openEvent } = useSessionActions();
+  const { queue, social, tasks, triage } = useSessionData();
   const count = social.status === 'ready' ? social.events.length : null;
 
   return (
@@ -63,7 +64,8 @@ export function InboxBlocks() {
 /** The whole feed, pushed from the head of it on `work`. */
 export function InboxPage() {
   const nav = useNav();
-  const { openEvent, social, triage } = useSession();
+  const { openEvent } = useSessionActions();
+  const { social, triage } = useSessionData();
   return (
     <OverlayFrame onBack={nav.close} where="work · inbox">
       <Page>

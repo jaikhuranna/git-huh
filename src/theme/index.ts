@@ -20,8 +20,10 @@ let version = 0;
 
 /**
  * Called by the root layout with the system's scheme before anything below it
- * renders. The tree is remounted when it changes, which is what makes every
- * `themed` sheet and every inline `colors.x` read the new palette.
+ * renders. The layout re-renders the mounted tree when the scheme changes —
+ * it does not remount it — and this version is what tells every `themed`
+ * sheet to rebuild. Inline `colors.x` reads the getters, which follow the
+ * same variable, so a screen that stays mounted still paints the new palette.
  */
 export function setScheme(next: Scheme): void {
   if (next === scheme) return;

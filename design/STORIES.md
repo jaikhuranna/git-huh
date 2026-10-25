@@ -188,17 +188,19 @@ each one is, or why it is not here.
 
 ### first run
 
-    launch → loading wave (stand-in commit subjects)
+    launch → loading wave (stand-in commit subjects, while the keystore is read)
            → sign in with github → a code → copy and open github
-                              → typed on github.com/login/device ─┬─ yes → keystore → contributions request
+                              → typed on github.com/login/device ─┬─ yes → keystore → the five tabs, today filling in
                                                                   └─ no / ran out → a line saying which, form stays
-             or paste a token ─┬─ verified → keystore → contributions request
+             or paste a token ─┬─ verified → keystore → the five tabs, today filling in
                                └─ rejected → error line, form stays
-           → loading wave (your own commit messages, from the pool)
-           → today
 
-The wave is on screen before anything has been fetched, which is why the
-messages are a pool kept on the device rather than a request.
+The wave covers the token read and nothing else, and it is on screen before
+anything has been fetched — which is why its messages are a pool kept on the
+device rather than a request. Once there is a token the five tabs are up and
+each section fills in on its own; `today` says `reading your year…` in place
+of its charts until the year lands, and an unreachable GitHub does not hide
+the device-local `ideas` and `host`.
 
 ### the daily glance
 

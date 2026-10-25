@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
@@ -21,24 +22,13 @@ export function ArchiveScreen({ model, onShare }: { model: GitHubModel; onShare:
   const { width } = useWindowDimensions();
   const chartWidth = width - 36 - 36;
 
-  // The pin runs oldest at the top, newest at the bottom.
-  const years = [...model.years].sort((a, b) => a.year - b.year);
-  const monthsWidth = chartWidth * 0.56;
-  const barsX = chartWidth * 0.62;
-  const barsWidth = chartWidth - barsX;
-
-  const peakMonth = Math.max(
-    1,
-    ...years.flatMap((year) => year.months),
-  );
-  const peakSplit = Math.max(
-    1,
-    ...years.map((year) => Math.max(year.beforeToday, year.afterToday)),
-  );
-
-  // Top three years get the saturated treatment the pin gives its wettest.
-  const ranked = [...years].sort((a, b) => b.total - a.total);
-  const highlighted = new Set(ranked.slice(0, 3).map((year) => year.year));
+  /**
+   * Ranking every year and scanning every month for the peaks is the
+   * expensive part of this chart. Width and the year list are its inputs;
+   * the "today" marker stays outside because it moves with the clock.
+   */
+  const archive = useMemo(() => rankYears(model.years, chartWidth), [model.years, chartWidth]);
+  const { years, monthsWidth, barsX, barsWidth, peakMonth, peakSplit, highlighted } = archive;
 
   const now = new Date();
   const todayX = 28 + ((now.getMonth() + now.getDate() / 31) / 12) * (monthsWidth - 34);
@@ -89,6 +79,25 @@ export function ArchiveScreen({ model, onShare }: { model: GitHubModel; onShare:
       </Card>
     </Block>
   );
+}
+
+/**
+ * Oldest at the top, as the pin runs. Peaks normalise the dots and the
+ * before/after bars; the three fullest years are the ones drawn saturated.
+ */
+function rankYears(source: readonly YearSummary[], chartWidth: number) {
+  const years = [...source].sort((a, b) => a.year - b.year);
+  const monthsWidth = chartWidth * 0.56;
+  const barsX = chartWidth * 0.62;
+  const barsWidth = chartWidth - barsX;
+  const peakMonth = Math.max(1, ...years.flatMap((year) => year.months));
+  const peakSplit = Math.max(
+    1,
+    ...years.map((year) => Math.max(year.beforeToday, year.afterToday)),
+  );
+  const ranked = [...years].sort((a, b) => b.total - a.total);
+  const highlighted = new Set(ranked.slice(0, 3).map((year) => year.year));
+  return { years, monthsWidth, barsX, barsWidth, peakMonth, peakSplit, highlighted };
 }
 
 function Row({

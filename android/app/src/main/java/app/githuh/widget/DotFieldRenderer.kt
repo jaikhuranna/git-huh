@@ -102,6 +102,32 @@ object DotFieldRenderer {
         val left = (width - pitch * columns) / 2f
         val top = (height - pitch * rows) / 2f
 
+        val today = days.indexOfLast { it.isToday }
+        val cacheKey = buildString {
+            append("field|")
+            append(width)
+            append('x')
+            append(height)
+            append('|')
+            append(rows)
+            append('|')
+            append(ink)
+            append('|')
+            append(emptyAlpha)
+            append('|')
+            append(density)
+            append('|')
+            append(context.resources.configuration.fontScale)
+            append('|')
+            append(today)
+            for (day in days) {
+                append('|')
+                append(day.level)
+                append(if (day.isToday) 't' else 'f')
+            }
+        }
+        WidgetBitmapCache.get(cacheKey)?.let { return ImageProvider(it) }
+
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -161,7 +187,7 @@ object DotFieldRenderer {
             k++
         }
 
-        return ImageProvider(bitmap)
+        return ImageProvider(WidgetBitmapCache.put(cacheKey, bitmap))
     }
 
     /**

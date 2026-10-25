@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { Linking, Platform } from 'react-native';
 
+import { useDayRollover } from '../hooks/useDayRollover';
 import { useActivity, type ActivityState } from '../hooks/useActivity';
 import { useContributions, type ContributionsState } from '../hooks/useContributions';
 import { useOpenPrs } from '../hooks/useOpenPrs';
@@ -109,12 +110,79 @@ export interface Session {
   wanting: number;
 }
 
-const SessionContext = createContext<Session | null>(null);
+/**
+ * Navigation and the actions that change the session. These identities stay
+ * put while a feed or a chart refreshes, so a screen that only navigates
+ * does not have to subscribe to that data.
+ */
+export interface SessionActions {
+  setToken: (token: string | null) => void;
+  toggleTogether: (login: string) => void;
+  setHome: (next: HomeSettings) => void;
+  forget: (login: string) => Promise<void>;
+  wantActivity: () => void;
+  tab: number;
+  goToTab: (index: number) => void;
+  stack: Route[];
+  nav: Nav;
+  openEvent: (event: SocialEvent) => void;
+  openUrl: (item: { url: string }) => void;
+  switchTo: (token: string) => Promise<void>;
+  disconnect: () => Promise<void>;
+}
 
+/**
+ * Account, year, inbox and work. A change here re-renders data consumers
+ * only; actions live on the other context.
+ */
+export interface SessionData {
+  token: TokenState;
+  contributions: ContributionsState & { reload: () => void };
+  model: GitHubModel | null;
+  together: string[];
+  missing: string[];
+  home: HomeSettings;
+  scopes: ReturnType<typeof useTokenScopes>;
+  prs: ReturnType<typeof useOpenPrs>;
+  social: SocialState;
+  queue: ReturnType<typeof useQueue>;
+  tasks: ReturnType<typeof useTasks>;
+  people: ReturnType<typeof usePeople>;
+  triage: ReturnType<typeof useTriage>;
+  activityState: ActivityState;
+  activity: Activity;
+  accounts: Account[];
+  lines: CommitLine[];
+  /** The inbox tab's count. */
+  wanting: number;
+}
+
+const SessionActionsContext = createContext<SessionActions | null>(null);
+const SessionDataContext = createContext<SessionData | null>(null);
+
+/** Navigation and session actions, without the year, inbox or charts. */
+export function useSessionActions(): SessionActions {
+  const actions = useContext(SessionActionsContext);
+  if (!actions) throw new Error('useSession outside SessionProvider');
+  return actions;
+}
+
+/** The account's data. Does not move when only the route stack does. */
+export function useSessionData(): SessionData {
+  const data = useContext(SessionDataContext);
+  if (!data) throw new Error('useSession outside SessionProvider');
+  return data;
+}
+
+/**
+ * Both halves. Prefer `useSessionActions` or `useSessionData` in a screen
+ * that should not redraw for the other half — a social refresh must not
+ * re-execute a chart that never reads the inbox.
+ */
 export function useSession(): Session {
-  const session = useContext(SessionContext);
-  if (!session) throw new Error('useSession outside SessionProvider');
-  return session;
+  const actions = useSessionActions();
+  const data = useSessionData();
+  return useMemo(() => ({ ...data, ...actions }), [actions, data]);
 }
 
 /**
@@ -136,8 +204,8 @@ function wantsYou(social: SocialState, marks: Marks): number {
 /**
  * The app's state, above the tab navigator: the token, the year, the inbox,
  * the pushed pages. It lives here rather than in a screen because the tabs are
- * native now — each section is its own route — and because it has to survive
- * the tree being remounted when the system switches between light and dark.
+ * native now — each section is its own route — and because the navigator
+ * stays mounted when the system switches between light and dark.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -173,6 +241,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // (`wantActivity`). The demo's are on the device, so it has them at once.
   const [activityWanted, setActivityWanted] = useState(false);
   const wantActivity = useCallback(() => setActivityWanted(true), []);
+  // Snooze and "today" are functions of the clock. This bumps at local
+  // midnight and when the app returns on a later day, and nothing else
+  // subscribes to it.
+  const day = useDayRollover();
   const needActivity = section === 'work' || activityWanted || token === DEMO_TOKEN;
   const activityState = useActivity(token ?? null, login, needActivity);
   const ownActivity =
@@ -270,13 +342,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     accountStore.upsert(login, token).then(setAccounts).catch(() => {});
   }, [login, token]);
 
-  // What the inbox has shown with the app open is not worth a notification
-  // later; the background check skips anything recorded here.
+  // An event is seen when the inbox is actually on screen, not when a
+  // background fetch brought it in. A fetch while you are on another section
+  // must still be eligible to notify.
   const feedEvents = social.status === 'ready' ? social.events : null;
+  const inboxVisible = section === 'work' && stack.length === 0;
   useEffect(() => {
-    if (!login || !feedEvents || token === DEMO_TOKEN) return;
+    if (!inboxVisible || !login || !feedEvents || token === DEMO_TOKEN) return;
     markSeen(login, feedEvents).catch(() => {});
-  }, [feedEvents, login, token]);
+  }, [feedEvents, inboxVisible, login, token]);
 
   // A tapped notification opens the pull request, issue or discussion it was
   // about — including when it is what started the app.
@@ -390,11 +464,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Which account the widget should show. A sync that started for the
+  // previous account must not land after a switch and paint the old year.
+  const widgetGeneration = useRef(0);
+  const widgetSent = useRef('');
   useEffect(() => {
-    if (model && token !== DEMO_TOKEN) {
-      syncWidget(model, words).catch(() => {});
-    }
-  }, [model, token, words]);
+    if (!model || token === DEMO_TOKEN) return;
+    const generation = ++widgetGeneration.current;
+    const loginKey = model.login.toLowerCase();
+    const today = model.columns.flat().find((item) => item.isToday)?.date ?? '';
+    const lineKey = words.map((line) => `${line.repo}\u0000${line.message}`).join('\n');
+    const identity = `${loginKey}\u0000${today}\u0000${model.todayCount}\u0000${lineKey}`;
+    if (widgetSent.current === identity) return;
+    widgetSent.current = identity;
+    syncWidget(model, words)
+      .then(() => {
+        if (widgetGeneration.current !== generation) {
+          widgetSent.current = '';
+        }
+      })
+      .catch(() => {
+        if (widgetGeneration.current === generation) widgetSent.current = '';
+      });
+  }, [day, model, token, words]);
 
   /** Everything that belongs to one account's session, back to the start. */
   const resetSession = useCallback(async () => {
@@ -443,20 +535,55 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [login],
   );
 
-  const wanting = useMemo(() => wantsYou(social, triage.marks), [social, triage.marks]);
+  const wanting = useMemo(
+    () => wantsYou(social, triage.marks),
+    // `day` is the clock: a snooze that expires overnight, or a new local
+    // day, has to recount even when the feed itself did not change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [day, social, triage.marks],
+  );
 
-  const value = useMemo<Session>(
+  const actions = useMemo<SessionActions>(
+    () => ({
+      setToken,
+      toggleTogether,
+      setHome,
+      forget,
+      wantActivity,
+      tab,
+      goToTab,
+      stack,
+      nav,
+      openEvent,
+      openUrl,
+      switchTo,
+      disconnect,
+    }),
+    [
+      disconnect,
+      forget,
+      goToTab,
+      nav,
+      openEvent,
+      openUrl,
+      setHome,
+      setToken,
+      stack,
+      switchTo,
+      tab,
+      toggleTogether,
+      wantActivity,
+    ],
+  );
+
+  const data = useMemo<SessionData>(
     () => ({
       token,
-      setToken,
       contributions,
       model,
       together,
-      toggleTogether,
       missing: summed.missing,
       home,
-      setHome,
-      forget,
       scopes,
       prs,
       social,
@@ -466,17 +593,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       triage,
       activityState,
       activity,
-      wantActivity,
       accounts,
       lines: words,
-      tab,
-      goToTab,
-      stack,
-      nav,
-      openEvent,
-      openUrl,
-      switchTo,
-      disconnect,
       wanting,
     }),
     [
@@ -484,35 +602,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activity,
       activityState,
       contributions,
-      disconnect,
-      forget,
-      goToTab,
       home,
       model,
-      nav,
-      openEvent,
-      openUrl,
       people,
       prs,
       queue,
       scopes,
       words,
-      setHome,
-      setToken,
       social,
-      stack,
       summed.missing,
-      switchTo,
-      tab,
       tasks,
       together,
-      toggleTogether,
       token,
       triage,
-      wantActivity,
       wanting,
     ],
   );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionActionsContext.Provider value={actions}>
+      <SessionDataContext.Provider value={data}>{children}</SessionDataContext.Provider>
+    </SessionActionsContext.Provider>
+  );
 }

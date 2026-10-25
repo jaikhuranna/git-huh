@@ -13,7 +13,7 @@ import type { Remote } from '../hooks/useRemote';
 import type { QueuedPull, Queue, ReviewedPull } from '../lib/queue';
 import { pullRoute, useNav } from '../lib/nav';
 import { savedAge } from '../lib/store';
-import { useSession } from '../shell/session';
+import { useSessionData } from '../shell/session';
 import { colors, fonts, themed } from '../theme';
 import { ago, Chips, fmt, Page, ScreenHead, whyNot } from './shared';
 
@@ -63,7 +63,7 @@ export function QueueTile({ state }: { state: Remote<Queue> }) {
 /** The queue in full, pushed from the inbox's tile. */
 export function QueuePage() {
   const nav = useNav();
-  const { queue } = useSession();
+  const { queue } = useSessionData();
   const open = useCallback(
     (pr: { repo: string; number: number }) => nav.open(pullRoute(pr)),
     [nav],

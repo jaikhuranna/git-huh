@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { clearDraft, loadDraft, saveDraft } from '../lib/drafts';
+import { outcomeUnknown } from '../lib/github';
 import { explain } from '../lib/rest';
 import { colors, fonts, radii, themed } from '../theme';
 import { Icon, type Glyph } from './Icon';
@@ -31,7 +33,12 @@ type Phase =
   | { kind: 'armed'; action: string }
   | { kind: 'sending'; action: string }
   | { kind: 'sent'; note: string }
-  | { kind: 'failed'; note: string };
+  | { kind: 'failed'; note: string }
+  /**
+   * The write left, and the reply did not come back. The draft stays, and
+   * the next press checks rather than sending the same words again.
+   */
+  | { kind: 'unknown'; action: string; note: string; operationId: string };
 
 /**
  * Where you write back. One box, one row of verbs, and a line under them that
@@ -57,6 +64,8 @@ export function Composer({
   quiet = false,
   initial = '',
   onCancel,
+  draftKey,
+  onCheck,
 }: {
   placeholder?: string;
   actions: ComposerAction[];
@@ -73,10 +82,44 @@ export function Composer({
   initial?: string;
   /** A `cancel` pill, for a box opened to edit something. */
   onCancel?: () => void;
+  /**
+   * Where an unsent comment lives across a remount. The account and the
+   * resource, so one person's draft is never the next person's.
+   */
+  draftKey?: { account: string | null; kind: string; id: string };
+  /**
+   * Look, don't send. Called when the reply was lost, so the screen can see
+   * whether the write landed before anyone offers to send it again.
+   */
+  onCheck?: (action: string, text: string, operationId: string) => Promise<string>;
 }) {
   const [text, setText] = useState(initial);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const busy = phase.kind === 'sending';
+  const restored = useRef(false);
+  // One id per armed send. A retry of an unknown outcome keeps it, so the
+  // write is not given a new identity and posted a second time.
+  const operationId = useRef<string | null>(null);
+  const operationCount = useRef(0);
+
+  useEffect(() => {
+    if (!draftKey || restored.current) return;
+    restored.current = true;
+    let live = true;
+    loadDraft(draftKey.account, draftKey.kind, draftKey.id).then((draft) => {
+      if (!live || !draft) return;
+      setText((current) => (current.trim().length > 0 ? current : draft.text));
+    });
+    return () => {
+      live = false;
+    };
+  }, [draftKey]);
+
+  const remember = (value: string) => {
+    setText(value);
+    if (draftKey && !demo) saveDraft(draftKey.account, draftKey.kind, draftKey.id, value);
+    if (phase.kind !== 'idle' && phase.kind !== 'sending') setPhase({ kind: 'idle' });
+  };
 
   const send = async (action: ComposerAction) => {
     if (busy || action.disabled) return;
@@ -85,6 +128,34 @@ export function Composer({
       setPhase({ kind: 'armed', action: action.key });
       return;
     }
+    if (phase.kind === 'unknown' && phase.action === action.key) {
+      // The first press already left. Checking is the only honest next step;
+      // sending again would be a second comment.
+      if (!onCheck) return;
+      setPhase({ kind: 'sending', action: action.key });
+      try {
+        const note = await onCheck(action.key, text.trim(), phase.operationId);
+        if (!bare) {
+          setText('');
+          if (draftKey) clearDraft(draftKey.account, draftKey.kind, draftKey.id);
+        }
+        setPhase(quiet ? { kind: 'idle' } : { kind: 'sent', note });
+      } catch (error) {
+        if (outcomeUnknown(error)) {
+          setPhase({
+            kind: 'unknown',
+            action: action.key,
+            note: explain(error, doing),
+            operationId: phase.operationId,
+          });
+          return;
+        }
+        setPhase({ kind: 'failed', note: explain(error, doing) });
+      }
+      return;
+    }
+    const id = operationId.current ?? `${action.key}:${(operationCount.current += 1)}`;
+    operationId.current = id;
     setPhase({ kind: 'sending', action: action.key });
     try {
       if (demo) {
@@ -92,9 +163,23 @@ export function Composer({
         return;
       }
       const note = await onSubmit(action.key, text.trim());
-      if (!bare) setText('');
+      operationId.current = null;
+      if (!bare) {
+        setText('');
+        if (draftKey) clearDraft(draftKey.account, draftKey.kind, draftKey.id);
+      }
       setPhase(quiet ? { kind: 'idle' } : { kind: 'sent', note });
     } catch (error) {
+      if (outcomeUnknown(error)) {
+        setPhase({
+          kind: 'unknown',
+          action: action.key,
+          note: explain(error, doing),
+          operationId: id,
+        });
+        return;
+      }
+      operationId.current = null;
       setPhase({ kind: 'failed', note: explain(error, doing) });
     }
   };
@@ -105,11 +190,8 @@ export function Composer({
       <TextInput
         editable={!busy}
         multiline
-        onChangeText={(value) => {
-          setText(value);
-          if (phase.kind !== 'idle' && phase.kind !== 'sending') setPhase({ kind: 'idle' });
-        }}
-        placeholder={placeholder}
+        onChangeText={remember}
+            placeholder={placeholder}
         placeholderTextColor={colors.ink40}
         style={[styles.input, compact && styles.inputCompact]}
         textAlignVertical="top"
@@ -149,11 +231,13 @@ export function Composer({
               ) : null}
               <Label style={filled ? styles.primaryLabel : styles.label}>
                 {busy && phase.action === action.key
-                  ? 'sending…'
-                  : armed
-                    ? (action.confirm ?? action.label)
-                    : action.label}
-              </Label>
+              ? 'sending…'
+              : phase.kind === 'unknown' && phase.action === action.key
+                ? 'check'
+                : armed
+                  ? (action.confirm ?? action.label)
+                  : action.label}
+            </Label>
             </Pressable>
           );
         })}
@@ -166,6 +250,7 @@ export function Composer({
       </View>
       {phase.kind === 'sent' && <Micro style={styles.sent}>{phase.note}</Micro>}
       {phase.kind === 'failed' && <Micro style={styles.failed}>{phase.note}</Micro>}
+      {phase.kind === 'unknown' && <Micro style={styles.failed}>{phase.note}</Micro>}
     </View>
   );
 }

@@ -1,3 +1,4 @@
+import { nextMorning as morningOf, stateOnDay } from './day';
 import type { SocialEvent } from './social';
 import { readSaved, writeSaved } from './store';
 
@@ -51,19 +52,10 @@ export function stateOf(
   marks: Marks,
   now: number = Date.now(),
 ): TriageState {
-  const mark = marks[event.id];
-  if (!mark) return 'open';
-  // Someone moved since you handled it: it is new again.
-  if (Date.parse(event.at) > Date.parse(mark.at)) return 'open';
-  if (mark.snoozeUntil != null && mark.snoozeUntil > now) return 'snoozed';
-  if (mark.done) return 'done';
-  return 'open';
+  return stateOnDay(event, marks[event.id], now);
 }
 
 /** Nine tomorrow morning — or this morning, if it is still before nine. */
 export function nextMorning(now: Date = new Date()): number {
-  const morning = new Date(now);
-  morning.setHours(9, 0, 0, 0);
-  if (morning.getTime() <= now.getTime()) morning.setDate(morning.getDate() + 1);
-  return morning.getTime();
+  return morningOf(now);
 }

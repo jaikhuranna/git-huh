@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
@@ -23,14 +24,20 @@ export function NowScreen({ model }: { model: GitHubModel }) {
   const inner = width - space.gutter * 2 - space.card * 2;
   const half = (width - space.gutter * 2 - 10) / 2 - space.card * 2;
 
-  const days = model.columns.flat();
-  const todayAt = days.findIndex((day) => day.isToday);
-  const upTo = todayAt >= 0 ? days.slice(0, todayAt + 1) : days;
-  const week = upTo.slice(-7);
-  const month = upTo.slice(-30);
-  const date = new Date()
-    .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-    .toLowerCase();
+  /**
+   * The week and month are slices of the same calendar, and each weekday
+   * initial used to construct a `Date` per day on every parent render. Both
+   * follow the columns; the heading date follows the clock, so it is kept
+   * apart and is not treated as chart geometry.
+   */
+  const { week, month } = useMemo(() => recentDays(model.columns), [model.columns]);
+  const date = useMemo(
+    () =>
+      new Date()
+        .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+        .toLowerCase(),
+    [],
+  );
 
   return (
     <Block>
@@ -46,7 +53,7 @@ export function NowScreen({ model }: { model: GitHubModel }) {
         <Card style={styles.half} title="last 7 days">
           <DotRow
             height={26}
-            labels={week.map((day) => WEEKDAY_INITIALS[new Date(`${day.date}T00:00:00`).getDay()])}
+            labels={week.map((day) => day.initial)}
             today={week.length - 1}
             values={week.map((day) => day.count)}
             width={half}
@@ -83,6 +90,27 @@ export function NowScreen({ model }: { model: GitHubModel }) {
 }
 
 const WEEKDAY_INITIALS = ['s', 'm', 't', 'w', 't', 'f', 's'] as const;
+
+type Day = GitHubModel['columns'][number][number];
+
+/**
+ * Days up to and including today, then the last seven and last thirty of
+ * those. The weekday initial is derived once here so the row does not parse
+ * a date string again while painting.
+ */
+function recentDays(columns: GitHubModel['columns']): {
+  week: (Day & { initial: string })[];
+  month: Day[];
+} {
+  const days = columns.flat();
+  const todayAt = days.findIndex((day) => day.isToday);
+  const upTo = todayAt >= 0 ? days.slice(0, todayAt + 1) : days;
+  const week = upTo.slice(-7).map((day) => ({
+    ...day,
+    initial: WEEKDAY_INITIALS[new Date(`${day.date}T00:00:00`).getDay()],
+  }));
+  return { week, month: upTo.slice(-30) };
+}
 
 /** 5 × 7 digits — only the digits, which is all the readout ever shows. */
 const GLYPHS: Record<string, string[]> = {

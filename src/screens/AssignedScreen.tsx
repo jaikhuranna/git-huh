@@ -10,7 +10,7 @@ import type { Remote } from '../hooks/useRemote';
 import { dueLine, type Task, type Tasks } from '../lib/assigned';
 import { useNav } from '../lib/nav';
 import { savedAge } from '../lib/store';
-import { useSession } from '../shell/session';
+import { useSessionActions, useSessionData } from '../shell/session';
 import { colors, fonts, radii, themed } from '../theme';
 import { ago, Chips, fmt, Page, ScreenHead, whyNot } from './shared';
 
@@ -68,7 +68,8 @@ export function AssignedTile({ state }: { state: Remote<Tasks> }) {
 /** Assignments in full, pushed from the inbox's tile. */
 export function AssignedPage() {
   const nav = useNav();
-  const { openUrl, tasks } = useSession();
+  const { openUrl } = useSessionActions();
+  const { tasks } = useSessionData();
   return (
     <OverlayFrame onBack={nav.close} where="inbox · assigned">
       <AssignedScreen onOpen={openUrl} state={tasks} />

@@ -5,6 +5,8 @@ import { fetchQueue, type Queue } from '../lib/queue';
 import { DEMO_TOKEN } from '../lib/token';
 import { useRemote, type Remote } from './useRemote';
 
+const QUEUE_STALE_AFTER_MS = 2 * 60_000;
+
 /** The review queue, fetched while the inbox is open and saved like everything else. */
 export function useQueue(
   token: string | null,
@@ -14,7 +16,11 @@ export function useQueue(
   const demo = useMemo(() => (token === DEMO_TOKEN ? demoQueue() : undefined), [token]);
   return useRemote(
     active && token && login ? `${token}|${login}` : null,
-    (signal) => fetchQueue(token ?? '', login ?? '', signal),
-    { cacheKey: login && token !== DEMO_TOKEN ? `${login.toLowerCase()}-queue` : null, demo },
+    (signal) => fetchQueue(token ?? '', login ?? '', signal, 'background'),
+    {
+      cacheKey: login && token !== DEMO_TOKEN ? `${login.toLowerCase()}-queue` : null,
+      demo,
+      staleAfterMs: QUEUE_STALE_AFTER_MS,
+    },
   );
 }

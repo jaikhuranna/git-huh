@@ -3,8 +3,10 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Markdown } from '../components/Markdown';
 import { PullHeader } from '../components/PullHeader';
 import { Label } from '../components/Type';
+import { useRemote } from '../hooks/useRemote';
 import type { Activity } from '../lib/activity';
 import { pullRoute, useNav } from '../lib/nav';
+import { fetchPullCore } from '../lib/pullDetail';
 import { space } from '../theme';
 import { Block, More, ScreenHead } from './shared';
 
@@ -19,6 +21,14 @@ export function BriefTile({ activity, loading }: { activity: Activity; loading: 
   const { width } = useWindowDimensions();
   const pulls = activity.pulls;
   const pr = pulls[0];
+  // List rows no longer carry the description. The card asks for the one
+  // body it is about to show, and the reader asks again when it pages.
+  const preview = useRemote(
+    nav.token && pr ? `${nav.token}|pull|${pr.repo}#${pr.number}|body` : null,
+    async (signal) => (await fetchPullCore(nav.token ?? '', pr.repo, pr.number, signal))?.pull.body ?? '',
+    { cacheKey: nav.login && pr ? `${nav.login.toLowerCase()}-pullbody-${pr.repo}-${pr.number}` : null },
+  );
+  const body = preview.status === 'ready' && preview.data ? preview.data : '';
 
   return (
     <Block>
@@ -37,7 +47,11 @@ export function BriefTile({ activity, loading }: { activity: Activity; loading: 
           >
             <PullHeader commentCount={pr.comments} pull={pr} />
             <View style={styles.excerpt}>
-              <Markdown limit={260} source={pr.body} width={width - space.gutter * 2 - 8} />
+              {preview.status === 'loading' && !body ? (
+              <Label style={styles.note}>reading the description…</Label>
+            ) : (
+              <Markdown href={pr.url} limit={260} source={body} width={width - space.gutter * 2 - 8} />
+            )}
             </View>
           </Pressable>
           {pulls.length > 1 && (

@@ -96,8 +96,10 @@ surface", so at night it is the light one.
 
 - **Read a colour at render, never at import.** `colors.x` is a getter on the
   palette in force; a module-level sheet is `themed(() => StyleSheet.create(…))`.
-- **The screens remount when the scheme changes.** The session sits above the
-  keyed tree, so the account, the year and any pushed page survive it.
+- **The tree re-renders in place when the scheme changes.** The scheme is a
+  context above the navigator (`app/_layout.tsx`), which stays mounted, so the
+  account, the year, a half-typed draft and any pushed page all survive the
+  switch.
 
 ## 4. Type
 

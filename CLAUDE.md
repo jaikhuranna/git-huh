@@ -175,24 +175,48 @@ compiled on a Mac.
   token, the login and whether this is the demo — do not thread those
   through props. `routeForUrl` turns a github.com link into a page; rendered
   Markdown uses it so links stay in the app.
-- **Every read is cache-first** through `src/hooks/useRemote.ts`: the saved
-  answer (`src/lib/store.ts`, JSON files in the documents directory — *not*
-  SecureStore, which caps at ~2 KB) is drawn first, the fresh one replaces
-  it, and offline the saved one stays with its age. New data sources should
-  use it rather than a hand-rolled hook. Disk is read once per data source;
-  refreshes reuse the in-memory answer while fetching its replacement. Cache keys start with the lowercase
-  login and a dash, so `accountStore.remove` can clear an account's answers.
+- **Every read is cache-first** through `src/hooks/useRemote.ts`, which owns
+  one share of each resource: the saved answer (`src/lib/store.ts`, JSON files
+  in the documents directory — *not* SecureStore, which caps at ~2 KB) is
+  drawn first, the fresh one replaces it, and offline the saved one stays with
+  its age. Two consumers asking for the same key share one in-flight request
+  and one current value, and unmounting one does not abort a request the other
+  still needs; a freed entry is held briefly, then let go. New data sources
+  should use it rather than a hand-rolled hook. Disk is read once per key, and
+  a refresh inside `staleAfterMs` serves the in-memory answer without touching
+  disk. A failure is classified (`network`, `forbidden`, `rate-limited`,
+  `missing`, `invalid-token`, `api`) so a screen can offer the right retry.
+  `invalidateResource` / `invalidateResourceWhere` / `refreshResource` let a
+  write drop exactly the keys it changed. Disk keys start with the lowercase
+  login and a dash, so `accountStore.remove` can clear an account's answers;
+  the store keeps itself inside a byte budget, evicting the least recently
+  used a non-draft, non-setting entry, and writes are queued per key and
+  skipped when unchanged. `httpCache`'s validators and `proposals`' half-made
+  writes default to memory and are given a disk-backed box in `index.js`, so
+  the pure modules and their tests never load `expo-file-system`.
 - **Every GitHub write** is in `src/lib/writes.ts` (comments, reviews, line
   comments, reactions, edits and deletes, issues, labels, assignees,
   milestones, lock, pin, merging and the rest of a pull request's state,
   threads, discussions, stars, watching, forks, branches, files, releases,
-  alerts, follows, gists, the edit → branch → pull request flow including the
-  fork fallback) and `src/lib/checks.ts` (re-run, cancel, approvals,
-  workflow dispatch), and every GitHub write in the UI goes through
+  alerts, follows, gists) and `src/lib/checks.ts` (re-run, cancel, approvals,
+  workflow dispatch). The edit → branch → pull request flow is its own
+  resumable operation in `src/lib/proposalWrites.ts`, re-exported by `writes.ts`
+  as `proposeChange`/`resumeProposal`: fork, branch, commit and pull are each
+  recorded before they are sent, a lost reply is read back before it is
+  repeated, and only a confirmed "reference already exists" retries a branch
+  name. `src/lib/encodePath.ts` and `src/lib/forkRepo.ts` are the single owners
+  of path encoding and the fork-then-wait. Every GitHub write in the UI goes through
   `src/components/Composer.tsx` — `bare` for a write that is only a verb,
   `confirm` on anything that cannot be undone (pressed twice), `on` for a
   toggle, `initial` + `onCancel` for an edit. On the demo token the composer
-  answers `nothing was sent` and never calls them. The pieces built on it:
+  answers `nothing was sent` and never calls them. A dropped write is told
+  apart from an unsent one: `unsent` means the request never left, `unknown`
+  means it may have landed, so the composer keeps the draft and offers a
+  check rather than a casual retry and never replays it. Reads and writes
+  settle within a deadline composed with the caller's signal, and a 403 that
+  is a rate limit is distinguished from a permission problem (with a shared
+  per-account cooldown so background retries do not storm). The pieces built
+  on it:
   `Reactions`, `CommentTools` (react, reply, edit, delete and a comment's own
   verbs), `Details` + `Picker` (an issue's or pull request's side column),
   `MergeBox`. **Check a new mutation against the live schema** before
@@ -224,6 +248,9 @@ compiled on a Mac.
   succeeded before checking access; normal reads still use binary protobuf.
   Calls time out after 20 s, because a public Funnel address can take
   several seconds to open a cold connection),
+  `src/lib/hostLifecycle.ts` (pure: connection identity, poll gating, the
+  failure backoff, and the one retained sample per resource — no sample ring
+  and no server delta without measured payload evidence),
   `src/lib/hostProto.ts` (proto messages → the types the screens
   draw, pure and tested), `proto/` (hostd's `.proto` files, copied from its
   repository; when they change, copy them again and run `npm run gen:host`,
@@ -239,16 +266,24 @@ compiled on a Mac.
   host with a light sweeping it, and the three steps to set it up). **Never
   put a real host's service names in this repository.**
 - `src/lib/triage.ts` + `src/hooks/useTriage.ts` — the inbox's own done /
-  snooze marks, per account, on the device.
+  snooze marks, per account, on the device. The local-day arithmetic it shares
+  with the midnight rollover (`src/hooks/useDayRollover.ts`) lives in the pure
+  `src/lib/day.ts`, tested across local midnight, daylight-saving and timezone
+  changes.
 - `src/lib/notify.ts` — the background inbox check (expo-background-task,
   ~15 min, Android decides) and its local notifications. See the entry-file
   trap below.
 - `src/lib/accounts.ts` — the list of accounts in the keystore; the current
   token is still `tokenStore`. **Accounts ticked `together`** on the account
   page are summed into the one in use: `src/hooks/useTogether.ts` loads each
-  one's year with its own token and `src/lib/merge.ts` adds them up. The
-  session's `model` (what every chart draws) is that sum; `contributions` is
-  still the account in use alone, and so are the inbox, the pull requests,
+  one's year with its own token — two at a time, the active account first,
+  reusing a just-saved per-account model — and `src/lib/merge.ts` adds them up.
+  The **sum is never saved**: it is derived, and a stored copy would keep
+  another account's year inside this one after it was removed. An account that
+  cannot be read keeps its saved year, and failing that drops out of the sum,
+  named in `missing` rather than taking the charts down.
+  The session's `model` (what every chart draws) is that sum; `contributions`
+  is still the account in use alone, and so are the inbox, the pull requests,
   `login`, `nav.token` and every write — only that token can act. Show a
   handle with `handleOf(model)`, never `~${model.login}`, or a summed year is
   labelled with one account's name.
@@ -343,21 +378,28 @@ compiled on a Mac.
 - `src/hooks/useTokenScopes.ts` — reads `x-oauth-scopes` off a REST call and
   drives the "no repo scope" strip in `src/shell/SectionScreen.tsx`. See the trap below.
 - **One PR detail path.** Every list, comment, notification and link uses
-  `pullRoute` → `PullScreen` → `usePullDetail` (`pull3` cache) → `fetchPullDetail`.
-  Brief's `read all` supplies a sequence of identities to that same screen;
-  `PullPager` replaces the current PR so back returns to the source. Never add
-  a second description reader. Comment/review links select `talk`.
+  `pullRoute` → `PullScreen` → `usePullDetail` → `fetchPullDetail`
+  (`pull4-` core cache). Brief's `read all` supplies a sequence of identities
+  to that same screen; `PullPager` replaces the current PR so back returns to
+  the source. Never add a second description reader. Comment/review links
+  select `talk`. A list or preview that needs the description of one request
+  asks `fetchPullBody` for that request alone — the activity sample never
+  downloads bodies.
 - `src/lib/pullRequest.ts` owns `PullRef`, `PullSummary`, the shared GraphQL
   fields/schema and mapper. Activity extends the summary as `PullActivity`;
   it is a sample for charts and previews, not a detail response. `PullHeader`
   renders both the preview and detail header.
-- `src/lib/pullDetail.ts` requires only the core PR. Conversation, management
-  details and REST patches are separate supplemental reads through
-  `optionalRead`. Failures are serializable `unavailable` entries shown by
-  `ReadNotice`, with a reason and retry; never silently draw an empty section
-  or invent permissions. Expired tokens and aborts still fail the entire load.
-  `rest.explain` preserves GitHub's denial reason instead of assuming missing
-  scopes. Every schema change requires a cache key bump.
+- `src/lib/pullDetail.ts` requires only the core PR — the header and
+  description — which draws the moment it returns. Conversation, management
+  details and REST patches are separate reads on their own cache keys and are
+  asked for when their tab is shown, so a brief visit pays for no diff.
+  Supplemental reads go through `optionalRead`: a failure is a serializable
+  `unavailable` entry shown by `ReadNotice`, with a reason and retry, and a
+  forbidden extra never hides a readable PR. Never silently draw an empty
+  section or invent permissions. Expired tokens and aborts still fail the
+  entire load. `rest.explain` preserves GitHub's denial reason instead of
+  assuming missing scopes. A patch and a long body are bounded and paged. Every
+  schema change requires a cache key bump.
 - `src/lib/` — GitHub GraphQL and REST (`github.ts`, `rest.ts`: every
   failure is a `GitHubError` with a `kind`, never a raw fetch or Zod error),
   the `GitHubModel` view model, seeded demo data. The pure modules have unit
@@ -368,8 +410,10 @@ compiled on a Mac.
   read at render**: `colors.x` is a getter on the palette in force, so a
   module-level `StyleSheet.create` must be wrapped as `themed(() =>
   StyleSheet.create({...}))`, and so must any module-level table of colours —
-  otherwise it keeps the palette it was imported under. The root layout
-  remounts the tree under the session when the system scheme changes.
+  otherwise it keeps the palette it was imported under. The scheme is provided
+  through a context (`src/theme/index.ts`, `app/_layout.tsx`) that re-renders
+  the tree in place, so switching to dark no longer remounts the navigator or
+  throws away a draft or a pushed page.
 - `android/app/src/main/java/app/githuh/widget/` — the Glance widget, plus
   the three bitmap renderers it is built from (`TextRenderer`,
   `GlyphRenderer`, `DotFieldRenderer`). It is a travelling commit message and

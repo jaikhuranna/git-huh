@@ -89,6 +89,28 @@ async function readSeen(login: string): Promise<string[]> {
   return saved.map((entry) => entry.split('@')[0]);
 }
 
+/**
+ * One writer at a time per account. A background check and the foreground
+ * screen both merge into the same set; if they interleave, the later write
+ * can drop an id the earlier one recorded.
+ */
+const seenLocks = new Map<string, Promise<void>>();
+
+async function withSeenLock(login: string, run: () => Promise<void>): Promise<void> {
+  const key = login.toLowerCase();
+  const previous = seenLocks.get(key) ?? Promise.resolve();
+  const next = previous.then(run, run);
+  seenLocks.set(
+    key,
+    next.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  await next;
+  if (seenLocks.get(key) === next) seenLocks.delete(key);
+}
+
 export async function readSettings(): Promise<NotifySettings> {
   return (await readSaved<NotifySettings>(SETTINGS_KEY))?.value ?? DEFAULT_SETTINGS;
 }
@@ -97,11 +119,20 @@ export async function writeSettings(settings: NotifySettings): Promise<void> {
   await writeSaved(SETTINGS_KEY, settings);
 }
 
-/** What the phone already knows about — so the background check stays quiet about it. */
+/**
+ * What the phone already knows about — so the background check stays quiet
+ * about it. A set that did not grow is not written: rewriting it races the
+ * next merge for nothing.
+ */
 export async function markSeen(login: string, events: SocialEvent[]): Promise<void> {
-  const seen = await readSeen(login);
-  const next = [...new Set([...events.map(stamp), ...seen])].slice(0, KEEP_SEEN);
-  await writeSaved(seenKey(login), next);
+  await withSeenLock(login, async () => {
+    const seen = await readSeen(login);
+    const known = new Set(seen);
+    const added = events.map(stamp).filter((id) => !known.has(id));
+    if (added.length === 0) return;
+    const next = [...new Set([...added, ...seen])].slice(0, KEEP_SEEN);
+    await writeSaved(seenKey(login), next);
+  });
 }
 
 function phrase(event: SocialEvent): string {
@@ -130,10 +161,12 @@ async function checkInbox(): Promise<number> {
   if (!token || token === DEMO_TOKEN) return 0;
 
   const accounts = await accountStore.list();
-  const login = accounts.find((account) => account.token === token)?.login ?? (await verifyToken(token));
+  const login =
+      accounts.find((account) => account.token === token)?.login ??
+      (await verifyToken(token, 'background'));
 
   const [events, marks, seenSaved] = await Promise.all([
-    fetchSocial(token, login),
+    fetchSocial(token, login, undefined, 'background'),
     loadMarks(login),
     readSeen(login),
   ]);

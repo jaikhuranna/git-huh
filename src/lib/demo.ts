@@ -345,6 +345,7 @@ export function demoGitHubModel(now: Date = new Date()): GitHubModel {
   const years = demoYears(map, startYear, now);
 
   const contributions: Contributions = {
+    id: 'demo',
     login: DEMO_LOGIN,
     name: DEMO_NAME,
     avatarUrl: DEMO_AVATAR,
@@ -362,18 +363,35 @@ export function demoGitHubModel(now: Date = new Date()): GitHubModel {
   };
 
   const todayCount = map.get(toISODate(now)) ?? 0;
+  const at = now.getTime();
   const stats: ContributionStats = {
-    todayCommits: todayCount > 0 ? Math.max(1, Math.round(todayCount * 0.7)) : 0,
-    totalCommits: years.reduce((sum, year) => sum + year.totalCommits, 0),
-    totalPrivate: years.reduce((sum, year) => sum + year.restricted, 0),
-    openPrs: demoPullRequests.length,
-    followers: 214,
-    following: 97,
-    stars: repos.reduce((sum, repo) => sum + repo.stargazerCount, 0),
-    // More repos exist than the demo details, same as a real account.
-    repoCount: repos.length + 26,
-    repos,
-    years,
+    today: {
+      status: 'ready',
+      at,
+      value: {
+        todayCommits: todayCount > 0 ? Math.max(1, Math.round(todayCount * 0.7)) : 0,
+        openPrs: demoPullRequests.length,
+      },
+    },
+    work: {
+      status: 'ready',
+      at,
+      value: { followers: 214, following: 97, repoCount: repos.length + 26 },
+    },
+    repos: {
+      status: 'ready',
+      at,
+      value: { stars: repos.reduce((sum, repo) => sum + repo.stargazerCount, 0), repos },
+    },
+    archive: {
+      status: 'ready',
+      at,
+      value: {
+        totalCommits: years.reduce((sum, year) => sum + year.totalCommits, 0),
+        totalPrivate: years.reduce((sum, year) => sum + year.restricted, 0),
+        years,
+      },
+    },
   };
 
   return toGitHubModel(contributions, stats, now);
@@ -442,7 +460,7 @@ export function demoActivity(): Activity {
   });
 
   void now;
-  return { commits, pulls };
+  return { commits, pulls, availability: 'ready', at: now };
 }
 
 const DEMO_REPOS = ['git-huh', 'paper-tokens', 'dot-tiles', 'orbit-widget', 'flux-cli', 'pixel-rain'];
